@@ -18,6 +18,7 @@ import NewOrder from "./admin/NewOrder";
 import OrderDetail from "./admin/OrderDetail";
 import Products from "./admin/Products";
 import Queue from "./admin/Queue";
+import Assignments from "./admin/Assignments";
 import Customers from "./admin/Customers";
 import CustomerDetail from "./admin/CustomerDetail";
 import QuickSale from "./admin/QuickSale";
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="admin/orders/:orderNumber" element={<OrderDetail />} />
             <Route path="admin/products" element={<Products />} />
             <Route path="admin/queue" element={<Queue />} />
+            <Route path="admin/assignments" element={<Assignments />} />
             <Route path="admin/customers" element={<Customers />} />
             <Route path="admin/customers/:customerId" element={<CustomerDetail />} />
             <Route path="admin/staff-users" element={<StaffUsers />} />
