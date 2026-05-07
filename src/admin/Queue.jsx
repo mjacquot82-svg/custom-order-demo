@@ -3,20 +3,56 @@ import { getStoredOrders } from "../lib/ordersStore";
 import { buildWorkerQueueSections } from "../queue/buildWorkerQueueSections";
 import { buildUnassignedQueueSection } from "../queue/buildUnassignedQueueSection";
 import { buildQueueWorkerSummary } from "../queue/buildQueueWorkerSummary";
+import { buildQueuePriority, sortQueueByPriority } from "../queue/buildQueuePriority";
 
 function normalizeOrder(order) {
   return {
     ...order,
     customer_name: order.customer_name || "Walk-in Customer",
     garment: order.garment || order.item || "Custom garment",
-    assigned_to_staff_name:
-      order.assigned_to_staff_name || "Unassigned",
-    decoration_type:
-      order.decoration_type || "Screen Printing",
+    assigned_to_staff_name: order.assigned_to_staff_name || "Unassigned",
+    decoration_type: order.decoration_type || "Screen Printing",
   };
 }
 
+function PriorityBadge({ priority }) {
+  if (!priority || priority.priorityLabel === "Normal") return null;
+
+  const background = priority.overdue
+    ? "#fef2f2"
+    : priority.dueSoon
+    ? "#fffbeb"
+    : priority.unassigned
+    ? "#fff7ed"
+    : "#f1f5f9";
+
+  const color = priority.overdue
+    ? "#b91c1c"
+    : priority.dueSoon
+    ? "#b45309"
+    : priority.unassigned
+    ? "#c2410c"
+    : "#475569";
+
+  return (
+    <span
+      style={{
+        background,
+        color,
+        borderRadius: "999px",
+        padding: "5px 9px",
+        fontSize: "12px",
+        fontWeight: 900,
+      }}
+    >
+      {priority.priorityLabel}
+    </span>
+  );
+}
+
 function OrderCard({ order }) {
+  const priority = buildQueuePriority(order);
+
   return (
     <Link
       to={`/admin/orders/${order.order_number}`}
@@ -25,148 +61,81 @@ function OrderCard({ order }) {
         gap: "7px",
         textDecoration: "none",
         color: "#0f172a",
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
+        background: priority.overdue ? "#fef2f2" : priority.dueSoon ? "#fffbeb" : "#f8fafc",
+        border: priority.overdue ? "1px solid #fecaca" : priority.dueSoon ? "1px solid #fde68a" : "1px solid #e2e8f0",
         borderRadius: "14px",
         padding: "12px",
       }}
     >
-      <strong>{order.order_number}</strong>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "center" }}>
+        <strong>{order.order_number}</strong>
+        <PriorityBadge priority={priority} />
+      </div>
       <span>{order.customer_name}</span>
       <span>{order.garment}</span>
       <span>{order.decoration_type}</span>
-      <span>
-        Assigned: {order.assigned_to_staff_name || "Unassigned"}
-      </span>
+      <span>Due: {order.due_date || "—"}</span>
+      <span>Assigned: {order.assigned_to_staff_name || "Unassigned"}</span>
     </Link>
   );
 }
 
 export default function Queue() {
-  const orders = getStoredOrders().map(normalizeOrder);
-
-  const workerSections = buildWorkerQueueSections(orders);
+  const orders = sortQueueByPriority(getStoredOrders().map(normalizeOrder));
+  const workerSections = buildWorkerQueueSections(orders).map((section) => ({
+    ...section,
+    orders: sortQueueByPriority(section.orders),
+  }));
   const unassignedSection = buildUnassignedQueueSection(orders);
   const workerSummary = buildQueueWorkerSummary(workerSections);
 
+  const overdueCount = orders.filter((order) => buildQueuePriority(order).overdue).length;
+  const dueSoonCount = orders.filter((order) => buildQueuePriority(order).dueSoon).length;
+  const pausedCount = orders.filter((order) => buildQueuePriority(order).paused).length;
+
   return (
     <div style={{ maxWidth: "1360px", margin: "0 auto", padding: "24px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "24px",
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", gap: "12px", flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0 }}>Production Queue</h1>
-          <p style={{ margin: "6px 0 0", color: "#64748b" }}>
-            Worker assignments and production visibility.
-          </p>
+          <p style={{ margin: "6px 0 0", color: "#64748b" }}>Priority-sorted production queue with overdue, due-soon, paused, and assignment warnings.</p>
         </div>
-
-        <Link
-          to="/admin/assignments"
-          style={{
-            background: "#171717",
-            color: "#ffffff",
-            textDecoration: "none",
-            borderRadius: "12px",
-            padding: "12px 16px",
-            fontWeight: 700,
-          }}
-        >
-          Open Assignments
-        </Link>
+        <Link to="/admin/assignments" style={{ background: "#171717", color: "#ffffff", textDecoration: "none", borderRadius: "12px", padding: "12px 16px", fontWeight: 700 }}>Open Assignments</Link>
       </div>
 
-      <section
-        style={{
-          background: "#ffffff",
-          borderRadius: "18px",
-          padding: "16px",
-          marginBottom: "18px",
-          border: "1px solid #e2e8f0",
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>Worker Summary</h2>
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "18px" }}>
+        <div style={{ background: "#fef2f2", borderRadius: "16px", padding: "14px", border: "1px solid #fecaca" }}><strong style={{ color: "#b91c1c" }}>Overdue</strong><h2>{overdueCount}</h2></div>
+        <div style={{ background: "#fffbeb", borderRadius: "16px", padding: "14px", border: "1px solid #fde68a" }}><strong style={{ color: "#b45309" }}>Due Soon</strong><h2>{dueSoonCount}</h2></div>
+        <div style={{ background: "#f8fafc", borderRadius: "16px", padding: "14px", border: "1px solid #e2e8f0" }}><strong style={{ color: "#475569" }}>Paused / Hold</strong><h2>{pausedCount}</h2></div>
+      </section>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "12px",
-          }}
-        >
+      <section style={{ background: "#ffffff", borderRadius: "18px", padding: "16px", marginBottom: "18px", border: "1px solid #e2e8f0" }}>
+        <h2 style={{ marginTop: 0 }}>Worker Summary</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
           {workerSummary.map((worker) => (
-            <div
-              key={worker.workerName}
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "14px",
-                padding: "14px",
-              }}
-            >
+            <div key={worker.workerName} style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
               <strong>{worker.workerName}</strong>
-              <p style={{ margin: "6px 0 0" }}>
-                {worker.totalOrders} assigned orders
-              </p>
+              <p style={{ margin: "6px 0 0" }}>{worker.totalOrders} assigned orders</p>
             </div>
           ))}
         </div>
       </section>
 
       {unassignedSection.hasItems && (
-        <section
-          style={{
-            background: "#fffbeb",
-            border: "1px solid #fde68a",
-            borderRadius: "18px",
-            padding: "16px",
-            marginBottom: "18px",
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>
-            Needs Assignment ({unassignedSection.count})
-          </h2>
-
-          <div style={{ display: "grid", gap: "10px" }}>
-            {unassignedSection.orders.map((order) => (
-              <OrderCard key={order.order_number} order={order} />
-            ))}
-          </div>
+        <section style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "18px", padding: "16px", marginBottom: "18px" }}>
+          <h2 style={{ marginTop: 0 }}>Needs Assignment ({unassignedSection.count})</h2>
+          <div style={{ display: "grid", gap: "10px" }}>{unassignedSection.orders.map((order) => <OrderCard key={order.order_number} order={order} />)}</div>
         </section>
       )}
 
       <div style={{ display: "grid", gap: "18px" }}>
         {workerSections.map((section) => (
-          <section
-            key={section.workerName}
-            style={{
-              background: "#ffffff",
-              borderRadius: "18px",
-              padding: "16px",
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "12px",
-              }}
-            >
+          <section key={section.workerName} style={{ background: "#ffffff", borderRadius: "18px", padding: "16px", border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
               <h2 style={{ margin: 0 }}>{section.workerName}</h2>
               <span>{section.orderCount} orders</span>
             </div>
-
-            <div style={{ display: "grid", gap: "10px" }}>
-              {section.orders.map((order) => (
-                <OrderCard key={order.order_number} order={order} />
-              ))}
-            </div>
+            <div style={{ display: "grid", gap: "10px" }}>{section.orders.map((order) => <OrderCard key={order.order_number} order={order} />)}</div>
           </section>
         ))}
       </div>
