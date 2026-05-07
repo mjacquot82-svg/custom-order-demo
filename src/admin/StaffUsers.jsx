@@ -305,3 +305,122 @@ export default function StaffUsers() {
     </div>
   );
 }
+
+import { useEffect, useState } from "react";
+
+export default function StaffUsers() {
+  const [staff, setStaff] = useState([]);
+
+  useEffect(() => {
+    // Load staff from localStorage or API
+    const storedStaff = JSON.parse(localStorage.getItem('staffUsers') || '[]');
+    setStaff(storedStaff);
+  }, []);
+
+  const handleAddStaff = () => {
+    const name = prompt('Enter staff name:');
+    const pin = prompt('Enter PIN:');
+    if (name && pin) {
+      const newStaff = [...staff, { id: Date.now(), name, pin }];
+      setStaff(newStaff);
+      localStorage.setItem('staffUsers', JSON.stringify(newStaff));
+    }
+  };
+
+  const handleRemoveStaff = (id) => {
+    const updatedStaff = staff.filter(s => s.id !== id);
+    setStaff(updatedStaff);
+    localStorage.setItem('staffUsers', JSON.stringify(updatedStaff));
+  };
+
+  return (
+    <div
+      style={{
+        maxWidth: "1100px",
+        margin: "0 auto",
+        padding: "24px",
+        fontFamily:
+          'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}
+    >
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: "20px",
+          padding: "24px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+          }}
+        >
+          <div>
+            <h1 style={{ margin: 0 }}>Staff Users</h1>
+            <p style={{ marginTop: "8px", color: "#475569" }}>
+              Manage staff accounts and PIN codes for shop access.
+            </p>
+          </div>
+
+          <button
+            onClick={handleAddStaff}
+            style={{
+              background: "#171717",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "12px",
+              padding: "12px 16px",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Add Staff User
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: "14px" }}>
+          {staff.map((user) => (
+            <article
+              key={user.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                gap: "14px",
+                alignItems: "center",
+                border: "1px solid #e2e8f0",
+                borderRadius: "18px",
+                padding: "14px",
+                background: "#ffffff",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: "0 0 4px", fontSize: "18px" }}>{user.name}</h3>
+                <p style={{ margin: 0, color: "#64748b" }}>PIN: {user.pin}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleRemoveStaff(user.id)}
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #fecaca",
+                  color: "#991b1b",
+                  borderRadius: "10px",
+                  padding: "8px 10px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Remove
+              </button>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

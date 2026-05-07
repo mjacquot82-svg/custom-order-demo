@@ -148,7 +148,34 @@ function PublicHeader() {
 export default function Layout() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
+<<<<<<< HEAD
   const activeStaffUser = isAdmin ? getActiveStaffUser() : null;
+=======
+  const isHome = location.pathname === "/";
+
+  // TODO: Replace with actual auth system
+  const userRole = "Owner"; // Assume Owner for now
+
+  const customerLinks = [
+    { to: "/", label: "Home" },
+    { to: "/my-orders", label: "My Orders" },
+    { to: "/login", label: "Login" },
+  ];
+
+  const adminLinks = [
+    { to: "/admin", label: "Dashboard" },
+    { to: "/admin/orders", label: "Orders" },
+    { to: "/admin/orders/new", label: "New Production Order" },
+    { to: "/admin/sales/new", label: "Quick Sale" },
+    { to: "/admin/queue", label: "Production Queue" },
+    { to: "/admin/products", label: "Products" },
+    ...(userRole === "Owner" ? [{ to: "/admin/staff", label: "Manage Staff" }] : []),
+    { to: "/admin/customers", label: "Customers" },
+    { to: "/", label: "Public Site" },
+  ];
+
+  const links = isAdmin ? adminLinks : customerLinks;
+>>>>>>> 68f0e20 (Add Manage Staff sidebar nav and expose /admin/staff route)
 
   return (
     <div>
