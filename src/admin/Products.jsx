@@ -1,50 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   createStoredProduct,
   deleteStoredProduct,
   getStoredProducts,
 } from "../lib/productsStore";
-
-const baseProductTypeOptions = [
-  "Pullover Hoodie",
-  "Zip Hoodie",
-  "Crewneck",
-  "T-Shirt",
-  "Long Sleeve Tee",
-  "Polo",
-  "Snapback",
-  "Beanie",
-  "Safety Vest",
-  "Softshell Jacket",
-  "Add New Type…",
-];
-
-const brandModelOptions = [
-  "Gildan 5000",
-  "Gildan 64000",
-  "Gildan 18500",
-  "Gildan 18000",
-  "ATC Everyday Tee",
-  "ATC Pro Team Hoodie",
-  "Bella + Canvas 3001",
-  "Independent Trading Co. SS4500",
-  "Richardson 112",
-  "Flexfit 6277",
-  "Yupoong 6606",
-  "Carhartt Workwear",
-  "Other / Custom",
-];
-
-const supplierOptions = [
-  "S&S Activewear",
-  "SanMar",
-  "AlphaBroder",
-  "Canada Sportswear",
-  "Independent Trading Co.",
-  "AJM International",
-  "Local Supplier",
-  "Other / Custom",
-];
+import { calculateBaseSellPrice } from "../products/productPricingIntegration";
 
 const fieldStyle = {
   border: "1px solid #cbd5e1",
@@ -55,28 +15,13 @@ const fieldStyle = {
   boxSizing: "border-box",
 };
 
-const labelStyle = {
-  display: "grid",
-  gap: "8px",
-  fontWeight: 600,
-  color: "#292524",
-};
-
 const emptyProduct = {
   name: "",
-  category: "Hoodie / Sweater",
-  product_type: "Pullover Hoodie",
-  custom_product_type: "",
-  brand_model: "Gildan 18500",
-  custom_brand_model: "",
-  supplier: "S&S Activewear",
-  custom_supplier: "",
+  category: "T-Shirt",
   image: "",
-  colors: "Black, Navy, Gray, White",
-  sizes: "S, M, L, XL, 2XL, 3XL",
-  placements: "Left Chest, Front Center, Back Center, Sleeve",
-  decoration_types: "Embroidery, Screen Print, DTF Transfer",
-  notes: "",
+  cost_price: "0",
+  markup_percentage: "0",
+  decoration_type: "Screen Printing",
   status: "Active",
 };
 
@@ -89,75 +34,13 @@ function fileToDataUrl(file) {
   });
 }
 
-function uniqueSorted(values) {
-  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
-}
-
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(emptyProduct);
 
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [typeFilter, setTypeFilter] = useState("All");
-  const [brandFilter, setBrandFilter] = useState("All");
-  const [supplierFilter, setSupplierFilter] = useState("All");
-  const [searchFilter, setSearchFilter] = useState("");
-
   useEffect(() => {
     setProducts(getStoredProducts());
   }, []);
-
-  const categories = useMemo(() => ["All", ...uniqueSorted(products.map((p) => p.category))], [products]);
-
-  const productTypeOptions = useMemo(() => {
-    const existingTypes = uniqueSorted(products.map((p) => p.product_type));
-    const options = uniqueSorted([...baseProductTypeOptions.filter((type) => type !== "Add New Type…"), ...existingTypes]);
-    return [...options, "Add New Type…"];
-  }, [products]);
-
-  const productTypes = useMemo(() => {
-    const filtered = categoryFilter === "All" ? products : products.filter((p) => p.category === categoryFilter);
-    return ["All", ...uniqueSorted(filtered.map((p) => p.product_type))];
-  }, [products, categoryFilter]);
-
-  const brands = useMemo(() => {
-    const filtered = products.filter((product) => {
-      const matchesCategory = categoryFilter === "All" || product.category === categoryFilter;
-      const matchesType = typeFilter === "All" || product.product_type === typeFilter;
-      return matchesCategory && matchesType;
-    });
-
-    return ["All", ...uniqueSorted(filtered.map((p) => p.brand_model))];
-  }, [products, categoryFilter, typeFilter]);
-
-  const suppliers = useMemo(() => {
-    const filtered = products.filter((product) => {
-      const matchesCategory = categoryFilter === "All" || product.category === categoryFilter;
-      const matchesType = typeFilter === "All" || product.product_type === typeFilter;
-      const matchesBrand = brandFilter === "All" || product.brand_model === brandFilter;
-      return matchesCategory && matchesType && matchesBrand;
-    });
-
-    return ["All", ...uniqueSorted(filtered.map((p) => p.supplier))];
-  }, [products, categoryFilter, typeFilter, brandFilter]);
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesCategory = categoryFilter === "All" || product.category === categoryFilter;
-      const matchesType = typeFilter === "All" || product.product_type === typeFilter;
-      const matchesBrand = brandFilter === "All" || product.brand_model === brandFilter;
-      const matchesSupplier = supplierFilter === "All" || product.supplier === supplierFilter;
-
-      const matchesSearch =
-        !searchFilter ||
-        product.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        product.product_type?.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        product.brand_model?.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        product.supplier?.toLowerCase().includes(searchFilter.toLowerCase());
-
-      return matchesCategory && matchesType && matchesBrand && matchesSupplier && matchesSearch;
-    });
-  }, [products, categoryFilter, typeFilter, brandFilter, supplierFilter, searchFilter]);
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -174,29 +57,16 @@ export default function Products() {
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (!form.name.trim()) return;
 
-    const productInput = {
+    const product = {
       ...form,
-      product_type:
-        form.product_type === "Add New Type…"
-          ? form.custom_product_type.trim()
-          : form.product_type,
-      brand_model:
-        form.brand_model === "Other / Custom"
-          ? form.custom_brand_model.trim()
-          : form.brand_model,
-      supplier:
-        form.supplier === "Other / Custom"
-          ? form.custom_supplier.trim()
-          : form.supplier,
+      calculated_base_price: calculateBaseSellPrice(
+        form.cost_price,
+        form.markup_percentage
+      ),
     };
 
-    if (!productInput.product_type) return;
-    if (!productInput.brand_model) return;
-    if (!productInput.supplier) return;
-
-    createStoredProduct(productInput);
+    createStoredProduct(product);
     setProducts(getStoredProducts());
     setForm(emptyProduct);
   }
@@ -207,136 +77,81 @@ export default function Products() {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: "1180px",
-        margin: "0 auto",
-        padding: "24px",
-        fontFamily:
-          'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(320px, 420px) 1fr",
-          gap: "22px",
-          alignItems: "start",
-        }}
-      >
+    <div style={{ maxWidth: "1180px", margin: "0 auto", padding: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "400px 1fr", gap: "22px" }}>
         <form
           onSubmit={handleSubmit}
           style={{
             background: "#ffffff",
             borderRadius: "20px",
             padding: "22px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
           }}
         >
-          <p
-            style={{
-              margin: 0,
-              color: "#78716c",
-              fontSize: "12px",
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            Product Catalog
-          </p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "28px" }}>Add Garment</h1>
+          <h1>Add Product</h1>
 
           <div style={{ display: "grid", gap: "14px" }}>
-            <label style={labelStyle}>
-              Garment Name
-              <input
-                name="name"
-                value={form.name}
-                onChange={updateField}
-                required
-                placeholder="Heavy Blend Hoodie"
-                style={fieldStyle}
+            <input
+              name="name"
+              value={form.name}
+              onChange={updateField}
+              placeholder="Product Name"
+              style={fieldStyle}
+            />
+
+            <select
+              name="decoration_type"
+              value={form.decoration_type}
+              onChange={updateField}
+              style={fieldStyle}
+            >
+              <option>Screen Printing</option>
+              <option>DTF</option>
+            </select>
+
+            <input
+              name="cost_price"
+              value={form.cost_price}
+              onChange={updateField}
+              placeholder="Cost"
+              style={fieldStyle}
+            />
+
+            <input
+              name="markup_percentage"
+              value={form.markup_percentage}
+              onChange={updateField}
+              placeholder="Markup %"
+              style={fieldStyle}
+            />
+
+            <div
+              style={{
+                padding: "14px",
+                borderRadius: "14px",
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                fontWeight: 700,
+              }}
+            >
+              Base Sell Price: $
+              {calculateBaseSellPrice(
+                form.cost_price,
+                form.markup_percentage
+              ).toFixed(2)}
+            </div>
+
+            <input type="file" accept="image/*" onChange={updateImage} />
+
+            {form.image && (
+              <img
+                src={form.image}
+                alt="Preview"
+                style={{
+                  width: "100%",
+                  borderRadius: "14px",
+                  border: "1px solid #e2e8f0",
+                }}
               />
-            </label>
-
-            <label style={labelStyle}>
-              Category
-              <select name="category" value={form.category} onChange={updateField} style={fieldStyle}>
-                <option>Hoodie / Sweater</option>
-                <option>T-Shirt</option>
-                <option>Hat</option>
-                <option>Jacket</option>
-                <option>Workwear</option>
-                <option>Tool / Hard Good</option>
-                <option>Other</option>
-              </select>
-            </label>
-
-            <label style={labelStyle}>
-              Product Type
-              <select name="product_type" value={form.product_type} onChange={updateField} style={fieldStyle}>
-                {productTypeOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-
-            {form.product_type === "Add New Type…" && (
-              <label style={labelStyle}>
-                New Product Type
-                <input
-                  name="custom_product_type"
-                  value={form.custom_product_type}
-                  onChange={updateField}
-                  placeholder="Enter new product type"
-                  style={fieldStyle}
-                />
-              </label>
-            )}
-
-            <label style={labelStyle}>
-              Brand / Model
-              <select name="brand_model" value={form.brand_model} onChange={updateField} style={fieldStyle}>
-                {brandModelOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-
-            {form.brand_model === "Other / Custom" && (
-              <label style={labelStyle}>
-                Custom Brand / Model
-                <input
-                  name="custom_brand_model"
-                  value={form.custom_brand_model}
-                  onChange={updateField}
-                  placeholder="Enter custom brand/model"
-                  style={fieldStyle}
-                />
-              </label>
-            )}
-
-            <label style={labelStyle}>
-              Supplier
-              <select name="supplier" value={form.supplier} onChange={updateField} style={fieldStyle}>
-                {supplierOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-
-            {form.supplier === "Other / Custom" && (
-              <label style={labelStyle}>
-                Custom Supplier
-                <input
-                  name="custom_supplier"
-                  value={form.custom_supplier}
-                  onChange={updateField}
-                  placeholder="Enter custom supplier"
-                  style={fieldStyle}
-                />
-              </label>
             )}
 
             <button
@@ -347,7 +162,6 @@ export default function Products() {
                 border: "none",
                 borderRadius: "12px",
                 padding: "13px 18px",
-                cursor: "pointer",
                 fontWeight: 700,
               }}
             >
@@ -356,177 +170,59 @@ export default function Products() {
           </div>
         </form>
 
-        <section
-          style={{
-            background: "#ffffff",
-            borderRadius: "20px",
-            padding: "22px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "12px",
-              flexWrap: "wrap",
-              alignItems: "center",
-              marginBottom: "12px",
-            }}
-          >
-            <div>
-              <h1 style={{ margin: 0, fontSize: "28px" }}>Products</h1>
-              <p style={{ margin: "6px 0 0", color: "#64748b" }}>
-                Filter by category, type, brand, supplier, or search.
-              </p>
-            </div>
-            <strong>{filteredProducts.length} shown</strong>
-          </div>
-
-          <div style={{ display: "flex", gap: "10px", marginBottom: "18px", flexWrap: "wrap" }}>
-            <select
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setTypeFilter("All");
-                setBrandFilter("All");
-                setSupplierFilter("All");
+        <section style={{ display: "grid", gap: "14px" }}>
+          {products.map((product) => (
+            <article
+              key={product.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "120px 1fr auto",
+                gap: "14px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "18px",
+                padding: "14px",
               }}
-              style={{ ...fieldStyle, maxWidth: "220px" }}
             >
-              {categories.map((category) => (
-                <option key={category}>{category}</option>
-              ))}
-            </select>
+              <div>
+                {product.image ? (
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    style={{
+                      width: "120px",
+                      height: "120px",
+                      objectFit: "cover",
+                      borderRadius: "12px",
+                    }}
+                  />
+                ) : (
+                  "No Image"
+                )}
+              </div>
 
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
-                setBrandFilter("All");
-                setSupplierFilter("All");
-              }}
-              style={{ ...fieldStyle, maxWidth: "220px" }}
-            >
-              {productTypes.map((type) => (
-                <option key={type}>{type}</option>
-              ))}
-            </select>
+              <div>
+                <h2>{product.name}</h2>
+                <p>{product.decoration_type}</p>
+                <p>
+                  Cost: ${Number(product.cost_price || 0).toFixed(2)}
+                </p>
+                <p>
+                  Markup: {Number(product.markup_percentage || 0).toFixed(0)}%
+                </p>
+                <strong>
+                  Base Sell Price: $
+                  {Number(product.calculated_base_price || 0).toFixed(2)}
+                </strong>
+              </div>
 
-            <select
-              value={brandFilter}
-              onChange={(e) => {
-                setBrandFilter(e.target.value);
-                setSupplierFilter("All");
-              }}
-              style={{ ...fieldStyle, maxWidth: "220px" }}
-            >
-              {brands.map((brand) => (
-                <option key={brand}>{brand}</option>
-              ))}
-            </select>
-
-            <select
-              value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-              style={{ ...fieldStyle, maxWidth: "220px" }}
-            >
-              {suppliers.map((supplier) => (
-                <option key={supplier}>{supplier}</option>
-              ))}
-            </select>
-
-            <input
-              placeholder="Search product name, type, brand, supplier…"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              style={{ ...fieldStyle, maxWidth: "280px" }}
-            />
-          </div>
-
-          <div style={{ display: "grid", gap: "14px" }}>
-            {filteredProducts.map((product) => (
-              <article
-                key={product.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "120px 1fr auto",
-                  gap: "14px",
-                  alignItems: "start",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "18px",
-                  padding: "14px",
-                  background: product.status === "Inactive" ? "#f5f5f4" : "#ffffff",
-                }}
+              <button
+                type="button"
+                onClick={() => handleDelete(product.id)}
               >
-                <div
-                  style={{
-                    height: "110px",
-                    borderRadius: "14px",
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                    color: "#94a3b8",
-                    fontSize: "13px",
-                    textAlign: "center",
-                    padding: "8px",
-                  }}
-                >
-                  {product.image ? (
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                    />
-                  ) : (
-                    "No image yet"
-                  )}
-                </div>
-
-                <div>
-                  <h2 style={{ margin: "0 0 4px", fontSize: "20px" }}>{product.name}</h2>
-                  <p style={{ margin: "0 0 10px", color: "#64748b" }}>
-                    {product.category} • {product.product_type}
-                    {product.brand_model ? ` • ${product.brand_model}` : ""}
-                    {product.supplier ? ` • ${product.supplier}` : ""}
-                  </p>
-                </div>
-
-                <div style={{ display: "grid", gap: "8px", justifyItems: "end" }}>
-                  <span
-                    style={{
-                      borderRadius: "999px",
-                      padding: "6px 10px",
-                      background: product.status === "Active" ? "#dcfce7" : "#e7e5e4",
-                      color: product.status === "Active" ? "#166534" : "#57534e",
-                      fontWeight: 700,
-                      fontSize: "12px",
-                    }}
-                  >
-                    {product.status}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(product.id)}
-                    style={{
-                      background: "#ffffff",
-                      border: "1px solid #fecaca",
-                      color: "#991b1b",
-                      borderRadius: "10px",
-                      padding: "8px 10px",
-                      cursor: "pointer",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                Remove
+              </button>
+            </article>
+          ))}
         </section>
       </div>
     </div>
