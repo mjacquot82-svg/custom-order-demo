@@ -76,12 +76,15 @@ function AdminSidebar({ pathname, staffUser }) {
   const adminSections = getAdminSections(role);
 
   return (
-    <aside style={{ width: "250px", minHeight: "100vh", background: "#ffffff", borderRight: "1px solid #e2e8f0", padding: "18px 14px", boxSizing: "border-box", position: "sticky", top: 0, alignSelf: "flex-start" }}>
-      <Link to="/admin" style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none", color: "#171717", marginBottom: "24px" }}>
-        <img src={logo} alt="Tee & Co" style={{ width: "54px", height: "54px", objectFit: "contain", borderRadius: "12px" }} />
-        <div>
-          <strong style={{ display: "block", fontSize: "19px" }}>Tee & Co</strong>
-          <span style={{ color: "#64748b", fontSize: "12px" }}>Central Operations</span>
+    <aside style={{ width: "250px", minWidth: "250px", maxWidth: "250px", flexShrink: 0, overflow: "hidden", minHeight: "100vh", background: "#ffffff", borderRight: "1px solid #e2e8f0", padding: "18px 14px", boxSizing: "border-box", position: "sticky", top: 0, alignSelf: "flex-start" }}>
+      <Link to="/admin" style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none", color: "#171717", marginBottom: "24px", minHeight: "56px" }}>
+        <div style={{ width: "54px", height: "54px", minWidth: "54px", minHeight: "54px", maxWidth: "54px", maxHeight: "54px", overflow: "hidden", borderRadius: "12px", flexShrink: 0 }}>
+          <img src={logo} alt="Tee & Co" width="54" height="54" style={{ width: "54px", height: "54px", minWidth: "54px", minHeight: "54px", maxWidth: "54px", maxHeight: "54px", objectFit: "contain", display: "block" }} />
+        </div>
+
+        <div style={{ overflow: "hidden" }}>
+          <strong style={{ display: "block", fontSize: "19px", lineHeight: 1.1 }}>Tee & Co</strong>
+          <span style={{ color: "#64748b", fontSize: "12px", whiteSpace: "nowrap" }}>Central Operations</span>
         </div>
       </Link>
 
@@ -99,18 +102,7 @@ function AdminSidebar({ pathname, staffUser }) {
                 <Link
                   key={link.to}
                   to={link.to}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "11px 12px",
-                    borderRadius: "12px",
-                    background: active ? "#171717" : "#ffffff",
-                    color: active ? "#ffffff" : "#171717",
-                    textDecoration: "none",
-                    border: active ? "1px solid #171717" : "1px solid #e2e8f0",
-                    fontWeight: 700,
-                  }}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 12px", borderRadius: "12px", background: active ? "#171717" : "#ffffff", color: active ? "#ffffff" : "#171717", textDecoration: "none", border: active ? "1px solid #171717" : "1px solid #e2e8f0", fontWeight: 700 }}
                 >
                   <span>{link.label}</span>
                   <AttentionBadge count={badgeCounts[link.badgeKey]} />
@@ -129,7 +121,7 @@ function PublicHeader() {
     <header style={{ borderBottom: "1px solid #e2e8f0", background: "#ffffff", position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
         <Link to="/" style={{ display: "flex", alignItems: "center", gap: "14px", textDecoration: "none", color: "#171717" }}>
-          <img src={logo} alt="Tee & Co" style={{ width: "56px", height: "56px", objectFit: "contain" }} />
+          <img src={logo} alt="Tee & Co" style={{ width: "56px", height: "56px", objectFit: "contain", display: "block" }} />
           <div>
             <strong style={{ fontSize: "24px", display: "block" }}>Tee & Co Ltd.</strong>
             <span style={{ color: "#64748b", fontSize: "14px" }}>Custom Apparel & Production</span>
