@@ -22,7 +22,6 @@ import Assignments from "./admin/Assignments";
 import Customers from "./admin/Customers";
 import CustomerDetail from "./admin/CustomerDetail";
 import QuickSale from "./admin/QuickSale";
-<<<<<<< HEAD
 import Sales from "./admin/Sales";
 import SaleReceipt from "./admin/SaleReceipt";
 import StaffUsers from "./admin/StaffUsers";
@@ -46,56 +45,36 @@ export default function App() {
             <Route path="payment-confirmed" element={<PaymentConfirmed />} />
             <Route path="approval/:orderNumber" element={<ApprovalReview />} />
             <Route path="quote/:orderNumber" element={<QuoteView />} />
+
             <Route path="admin" element={<Dashboard />} />
             <Route path="admin/orders" element={<Orders />} />
             <Route path="admin/orders/new" element={<NewOrder />} />
-            <Route path="admin/sales" element={<Sales />} />
-            <Route path="admin/sales/new" element={<QuickSale />} />
-            <Route path="admin/sales/receipt/:saleNumber" element={<SaleReceipt />} />
             <Route path="admin/orders/:orderNumber" element={<OrderDetail />} />
+
             <Route path="admin/products" element={<Products />} />
             <Route path="admin/queue" element={<Queue />} />
             <Route path="admin/assignments" element={<Assignments />} />
+
             <Route path="admin/customers" element={<Customers />} />
-            <Route path="admin/customers/:customerId" element={<CustomerDetail />} />
-            <Route path="admin/staff-users" element={<StaffUsers />} />
+            <Route
+              path="admin/customers/:customerId"
+              element={<CustomerDetail />}
+            />
+
+            <Route path="admin/sales" element={<Sales />} />
+            <Route path="admin/sales/new" element={<QuickSale />} />
+            <Route
+              path="admin/sales/receipt/:saleNumber"
+              element={<SaleReceipt />}
+            />
+
+            <Route
+              path="admin/staff-users"
+              element={<StaffUsers />}
+            />
           </Route>
         </Routes>
       </BrowserRouter>
     </AppSplash>
-=======
-import StaffUsers from "./admin/StaffUsers";
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="login" element={<Login />} />
-          <Route path="signup" element={<Signup />} />
-          <Route path="category/:categoryId" element={<CategoryView />} />
-          <Route path="garment/:garmentId" element={<GarmentView />} />
-          <Route path="order-preview" element={<OrderPreview />} />
-          <Route path="order-submitted" element={<OrderSubmitted />} />
-          <Route path="my-orders" element={<MyOrders />} />
-          <Route path="deposit-payment" element={<DepositPayment />} />
-          <Route path="payment-confirmed" element={<PaymentConfirmed />} />
-          <Route path="approval/:orderNumber" element={<ApprovalReview />} />
-          <Route path="quote/:orderNumber" element={<QuoteView />} />
-          <Route path="admin" element={<Dashboard />} />
-          <Route path="admin/orders" element={<Orders />} />
-          <Route path="admin/orders/new" element={<NewOrder />} />
-          <Route path="admin/orders/:orderNumber" element={<OrderDetail />} />
-          <Route path="admin/products" element={<Products />} />
-          <Route path="admin/staff" element={<StaffUsers />} />
-          <Route path="admin/queue" element={<Queue />} />
-          <Route path="admin/customers" element={<Customers />} />
-          <Route path="admin/customers/:customerId" element={<CustomerDetail />} />
-          <Route path="admin/sales/new" element={<QuickSale />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
->>>>>>> 68f0e20 (Add Manage Staff sidebar nav and expose /admin/staff route)
   );
 }
