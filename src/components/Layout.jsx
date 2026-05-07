@@ -34,6 +34,13 @@ function getAdminSections(role) {
 
   return [
     {
+      title: "Overview",
+      links: [
+        { to: "/admin", label: "Dashboard" },
+        { to: "/admin/staff-users", label: "Manage Staff" },
+      ],
+    },
+    {
       title: "Production",
       links: [
         { to: "/admin/orders", label: "Production Orders", badgeKey: "productionOrders" },
@@ -56,6 +63,8 @@ function getActiveSidebarLink(pathname) {
   if (pathname.startsWith("/admin/orders")) return "/admin/orders";
   if (pathname.startsWith("/admin/queue")) return "/admin/queue";
   if (pathname.startsWith("/admin/products")) return "/admin/products";
+  if (pathname.startsWith("/admin/staff-users")) return "/admin/staff-users";
+  if (pathname === "/admin") return "/admin";
   return "";
 }
 
