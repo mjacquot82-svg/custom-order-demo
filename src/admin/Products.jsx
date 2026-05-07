@@ -3,6 +3,7 @@ import {
   createStoredProduct,
   deleteStoredProduct,
   getStoredProducts,
+  updateStoredProduct,
 } from "../lib/productsStore";
 import { calculateBaseSellPrice } from "../products/productPricingIntegration";
 
@@ -37,6 +38,7 @@ function fileToDataUrl(file) {
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(emptyProduct);
+  const [editingProductId, setEditingProductId] = useState(null);
 
   useEffect(() => {
     setProducts(getStoredProducts());
@@ -55,10 +57,26 @@ export default function Products() {
     setForm((current) => ({ ...current, image }));
   }
 
+  function resetForm() {
+    setForm(emptyProduct);
+    setEditingProductId(null);
+  }
+
+  function handleEdit(product) {
+    setEditingProductId(product.id);
+    setForm({
+      ...emptyProduct,
+      ...product,
+      cost_price: String(product.cost_price ?? "0"),
+      markup_percentage: String(product.markup_percentage ?? "0"),
+      decoration_type: product.decoration_type || "Screen Printing",
+    });
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
 
-    const product = {
+    const productPayload = {
       ...form,
       calculated_base_price: calculateBaseSellPrice(
         form.cost_price,
@@ -66,14 +84,23 @@ export default function Products() {
       ),
     };
 
-    createStoredProduct(product);
+    if (editingProductId) {
+      updateStoredProduct(editingProductId, productPayload);
+    } else {
+      createStoredProduct(productPayload);
+    }
+
     setProducts(getStoredProducts());
-    setForm(emptyProduct);
+    resetForm();
   }
 
   function handleDelete(productId) {
     deleteStoredProduct(productId);
     setProducts(getStoredProducts());
+
+    if (editingProductId === productId) {
+      resetForm();
+    }
   }
 
   return (
@@ -87,7 +114,7 @@ export default function Products() {
             padding: "22px",
           }}
         >
-          <h1>Add Product</h1>
+          <h1>{editingProductId ? "Edit Product" : "Add Product"}</h1>
 
           <div style={{ display: "grid", gap: "14px" }}>
             <input
@@ -154,19 +181,38 @@ export default function Products() {
               />
             )}
 
-            <button
-              type="submit"
-              style={{
-                background: "#171717",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "12px",
-                padding: "13px 18px",
-                fontWeight: 700,
-              }}
-            >
-              Save Product
-            </button>
+            <div style={{ display: "grid", gridTemplateColumns: editingProductId ? "1fr 1fr" : "1fr", gap: "10px" }}>
+              <button
+                type="submit"
+                style={{
+                  background: "#171717",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "12px",
+                  padding: "13px 18px",
+                  fontWeight: 700,
+                }}
+              >
+                {editingProductId ? "Update Product" : "Save Product"}
+              </button>
+
+              {editingProductId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  style={{
+                    background: "#ffffff",
+                    color: "#171717",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "12px",
+                    padding: "13px 18px",
+                    fontWeight: 700,
+                  }}
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
           </div>
         </form>
 
@@ -215,12 +261,17 @@ export default function Products() {
                 </strong>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleDelete(product.id)}
-              >
-                Remove
-              </button>
+              <div style={{ display: "grid", alignContent: "start", gap: "8px" }}>
+                <button type="button" onClick={() => handleEdit(product)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(product.id)}
+                >
+                  Remove
+                </button>
+              </div>
             </article>
           ))}
         </section>

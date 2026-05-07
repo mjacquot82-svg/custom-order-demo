@@ -48,9 +48,7 @@ function getAdminSections(role) {
       title: "Overview",
       links: [
         { to: "/admin", label: "Dashboard" },
-        ...(isOwner
-          ? [{ to: "/admin/staff-users", label: "Manage Staff" }]
-          : []),
+        { to: "/admin/staff-users", label: "Manage Staff" },
       ],
     },
     {
@@ -86,20 +84,12 @@ function getAdminSections(role) {
 }
 
 function getActiveSidebarLink(pathname) {
+  if (pathname.startsWith("/admin/assignments")) return "/admin/assignments";
+  if (pathname.startsWith("/admin/orders")) return "/admin/orders";
+  if (pathname.startsWith("/admin/queue")) return "/admin/queue";
+  if (pathname.startsWith("/admin/products")) return "/admin/products";
+  if (pathname.startsWith("/admin/staff-users")) return "/admin/staff-users";
   if (pathname === "/admin") return "/admin";
-  if (pathname.startsWith("/admin/staff-users"))
-    return "/admin/staff-users";
-  if (pathname.startsWith("/admin/assignments"))
-    return "/admin/assignments";
-  if (pathname.startsWith("/admin/orders"))
-    return "/admin/orders";
-  if (pathname.startsWith("/admin/queue"))
-    return "/admin/queue";
-  if (pathname.startsWith("/admin/products"))
-    return "/admin/products";
-  if (pathname.startsWith("/admin/customers"))
-    return "/admin/customers";
-
   return "";
 }
 
