@@ -6,6 +6,7 @@ import {
   updateStoredStaffUser,
   disableStoredStaffUser,
   reactivateStoredStaffUser,
+  generateUniqueStaffPin,
   isProtectedStaffUser,
   STAFF_ROLES,
 } from "../lib/staffUsersStore";
@@ -29,6 +30,7 @@ const buttonStyle = {
 
 export default function StaffUsers() {
   const [staff, setStaff] = useState([]);
+  const [drafts, setDrafts] = useState({});
   const [form, setForm] = useState({
     name: "",
     pin: "",
@@ -42,8 +44,55 @@ export default function StaffUsers() {
     });
   }, []);
 
+  useEffect(() => {
+    setDrafts(
+      Object.fromEntries(
+        staff.map((user) => [
+          user.id,
+          {
+            name: user.name,
+            pin: user.pin,
+          },
+        ])
+      )
+    );
+  }, [staff]);
+
   function refreshStaff() {
     setStaff(getStoredStaffUsers());
+  }
+
+  function setDraftValue(userId, field, value) {
+    setDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [userId]: {
+        ...currentDrafts[userId],
+        [field]: field === "pin" ? String(value).replace(/\D/g, "").slice(0, 4) : value,
+      },
+    }));
+  }
+
+  function resetDraft(userId, user) {
+    setDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [userId]: {
+        name: user.name,
+        pin: user.pin,
+      },
+    }));
+  }
+
+  function persistStaffUpdate(user, changes) {
+    try {
+      updateStoredStaffUser(user.id, changes);
+      refreshStaff();
+      return true;
+    } catch (error) {
+      alert(error.message || "Unable to save staff user.");
+      resetDraft(user.id, user);
+      refreshStaff();
+      return false;
+    }
   }
 
   function handleCreate(e) {
@@ -54,11 +103,16 @@ export default function StaffUsers() {
       return;
     }
 
-    createStoredStaffUser({
-      name: form.name,
-      pin: form.pin,
-      role: form.role,
-    });
+    try {
+      createStoredStaffUser({
+        name: form.name,
+        pin: form.pin,
+        role: form.role,
+      });
+    } catch (error) {
+      alert(error.message || "Unable to create staff user.");
+      return;
+    }
 
     setForm({
       name: "",
@@ -70,18 +124,56 @@ export default function StaffUsers() {
   }
 
   function handleDisable(id) {
-    disableStoredStaffUser(id);
+    try {
+      disableStoredStaffUser(id);
+    } catch (error) {
+      alert(error.message || "Unable to disable staff user.");
+      return;
+    }
+
     refreshStaff();
   }
 
   function handleReactivate(id) {
-    reactivateStoredStaffUser(id);
+    try {
+      reactivateStoredStaffUser(id);
+    } catch (error) {
+      alert(error.message || "Unable to reactivate staff user.");
+      return;
+    }
+
     refreshStaff();
   }
 
   function handleRoleChange(id, role) {
-    updateStoredStaffUser(id, { role });
-    refreshStaff();
+    const user = staff.find((staffUser) => staffUser.id === id);
+    if (!user) return;
+    persistStaffUpdate(user, { role });
+  }
+
+  function handleFieldBlur(user, field) {
+    const draft = drafts[user.id];
+    if (!draft) return;
+
+    const nextValue = field === "name" ? draft.name.trim() : draft.pin;
+    if (nextValue === user[field]) {
+      if (field === "name" && draft.name !== user.name) {
+        resetDraft(user.id, user);
+      }
+      return;
+    }
+
+    persistStaffUpdate(user, { [field]: nextValue });
+  }
+
+  function handleResetPin(user) {
+    try {
+      const nextPin = generateUniqueStaffPin(user.id);
+      setDraftValue(user.id, "pin", nextPin);
+      persistStaffUpdate(user, { pin: nextPin });
+    } catch (error) {
+      alert(error.message || "Unable to reset PIN.");
+    }
   }
 
   return (
@@ -180,7 +272,7 @@ export default function StaffUsers() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    pin: e.target.value,
+                    pin: e.target.value.replace(/\D/g, "").slice(0, 4),
                   })
                 }
                 placeholder="4-digit PIN"
@@ -262,6 +354,7 @@ export default function StaffUsers() {
                   }}
                 >
                   <th style={{ padding: "12px" }}>Name</th>
+                  <th style={{ padding: "12px" }}>PIN</th>
                   <th style={{ padding: "12px" }}>Role</th>
                   <th style={{ padding: "12px" }}>Status</th>
                   <th style={{ padding: "12px" }}>Actions</th>
@@ -276,6 +369,10 @@ export default function StaffUsers() {
                       ? ["Owner"]
                       : STAFF_ROLES.filter((role) => role !== "Owner");
                     const isInactive = user.status === "Inactive";
+                    const draft = drafts[user.id] || {
+                      name: user.name,
+                      pin: user.pin,
+                    };
 
                     return (
                       <tr
@@ -285,7 +382,68 @@ export default function StaffUsers() {
                         }}
                       >
                         <td style={{ padding: "12px" }}>
-                          {user.name}
+                          <input
+                            style={{
+                              ...inputStyle,
+                              minWidth: "180px",
+                              opacity: isProtected ? 0.75 : 1,
+                            }}
+                            value={draft.name}
+                            disabled={isProtected}
+                            onChange={(e) =>
+                              setDraftValue(user.id, "name", e.target.value)
+                            }
+                            onBlur={() => handleFieldBlur(user, "name")}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                          />
+                        </td>
+
+                        <td style={{ padding: "12px" }}>
+                          <div
+                            style={{
+                              display: "grid",
+                              gap: "8px",
+                              minWidth: "160px",
+                            }}
+                          >
+                            <input
+                              style={{
+                                ...inputStyle,
+                                fontFamily: "monospace",
+                                letterSpacing: "0.18em",
+                                opacity: isProtected ? 0.75 : 1,
+                              }}
+                              value={draft.pin}
+                              disabled={isProtected}
+                              onChange={(e) =>
+                                setDraftValue(user.id, "pin", e.target.value)
+                              }
+                              onBlur={() => handleFieldBlur(user, "pin")}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                            />
+
+                            <button
+                              onClick={() => handleResetPin(user)}
+                              disabled={isProtected}
+                              style={{
+                                ...buttonStyle,
+                                background: isProtected ? "#e7e5e4" : "#f5f5f4",
+                                color: isProtected ? "#a8a29e" : "#292524",
+                                border: "1px solid #d6d3d1",
+                                cursor: isProtected ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              Reset PIN
+                            </button>
+                          </div>
                         </td>
 
                         <td style={{ padding: "12px" }}>

@@ -18,6 +18,55 @@ const DEFAULT_STAFF_USERS = [
   },
 ];
 
+function cleanStaffPin(pin) {
+  return String(pin ?? "").replace(/\D/g, "").slice(0, 4);
+}
+
+function formatStaffPin(pin) {
+  return cleanStaffPin(pin).padStart(4, "0");
+}
+
+function validateStaffUserName(name) {
+  const trimmedName = String(name ?? "").trim();
+  if (!trimmedName) {
+    throw new Error("Name is required.");
+  }
+
+  return trimmedName;
+}
+
+function validateUniqueStaffPin(pin, users, excludedUserId) {
+  const cleanedPin = cleanStaffPin(pin);
+
+  if (cleanedPin.length !== 4) {
+    throw new Error("PIN must be exactly 4 digits.");
+  }
+
+  const hasDuplicatePin = users.some(
+    (user) => user.id !== excludedUserId && cleanStaffPin(user.pin) === cleanedPin
+  );
+
+  if (hasDuplicatePin) {
+    throw new Error("PIN is already assigned to another staff account.");
+  }
+
+  return cleanedPin;
+}
+
+function prepareStaffUserInput(userInput, users, excludedUserId) {
+  const nextInput = { ...userInput };
+
+  if (Object.prototype.hasOwnProperty.call(nextInput, "name")) {
+    nextInput.name = validateStaffUserName(nextInput.name);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextInput, "pin")) {
+    nextInput.pin = validateUniqueStaffPin(nextInput.pin, users, excludedUserId);
+  }
+
+  return nextInput;
+}
+
 function normalizeStaffUser(user) {
   const isProtectedOwner = user.id === PROTECTED_OWNER_ID;
   const fallbackRole = isProtectedOwner ? "Owner" : "Staff";
@@ -32,7 +81,7 @@ function normalizeStaffUser(user) {
         : STAFF_ROLES.includes(user.role)
           ? user.role
           : fallbackRole,
-    pin: String(user.pin || "0000").replace(/\D/g, "").slice(0, 4).padStart(4, "0"),
+    pin: formatStaffPin(user.pin || "0000"),
     status: isProtectedOwner
       ? "Active"
       : STAFF_STATUSES.includes(user.status)
@@ -89,13 +138,14 @@ export function saveStoredStaffUsers(users) {
 export function createStoredStaffUser(userInput) {
   const currentUsers = getStoredStaffUsers();
   const createdAt = new Date().toISOString();
+  const nextInput = prepareStaffUserInput(userInput, currentUsers);
 
   const user = normalizeStaffUser({
     id: `staff-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: userInput.name,
-    role: userInput.role,
-    pin: userInput.pin,
-    status: userInput.status || "Active",
+    name: nextInput.name,
+    role: nextInput.role,
+    pin: nextInput.pin,
+    status: nextInput.status || "Active",
     created_at: createdAt,
     updated_at: createdAt,
   });
@@ -107,26 +157,28 @@ export function createStoredStaffUser(userInput) {
 
 export function updateStoredStaffUser(userId, userInput) {
   const currentUsers = getStoredStaffUsers();
+  const staffUser = currentUsers.find((user) => user.id === userId);
+  const isProtectedOwner = isProtectedStaffUser(staffUser);
+  const nextInput = prepareStaffUserInput(userInput, currentUsers, userId);
   let updatedUser = null;
 
   const nextUsers = currentUsers.map((user) => {
     if (user.id !== userId) return user;
 
-    const isProtectedOwner = isProtectedStaffUser(user);
     const nextRole = isProtectedOwner
       ? "Owner"
-      : userInput.role === undefined
+      : nextInput.role === undefined
         ? user.role
-        : userInput.role;
+        : nextInput.role;
     const nextStatus = isProtectedOwner
       ? "Active"
-      : userInput.status === undefined
+      : nextInput.status === undefined
         ? user.status
-        : userInput.status;
+        : nextInput.status;
 
     updatedUser = normalizeStaffUser({
       ...user,
-      ...userInput,
+      ...nextInput,
       role: nextRole,
       status: nextStatus,
       id: user.id,
@@ -165,7 +217,7 @@ export function reactivateStoredStaffUser(userId) {
 }
 
 export function validateStaffPin(pin) {
-  const cleanedPin = String(pin || "").trim();
+  const cleanedPin = cleanStaffPin(pin);
   return getStoredStaffUsers().find(
     (user) => user.status !== "Inactive" && user.pin === cleanedPin
   );
@@ -202,6 +254,23 @@ export function isActiveStaffOwner() {
 
 export function isProtectedStaffUser(user) {
   return user?.id === PROTECTED_OWNER_ID || user?.role === "Owner";
+}
+
+export function generateUniqueStaffPin(excludedUserId) {
+  const users = getStoredStaffUsers();
+
+  for (let pinNumber = 0; pinNumber <= 9999; pinNumber += 1) {
+    const candidatePin = formatStaffPin(pinNumber);
+    const hasDuplicatePin = users.some(
+      (user) => user.id !== excludedUserId && user.pin === candidatePin
+    );
+
+    if (!hasDuplicatePin) {
+      return candidatePin;
+    }
+  }
+
+  throw new Error("No available PINs remaining.");
 }
 
 export function subscribeToStaffUsers(listener) {
