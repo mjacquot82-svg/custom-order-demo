@@ -4,6 +4,10 @@ import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 
 const STORAGE_KEY = "teeCoStaffOrders";
 const orderListeners = new Set();
+const EMPTY_ORDERS = [];
+
+let cachedOrdersRaw = null;
+let cachedOrdersSnapshot = EMPTY_ORDERS;
 
 function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
@@ -55,14 +59,25 @@ function readStoredOrders() {
 
   try {
     const rawOrders = window.localStorage.getItem(STORAGE_KEY);
+    const normalizedRawOrders = rawOrders || "";
+
+    if (normalizedRawOrders === cachedOrdersRaw) {
+      return cachedOrdersSnapshot;
+    }
+
     const parsedOrders = rawOrders ? JSON.parse(rawOrders) : [];
 
-    return Array.isArray(parsedOrders)
+    cachedOrdersRaw = normalizedRawOrders;
+    cachedOrdersSnapshot = Array.isArray(parsedOrders)
       ? parsedOrders.map((order) => normalizeStoredOrder(order))
-      : [];
+      : EMPTY_ORDERS;
+
+    return cachedOrdersSnapshot;
   } catch (error) {
     console.error("Unable to read stored Tee & Co orders", error);
-    return [];
+    cachedOrdersRaw = null;
+    cachedOrdersSnapshot = EMPTY_ORDERS;
+    return EMPTY_ORDERS;
   }
 }
 
@@ -189,7 +204,7 @@ export function subscribeToStoredOrders(listener) {
 }
 
 export function useStoredOrders() {
-  return useSyncExternalStore(subscribeToStoredOrders, getStoredOrders, () => []);
+  return useSyncExternalStore(subscribeToStoredOrders, getStoredOrders, () => EMPTY_ORDERS);
 }
 
 export function seedStoredOrders(seedOrders = demoOrders) {
