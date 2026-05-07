@@ -4,6 +4,7 @@ import { getStoredQuickSales } from "../lib/salesStore";
 import DashboardAssignmentsPanel from "../dashboard/DashboardAssignmentsPanel";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
 import { buildOperationalMetrics } from "../operations/buildOperationalMetrics";
+import { isActiveStaffOwner } from "../lib/staffUsersStore";
 
 function currency(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -31,6 +32,7 @@ export default function Dashboard() {
   const orders = getStoredOrders();
   const quickSales = getStoredQuickSales();
   const metrics = buildOperationalMetrics(orders);
+  const isOwner = isActiveStaffOwner();
 
   const todaysSalesTotal = quickSales.reduce((total, sale) => total + Number(sale.total || 0), 0);
 
@@ -82,7 +84,7 @@ export default function Dashboard() {
           <ActionCard to="/admin/assignments" title="Assignments" description="Dispatch and rebalance production workload." primary />
           <ActionCard to="/admin/queue" title="Production Queue" description="Monitor production status and overdue jobs." />
           <ActionCard to="/admin/orders" title="Orders" description="Manage production orders and workflow history." />
-          <ActionCard to="/admin/products" title="Products" description="Manage garments, pricing, and production types." />
+          {isOwner && <ActionCard to="/admin/products" title="Products" description="Manage garments, pricing, and production types." />}
         </div>
       </Section>
     </div>

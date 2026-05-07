@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import {
-  getStoredStaffUsers,
   createStoredStaffUser,
-  updateStoredStaffUser,
   disableStoredStaffUser,
+  getStoredStaffUsers,
+  OWNER_USER_ID,
+  reactivateStoredStaffUser,
+  resetStoredStaffUserPin,
   STAFF_ROLES,
+  updateStoredStaffUser,
 } from "../lib/staffUsersStore";
+
+const EDITABLE_STAFF_ROLES = STAFF_ROLES.filter((role) => role !== "Owner");
 
 const inputStyle = {
   width: "100%",
@@ -24,6 +29,10 @@ const buttonStyle = {
   fontWeight: 700,
 };
 
+function formatPinValue(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 4);
+}
+
 export default function StaffUsers() {
   const [staff, setStaff] = useState([]);
   const [form, setForm] = useState({
@@ -31,46 +40,87 @@ export default function StaffUsers() {
     pin: "",
     role: "Staff",
   });
+  const [pinDrafts, setPinDrafts] = useState({});
 
   useEffect(() => {
-    setStaff(getStoredStaffUsers());
+    refreshStaff();
   }, []);
 
   function refreshStaff() {
-    setStaff(getStoredStaffUsers());
+    const storedStaff = getStoredStaffUsers();
+    setStaff(storedStaff);
+    setPinDrafts(
+      storedStaff.reduce((drafts, user) => {
+        drafts[user.id] = "";
+        return drafts;
+      }, {})
+    );
   }
 
-  function handleCreate(e) {
-    e.preventDefault();
+  function handleCreate(event) {
+    event.preventDefault();
 
-    if (!form.name || !form.pin) {
-      alert("Name and PIN are required.");
+    if (!form.name.trim() || form.pin.length !== 4) {
+      alert("Enter a staff name and a unique 4-digit PIN.");
       return;
     }
 
-    createStoredStaffUser({
-      name: form.name,
-      pin: form.pin,
-      role: form.role,
-    });
+    try {
+      createStoredStaffUser({
+        name: form.name,
+        pin: form.pin,
+        role: form.role,
+      });
 
-    setForm({
-      name: "",
-      pin: "",
-      role: "Staff",
-    });
+      setForm({
+        name: "",
+        pin: "",
+        role: "Staff",
+      });
 
-    refreshStaff();
+      refreshStaff();
+    } catch (error) {
+      alert(error.message);
+    }
   }
 
-  function handleDisable(id) {
-    disableStoredStaffUser(id);
-    refreshStaff();
+  function handleDisable(user) {
+    try {
+      if (user.status === "Inactive") {
+        reactivateStoredStaffUser(user.id);
+      } else {
+        disableStoredStaffUser(user.id);
+      }
+
+      refreshStaff();
+    } catch (error) {
+      alert(error.message);
+    }
   }
 
   function handleRoleChange(id, role) {
-    updateStoredStaffUser(id, { role });
-    refreshStaff();
+    try {
+      updateStoredStaffUser(id, { role });
+      refreshStaff();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  function handlePinReset(user) {
+    const nextPin = pinDrafts[user.id] || "";
+
+    if (nextPin.length !== 4) {
+      alert("PIN must be exactly 4 digits.");
+      return;
+    }
+
+    try {
+      resetStoredStaffUserPin(user.id, nextPin);
+      refreshStaff();
+    } catch (error) {
+      alert(error.message);
+    }
   }
 
   return (
@@ -94,7 +144,7 @@ export default function StaffUsers() {
             fontSize: "15px",
           }}
         >
-          Create and manage staff accounts for production operations.
+          Create staff accounts, enforce unique PINs, and control activation status.
         </p>
       </div>
 
@@ -142,10 +192,10 @@ export default function StaffUsers() {
               <input
                 style={inputStyle}
                 value={form.name}
-                onChange={(e) =>
+                onChange={(event) =>
                   setForm({
                     ...form,
-                    name: e.target.value,
+                    name: event.target.value,
                   })
                 }
                 placeholder="Staff member name"
@@ -166,10 +216,12 @@ export default function StaffUsers() {
               <input
                 style={inputStyle}
                 value={form.pin}
-                onChange={(e) =>
+                inputMode="numeric"
+                maxLength={4}
+                onChange={(event) =>
                   setForm({
                     ...form,
-                    pin: e.target.value,
+                    pin: formatPinValue(event.target.value),
                   })
                 }
                 placeholder="4-digit PIN"
@@ -190,14 +242,14 @@ export default function StaffUsers() {
               <select
                 style={inputStyle}
                 value={form.role}
-                onChange={(e) =>
+                onChange={(event) =>
                   setForm({
                     ...form,
-                    role: e.target.value,
+                    role: event.target.value,
                   })
                 }
               >
-                {STAFF_ROLES.map((role) => (
+                {EDITABLE_STAFF_ROLES.map((role) => (
                   <option key={role} value={role}>
                     {role}
                   </option>
@@ -252,67 +304,118 @@ export default function StaffUsers() {
                 >
                   <th style={{ padding: "12px" }}>Name</th>
                   <th style={{ padding: "12px" }}>Role</th>
+                  <th style={{ padding: "12px" }}>PIN Reset</th>
                   <th style={{ padding: "12px" }}>Status</th>
                   <th style={{ padding: "12px" }}>Actions</th>
                 </tr>
               </thead>
 
               <tbody>
-                {staff.map((user) => (
-                  <tr
-                    key={user.id}
-                    style={{
-                      borderBottom: "1px solid #f5f5f4",
-                    }}
-                  >
-                    <td style={{ padding: "12px" }}>
-                      {user.name}
-                    </td>
+                {staff.map((user) => {
+                  const isProtectedOwner = user.id === OWNER_USER_ID;
 
-                    <td style={{ padding: "12px" }}>
-                      <select
-                        value={user.role}
-                        onChange={(e) =>
-                          handleRoleChange(
-                            user.id,
-                            e.target.value
-                          )
-                        }
-                        style={{
-                          ...inputStyle,
-                          minWidth: "140px",
-                        }}
-                      >
-                        {STAFF_ROLES.map((role) => (
-                          <option key={role} value={role}>
-                            {role}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                  return (
+                    <tr
+                      key={user.id}
+                      style={{
+                        borderBottom: "1px solid #f5f5f4",
+                      }}
+                    >
+                      <td style={{ padding: "12px" }}>
+                        <strong>{user.name}</strong>
+                        {isProtectedOwner && (
+                          <div style={{ marginTop: "4px", color: "#78716c", fontSize: "12px", fontWeight: 700 }}>
+                            Protected default owner account
+                          </div>
+                        )}
+                      </td>
 
-                    <td style={{ padding: "12px" }}>
-                      {user.disabled ? "Disabled" : "Active"}
-                    </td>
+                      <td style={{ padding: "12px" }}>
+                        {isProtectedOwner ? (
+                          <span style={{ fontWeight: 700 }}>{user.role}</span>
+                        ) : (
+                          <select
+                            value={user.role}
+                            onChange={(event) =>
+                              handleRoleChange(user.id, event.target.value)
+                            }
+                            style={{
+                              ...inputStyle,
+                              minWidth: "140px",
+                            }}
+                          >
+                            {EDITABLE_STAFF_ROLES.map((role) => (
+                              <option key={role} value={role}>
+                                {role}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
 
-                    <td style={{ padding: "12px" }}>
-                      {!user.disabled && (
-                        <button
-                          onClick={() =>
-                            handleDisable(user.id)
-                          }
-                          style={{
-                            ...buttonStyle,
-                            background: "#dc2626",
-                            color: "#ffffff",
-                          }}
-                        >
-                          Disable
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      <td style={{ padding: "12px", minWidth: "220px" }}>
+                        {isProtectedOwner ? (
+                          <span style={{ color: "#78716c", fontWeight: 700 }}>
+                            Default PIN 1234 is reserved.
+                          </span>
+                        ) : (
+                          <div style={{ display: "grid", gap: "8px" }}>
+                            <input
+                              style={inputStyle}
+                              inputMode="numeric"
+                              maxLength={4}
+                              value={pinDrafts[user.id] || ""}
+                              onChange={(event) =>
+                                setPinDrafts((current) => ({
+                                  ...current,
+                                  [user.id]: formatPinValue(event.target.value),
+                                }))
+                              }
+                              placeholder="New 4-digit PIN"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => handlePinReset(user)}
+                              style={{
+                                ...buttonStyle,
+                                background: "#0f172a",
+                                color: "#ffffff",
+                              }}
+                            >
+                              Save PIN
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={{ padding: "12px", fontWeight: 700 }}>
+                        {user.status}
+                      </td>
+
+                      <td style={{ padding: "12px" }}>
+                        {isProtectedOwner ? (
+                          <span style={{ color: "#78716c", fontWeight: 700 }}>
+                            Protected
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleDisable(user)}
+                            style={{
+                              ...buttonStyle,
+                              background:
+                                user.status === "Inactive" ? "#166534" : "#dc2626",
+                              color: "#ffffff",
+                            }}
+                          >
+                            {user.status === "Inactive" ? "Reactivate" : "Disable"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
