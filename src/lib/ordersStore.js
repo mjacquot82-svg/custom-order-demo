@@ -16,6 +16,7 @@ function normalizeStatus(value) {
 function normalizeStoredOrder(order = {}) {
   const assignedToStaffId = order.assigned_to_staff_id || "";
   const assignedToStaffName = order.assigned_to_staff_name || "";
+  const hasAssignedStaff = Boolean(assignedToStaffId);
 
   return {
     ...order,
@@ -26,7 +27,7 @@ function normalizeStoredOrder(order = {}) {
     needs_assignment:
       typeof order.needs_assignment === "boolean"
         ? order.needs_assignment
-        : !assignedToStaffId && !assignedToStaffName,
+        : !hasAssignedStaff,
   };
 }
 
@@ -91,9 +92,25 @@ function buildAssignmentUpdates(currentOrder, updates) {
 
   if (!hasAssignmentFields) return updates;
 
-  const assignedToStaffId = updates.assigned_to_staff_id || "";
-  const assignedToStaffName = updates.assigned_to_staff_name || "";
-  const assigned = Boolean(assignedToStaffId && assignedToStaffName);
+  const assignedToStaffId = Object.prototype.hasOwnProperty.call(
+    updates,
+    "assigned_to_staff_id"
+  )
+    ? updates.assigned_to_staff_id || ""
+    : currentOrder.assigned_to_staff_id || "";
+  const assignedToStaffName = Object.prototype.hasOwnProperty.call(
+    updates,
+    "assigned_to_staff_name"
+  )
+    ? updates.assigned_to_staff_name || ""
+    : currentOrder.assigned_to_staff_name || "";
+  const assignedToStaffRole = Object.prototype.hasOwnProperty.call(
+    updates,
+    "assigned_to_staff_role"
+  )
+    ? updates.assigned_to_staff_role || ""
+    : currentOrder.assigned_to_staff_role || "";
+  const assigned = Boolean(assignedToStaffId);
   const nextStatus = normalizeStatus(updates.status || currentOrder.status);
   const shouldAdvanceToReadyForProduction =
     assigned &&
@@ -102,8 +119,8 @@ function buildAssignmentUpdates(currentOrder, updates) {
   return {
     ...updates,
     assigned_to_staff_id: assignedToStaffId,
-    assigned_to_staff_name: assignedToStaffName,
-    assigned_to_staff_role: updates.assigned_to_staff_role || "",
+    assigned_to_staff_name: assigned ? assignedToStaffName : "",
+    assigned_to_staff_role: assigned ? assignedToStaffRole : "",
     assigned_at:
       Object.prototype.hasOwnProperty.call(updates, "assigned_at")
         ? updates.assigned_at

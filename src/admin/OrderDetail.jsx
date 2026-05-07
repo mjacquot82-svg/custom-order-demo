@@ -41,7 +41,9 @@ export default function OrderDetail() {
     if (!stored) return;
 
     setOrder(stored);
-    setStaffUsers(getStoredStaffUsers());
+    setStaffUsers(
+      getStoredStaffUsers().filter((staffUser) => staffUser.status !== "Inactive")
+    );
   }, [orderNumber]);
 
   const selectedProduct = useMemo(() => {

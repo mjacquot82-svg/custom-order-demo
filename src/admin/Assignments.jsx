@@ -1,7 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { demoOrders } from "../data/demoOrders";
-import { getStoredOrders, updateStoredOrder } from "../lib/ordersStore";
+import {
+  seedStoredOrders,
+  updateStoredOrder,
+  useStoredOrders,
+} from "../lib/ordersStore";
 import { getStoredStaffUsers } from "../lib/staffUsersStore";
 import AssignmentDispatchBoard from "../assignments/AssignmentDispatchBoard";
 
@@ -30,9 +33,22 @@ function UrgentAssignmentCard({ order, staffUsers, onAssign }) {
 }
 
 export default function Assignments() {
-  const [refreshKey, setRefreshKey] = useState(0);
-  const staffUsers = useMemo(() => getStoredStaffUsers().filter((user) => user.status !== "Inactive"), [refreshKey]);
-  const orders = useMemo(() => { const storedOrders = getStoredOrders().map(normalizeOrder); const demoQueueOrders = demoOrders.map(normalizeOrder); return (storedOrders.length ? storedOrders : demoQueueOrders).filter(isOpenOrder); }, [refreshKey]);
+  const storedOrders = useStoredOrders();
+
+  useEffect(() => {
+    if (!storedOrders.length) {
+      seedStoredOrders();
+    }
+  }, [storedOrders.length]);
+
+  const staffUsers = useMemo(
+    () => getStoredStaffUsers().filter((user) => user.status !== "Inactive"),
+    []
+  );
+  const orders = useMemo(
+    () => storedOrders.map(normalizeOrder).filter(isOpenOrder),
+    [storedOrders]
+  );
   const unassignedOrders = orders.filter((order) => !order.assigned_to_staff_id).sort((a, b) => String(a.due_date || "").localeCompare(String(b.due_date || "")));
   const assignedOrders = orders.filter((order) => order.assigned_to_staff_id);
   const overdueOrders = orders.filter(isOverdue);
@@ -40,7 +56,6 @@ export default function Assignments() {
   function handleAssign(order, staffId) {
     const selectedWorker = staffUsers.find((worker) => worker.id === staffId);
     updateStoredOrder(order.order_number, { assigned_to_staff_id: selectedWorker?.id || "", assigned_to_staff_name: selectedWorker?.name || "", assigned_to_staff_role: selectedWorker?.role || "", assigned_at: selectedWorker ? new Date().toISOString() : null, needs_assignment: !selectedWorker, activity_type: "assignment", activity_note: selectedWorker ? `Assigned to ${selectedWorker.name}.` : "Worker assignment removed." });
-    setRefreshKey((current) => current + 1);
   }
 
   return (

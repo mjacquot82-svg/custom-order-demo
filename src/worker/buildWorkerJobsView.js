@@ -1,6 +1,12 @@
-export function buildWorkerJobsView(orders = [], workerName = "") {
+export function buildWorkerJobsView(orders = [], worker = "") {
+  const workerId =
+    worker && typeof worker === "object" ? worker.id || "" : "";
+  const workerName =
+    worker && typeof worker === "object" ? worker.name || "" : worker;
   const workerOrders = orders.filter(
-    (order) => order.assigned_to_staff_name === workerName
+    (order) =>
+      (workerId && order.assigned_to_staff_id === workerId) ||
+      (!workerId && order.assigned_to_staff_name === workerName)
   );
 
   const grouped = {
