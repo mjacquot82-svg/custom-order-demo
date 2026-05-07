@@ -261,13 +261,38 @@ export default function Products() {
                 </strong>
               </div>
 
-              <div style={{ display: "grid", alignContent: "start", gap: "8px" }}>
-                <button type="button" onClick={() => handleEdit(product)}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => handleEdit(product)}
+                  style={{
+                    border: "1px solid #cbd5e1",
+                    background: "#ffffff",
+                    color: "#171717",
+                    borderRadius: "10px",
+                    padding: "9px 12px",
+                    fontWeight: 700,
+                    fontSize: "13px",
+                    lineHeight: 1.2,
+                    cursor: "pointer",
+                  }}
+                >
                   Edit
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(product.id)}
+                  style={{
+                    border: "1px solid #fecaca",
+                    background: "#fff1f2",
+                    color: "#be123c",
+                    borderRadius: "10px",
+                    padding: "9px 12px",
+                    fontWeight: 700,
+                    fontSize: "13px",
+                    lineHeight: 1.2,
+                    cursor: "pointer",
+                  }}
                 >
                   Remove
                 </button>
