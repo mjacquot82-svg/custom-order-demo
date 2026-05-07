@@ -1,10 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import {
-  authenticateStaffUser,
-  getActiveStaffUsers,
-  setActiveStaffUser,
-} from "../lib/staffUsersStore";
+import { useState } from "react";
+import { getStoredStaffUsers, validateStaffPin } from "../lib/staffUsersStore";
 
 const inputStyle = {
   width: "100%",
@@ -28,22 +24,10 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showStaffLogin, setShowStaffLogin] = useState(false);
-  const staffUsers = getActiveStaffUsers();
-  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [staffUsers] = useState(() => getStoredStaffUsers().filter((user) => user.status !== "Inactive"));
+  const [selectedStaffId, setSelectedStaffId] = useState(staffUsers[0]?.id || "");
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
-
-  useEffect(() => {
-    if (!staffUsers.length) {
-      setSelectedStaffId("");
-      return;
-    }
-
-    const selectedStillExists = staffUsers.some((user) => user.id === selectedStaffId);
-    if (!selectedStillExists) {
-      setSelectedStaffId(staffUsers[0].id);
-    }
-  }, [selectedStaffId, staffUsers]);
 
   function handleCustomerLogin(e) {
     e.preventDefault();
@@ -53,15 +37,19 @@ export default function Login() {
   function handleShopLogin(event) {
     event.preventDefault();
 
-    const matchedUser = authenticateStaffUser(selectedStaffId, pin);
+    const selectedUser = staffUsers.find((user) => user.id === selectedStaffId);
+    const matchedUser = validateStaffPin(pin);
 
-    if (!matchedUser) {
-      setPinError("That PIN does not match the selected active staff member.");
+    if (!selectedUser || !matchedUser || matchedUser.id !== selectedUser.id) {
+      setPinError("That PIN does not match the selected staff member.");
       setPin("");
       return;
     }
 
-    setActiveStaffUser(matchedUser);
+    window.localStorage.setItem(
+      "teeCoActiveStaffUser",
+      JSON.stringify({ id: matchedUser.id, name: matchedUser.name, role: matchedUser.role })
+    );
 
     navigate("/admin");
   }
@@ -295,30 +283,19 @@ export default function Login() {
                 <label style={labelStyle}>Staff Member</label>
                 <select
                   value={selectedStaffId}
-                  disabled={!staffUsers.length}
                   onChange={(event) => {
                     setSelectedStaffId(event.target.value);
                     clearPin();
                   }}
                   style={inputStyle}
                 >
-                  {staffUsers.length ? (
-                    staffUsers.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} — {user.role}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">No active staff accounts</option>
-                  )}
+                  {staffUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} — {user.role}
+                    </option>
+                  ))}
                 </select>
               </div>
-
-              {!staffUsers.length && (
-                <p style={{ margin: "0 0 14px", color: "#b91c1c", fontWeight: 700 }}>
-                  No active staff accounts are available for login.
-                </p>
-              )}
 
               <div style={{ marginBottom: "14px" }}>
                 <label style={labelStyle}>PIN</label>
@@ -362,7 +339,7 @@ export default function Login() {
                 <button type="button" onClick={() => addPinDigit("0")} style={{ padding: "14px", borderRadius: "14px", border: "1px solid #d6d3d1", background: "#fafaf9", fontWeight: 800, fontSize: "18px", cursor: "pointer" }}>
                   0
                 </button>
-                <button type="submit" disabled={!staffUsers.length} style={{ padding: "14px", borderRadius: "14px", border: "1px solid #171717", background: "#171717", color: "#ffffff", fontWeight: 800, cursor: staffUsers.length ? "pointer" : "not-allowed", opacity: staffUsers.length ? 1 : 0.6 }}>
+                <button type="submit" style={{ padding: "14px", borderRadius: "14px", border: "1px solid #171717", background: "#171717", color: "#ffffff", fontWeight: 800, cursor: "pointer" }}>
                   Enter
                 </button>
               </div>
@@ -375,17 +352,17 @@ export default function Login() {
 
               <button
                 type="submit"
-                disabled={pin.length < 4 || !staffUsers.length}
+                disabled={pin.length < 4}
                 style={{
                   width: "100%",
-                  background: pin.length === 4 && staffUsers.length ? "#171717" : "#a8a29e",
+                  background: pin.length === 4 ? "#171717" : "#a8a29e",
                   color: "#ffffff",
                   border: "none",
                   borderRadius: "14px",
                   padding: "14px 18px",
                   fontWeight: "800",
                   fontSize: "15px",
-                  cursor: pin.length === 4 && staffUsers.length ? "pointer" : "not-allowed",
+                  cursor: pin.length === 4 ? "pointer" : "not-allowed",
                 }}
               >
                 Enter Shop Dashboard

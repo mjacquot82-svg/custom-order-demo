@@ -1,12 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { demoOrders } from "../data/demoOrders";
-import {
-  seedStoredOrders,
-  updateStoredOrder,
-  useStoredOrders,
-} from "../lib/ordersStore";
-import { getActiveStaffUsers, isActiveStaffOwner } from "../lib/staffUsersStore";
+import { getStoredOrders, updateStoredOrder } from "../lib/ordersStore";
+import { getStoredStaffUsers } from "../lib/staffUsersStore";
 import AssignmentDispatchBoard from "../assignments/AssignmentDispatchBoard";
 
 const openStatuses = ["awaiting artwork", "mockup sent", "awaiting approval", "approved", "awaiting deposit", "in production", "printing", "ready for pickup", "on hold"];
@@ -34,19 +30,9 @@ function UrgentAssignmentCard({ order, staffUsers, onAssign }) {
 }
 
 export default function Assignments() {
-  const staffUsers = useMemo(() => getActiveStaffUsers(), []);
-  const isOwner = isActiveStaffOwner();
-  const storedOrders = useStoredOrders();
-
-  useEffect(() => {
-    if (!storedOrders.length) {
-      seedStoredOrders(demoOrders);
-    }
-  }, [storedOrders.length]);
-
-  const orders = useMemo(() => {
-    return storedOrders.map(normalizeOrder).filter(isOpenOrder);
-  }, [storedOrders]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const staffUsers = useMemo(() => getStoredStaffUsers().filter((user) => user.status !== "Inactive"), [refreshKey]);
+  const orders = useMemo(() => { const storedOrders = getStoredOrders().map(normalizeOrder); const demoQueueOrders = demoOrders.map(normalizeOrder); return (storedOrders.length ? storedOrders : demoQueueOrders).filter(isOpenOrder); }, [refreshKey]);
   const unassignedOrders = orders.filter((order) => !order.assigned_to_staff_id).sort((a, b) => String(a.due_date || "").localeCompare(String(b.due_date || "")));
   const assignedOrders = orders.filter((order) => order.assigned_to_staff_id);
   const overdueOrders = orders.filter(isOverdue);
@@ -54,13 +40,14 @@ export default function Assignments() {
   function handleAssign(order, staffId) {
     const selectedWorker = staffUsers.find((worker) => worker.id === staffId);
     updateStoredOrder(order.order_number, { assigned_to_staff_id: selectedWorker?.id || "", assigned_to_staff_name: selectedWorker?.name || "", assigned_to_staff_role: selectedWorker?.role || "", assigned_at: selectedWorker ? new Date().toISOString() : null, needs_assignment: !selectedWorker, activity_type: "assignment", activity_note: selectedWorker ? `Assigned to ${selectedWorker.name}.` : "Worker assignment removed." });
+    setRefreshKey((current) => current + 1);
   }
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "14px", flexWrap: "wrap", marginBottom: "18px" }}>
         <div><p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Production Dispatch</p><h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>Assignment Dispatch Board</h1><p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>Assign new work, watch overdue jobs, and balance worker load from one dispatch board.</p></div>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>{isOwner && <Link to="/admin/staff-users" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Manage Staff</Link>}<Link to="/admin/queue" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Production Queue</Link></div>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}><Link to="/admin/staff-users" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Manage Staff</Link><Link to="/admin/queue" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Production Queue</Link></div>
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "14px", marginBottom: "18px" }}>

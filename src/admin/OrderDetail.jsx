@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { findStoredOrder, updateStoredOrder } from "../lib/ordersStore";
 import { getStoredProducts } from "../lib/productsStore";
-import { getActiveStaffUser, getActiveStaffUsers } from "../lib/staffUsersStore";
+import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import StatusBadge from "../components/StatusBadge";
 import ProductionProgressTracker from "../order-detail/ProductionProgressTracker";
@@ -41,7 +41,7 @@ export default function OrderDetail() {
     if (!stored) return;
 
     setOrder(stored);
-    setStaffUsers(getActiveStaffUsers());
+    setStaffUsers(getStoredStaffUsers());
   }, [orderNumber]);
 
   const selectedProduct = useMemo(() => {

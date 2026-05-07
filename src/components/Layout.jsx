@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import logo from "../assets/icon-512.png";
 import { useStoredOrders } from "../lib/ordersStore";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
@@ -46,9 +46,7 @@ function getAdminSections(role) {
       title: "Overview",
       links: [
         { to: "/admin", label: "Dashboard" },
-        ...(isOwner
-          ? [{ to: "/admin/staff-users", label: "Manage Staff" }]
-          : []),
+        { to: "/admin/staff-users", label: "Manage Staff" },
       ],
     },
     {
@@ -393,18 +391,6 @@ export default function Layout() {
   const activeStaffUser = isAdmin
     ? getActiveStaffUser()
     : null;
-  const isOwner = activeStaffUser?.role === "Owner";
-  const isOwnerOnlyRoute =
-    location.pathname.startsWith("/admin/staff-users") ||
-    location.pathname.startsWith("/admin/products");
-
-  if (isAdmin && !activeStaffUser) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (isAdmin && isOwnerOnlyRoute && !isOwner) {
-    return <Navigate to="/admin" replace />;
-  }
 
   return (
     <div>
