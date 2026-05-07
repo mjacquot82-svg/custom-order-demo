@@ -12,11 +12,11 @@ requestAnimationFrame(() => {
   document.body.classList.add('app-ready')
 })
 
-// Register service worker for installable desktop/mobile app support
+// Disable stale PWA shell caching that causes first-load layout flashes
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // safe fallback if registration fails
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      registration.unregister()
     })
   })
 }
