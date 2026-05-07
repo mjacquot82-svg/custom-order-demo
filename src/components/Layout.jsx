@@ -118,17 +118,19 @@ function AdminSidebar({ pathname, staffUser }) {
 
 function PublicHeader() {
   return (
-    <header style={{ borderBottom: "1px solid #e2e8f0", background: "#ffffff", position: "sticky", top: 0, zIndex: 50 }}>
-      <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px" }}>
-        <Link to="/" style={{ display: "flex", alignItems: "center", gap: "14px", textDecoration: "none", color: "#171717" }}>
-          <img src={logo} alt="Tee & Co" style={{ width: "56px", height: "56px", objectFit: "contain", display: "block" }} />
+    <header style={{ borderBottom: "1px solid #e2e8f0", background: "#ffffff", position: "sticky", top: 0, zIndex: 50, minHeight: "84px" }}>
+      <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", minHeight: "84px", boxSizing: "border-box" }}>
+        <Link to="/" style={{ display: "flex", alignItems: "center", gap: "14px", textDecoration: "none", color: "#171717", minWidth: 0 }}>
+          <div style={{ width: "56px", height: "56px", minWidth: "56px", minHeight: "56px", maxWidth: "56px", maxHeight: "56px", overflow: "hidden", borderRadius: "999px", flexShrink: 0 }}>
+            <img src={logo} alt="Tee & Co" width="56" height="56" loading="eager" decoding="sync" style={{ width: "56px", height: "56px", minWidth: "56px", minHeight: "56px", maxWidth: "56px", maxHeight: "56px", objectFit: "contain", display: "block" }} />
+          </div>
           <div>
             <strong style={{ fontSize: "24px", display: "block" }}>Tee & Co Ltd.</strong>
             <span style={{ color: "#64748b", fontSize: "14px" }}>Custom Apparel & Production</span>
           </div>
         </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "18px", flexShrink: 0 }}>
           <div style={{ display: "flex", gap: "12px" }}>
             <a href="https://facebook.com" target="_blank" rel="noreferrer" style={{ color: "#171717" }}><FacebookIcon /></a>
             <a href="https://instagram.com" target="_blank" rel="noreferrer" style={{ color: "#171717" }}><InstagramIcon /></a>
