@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createStoredProduct,
   deleteStoredProduct,
@@ -39,6 +39,8 @@ export default function Products() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(emptyProduct);
   const [editingProductId, setEditingProductId] = useState(null);
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const imageInputRef = useRef(null);
 
   useEffect(() => {
     setProducts(getStoredProducts());
@@ -46,30 +48,49 @@ export default function Products() {
 
   function updateField(event) {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
   }
 
   async function updateImage(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setSelectedFileName(file.name);
+
     const image = await fileToDataUrl(file);
-    setForm((current) => ({ ...current, image }));
+
+    setForm((current) => ({
+      ...current,
+      image,
+    }));
   }
 
   function resetForm() {
     setForm(emptyProduct);
     setEditingProductId(null);
+    setSelectedFileName("");
+
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
   }
 
   function handleEdit(product) {
     setEditingProductId(product.id);
+
+    setSelectedFileName("");
+
     setForm({
       ...emptyProduct,
       ...product,
       cost_price: String(product.cost_price ?? "0"),
       markup_percentage: String(product.markup_percentage ?? "0"),
-      decoration_type: product.decoration_type || "Screen Printing",
+      decoration_type:
+        product.decoration_type || "Screen Printing",
     });
   }
 
@@ -91,11 +112,13 @@ export default function Products() {
     }
 
     setProducts(getStoredProducts());
+
     resetForm();
   }
 
   function handleDelete(productId) {
     deleteStoredProduct(productId);
+
     setProducts(getStoredProducts());
 
     if (editingProductId === productId) {
@@ -104,8 +127,20 @@ export default function Products() {
   }
 
   return (
-    <div style={{ maxWidth: "1180px", margin: "0 auto", padding: "24px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "400px 1fr", gap: "22px" }}>
+    <div
+      style={{
+        maxWidth: "1180px",
+        margin: "0 auto",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "400px 1fr",
+          gap: "22px",
+        }}
+      >
         <form
           onSubmit={handleSubmit}
           style={{
@@ -114,7 +149,11 @@ export default function Products() {
             padding: "22px",
           }}
         >
-          <h1>{editingProductId ? "Edit Product" : "Add Product"}</h1>
+          <h1>
+            {editingProductId
+              ? "Edit Product"
+              : "Add Product"}
+          </h1>
 
           <div style={{ display: "grid", gap: "14px" }}>
             <input
@@ -167,7 +206,47 @@ export default function Products() {
               ).toFixed(2)}
             </div>
 
-            <input type="file" accept="image/*" onChange={updateImage} />
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <label
+                htmlFor="product-image-upload"
+                style={{
+                  background: "#171717",
+                  color: "#ffffff",
+                  borderRadius: "12px",
+                  padding: "12px 14px",
+                  fontWeight: 700,
+                  textAlign: "center",
+                  cursor: "pointer",
+                }}
+              >
+                Upload Product Image
+              </label>
+
+              <input
+                id="product-image-upload"
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={updateImage}
+                style={{ display: "none" }}
+              />
+
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "#78716c",
+                  wordBreak: "break-word",
+                }}
+              >
+                {selectedFileName || "No image selected"}
+              </div>
+            </div>
 
             {form.image && (
               <img
@@ -181,7 +260,15 @@ export default function Products() {
               />
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: editingProductId ? "1fr 1fr" : "1fr", gap: "10px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: editingProductId
+                  ? "1fr 1fr"
+                  : "1fr",
+                gap: "10px",
+              }}
+            >
               <button
                 type="submit"
                 style={{
@@ -191,9 +278,12 @@ export default function Products() {
                   borderRadius: "12px",
                   padding: "13px 18px",
                   fontWeight: 700,
+                  cursor: "pointer",
                 }}
               >
-                {editingProductId ? "Update Product" : "Save Product"}
+                {editingProductId
+                  ? "Update Product"
+                  : "Save Product"}
               </button>
 
               {editingProductId && (
@@ -207,6 +297,7 @@ export default function Products() {
                     borderRadius: "12px",
                     padding: "13px 18px",
                     fontWeight: 700,
+                    cursor: "pointer",
                   }}
                 >
                   Cancel Edit
@@ -248,20 +339,37 @@ export default function Products() {
 
               <div>
                 <h2>{product.name}</h2>
+
                 <p>{product.decoration_type}</p>
+
                 <p>
-                  Cost: ${Number(product.cost_price || 0).toFixed(2)}
+                  Cost: $
+                  {Number(product.cost_price || 0).toFixed(2)}
                 </p>
+
                 <p>
-                  Markup: {Number(product.markup_percentage || 0).toFixed(0)}%
+                  Markup:{" "}
+                  {Number(
+                    product.markup_percentage || 0
+                  ).toFixed(0)}
+                  %
                 </p>
+
                 <strong>
                   Base Sell Price: $
-                  {Number(product.calculated_base_price || 0).toFixed(2)}
+                  {Number(
+                    product.calculated_base_price || 0
+                  ).toFixed(2)}
                 </strong>
               </div>
 
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px",
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => handleEdit(product)}
@@ -279,6 +387,7 @@ export default function Products() {
                 >
                   Edit
                 </button>
+
                 <button
                   type="button"
                   onClick={() => handleDelete(product.id)}
