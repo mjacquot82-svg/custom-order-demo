@@ -12,10 +12,11 @@ export default function Header() {
         style={{
           maxWidth: "1100px",
           margin: "0 auto",
-          padding: "10px 24px", // reduced from 16px → tighter header height
+          padding: "10px 24px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          minHeight: "72px",
           fontFamily:
             'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
@@ -25,35 +26,56 @@ export default function Header() {
           style={{
             textDecoration: "none",
             color: "#171717",
-            lineHeight: "1.1", // tighter vertical stacking
+            lineHeight: "1.1",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
           }}
         >
-          <div
+          <img
+            src="/assets/icon-512.png"
+            alt="Tee & Co Ltd."
+            width="48"
+            height="48"
+            loading="eager"
+            decoding="async"
             style={{
-              fontWeight: "700",
-              fontSize: "18px", // slightly reduced from 20px
+              width: "48px",
+              height: "48px",
+              objectFit: "contain",
+              flexShrink: 0,
+              display: "block",
             }}
-          >
-            Tee & Co Ltd.
-          </div>
+          />
 
-          <div
-            style={{
-              fontSize: "11px", // slightly reduced
-              color: "#78716c",
-              marginTop: "1px", // reduced from 2px
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            Customer Portal Demo
+          <div>
+            <div
+              style={{
+                fontWeight: "700",
+                fontSize: "18px",
+              }}
+            >
+              Tee & Co Ltd.
+            </div>
+
+            <div
+              style={{
+                fontSize: "11px",
+                color: "#78716c",
+                marginTop: "1px",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Customer Portal Demo
+            </div>
           </div>
         </Link>
 
         <nav
           style={{
             display: "flex",
-            gap: "16px", // slightly tighter spacing
+            gap: "16px",
             alignItems: "center",
           }}
         >
