@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   getStoredStaffUsers,
+  subscribeToStaffUsers,
   createStoredStaffUser,
   updateStoredStaffUser,
   disableStoredStaffUser,
+  reactivateStoredStaffUser,
+  isProtectedStaffUser,
   STAFF_ROLES,
 } from "../lib/staffUsersStore";
 
@@ -34,6 +37,9 @@ export default function StaffUsers() {
 
   useEffect(() => {
     setStaff(getStoredStaffUsers());
+    return subscribeToStaffUsers((users) => {
+      setStaff(users);
+    });
   }, []);
 
   function refreshStaff() {
@@ -65,6 +71,11 @@ export default function StaffUsers() {
 
   function handleDisable(id) {
     disableStoredStaffUser(id);
+    refreshStaff();
+  }
+
+  function handleReactivate(id) {
+    reactivateStoredStaffUser(id);
     refreshStaff();
   }
 
@@ -197,7 +208,7 @@ export default function StaffUsers() {
                   })
                 }
               >
-                {STAFF_ROLES.map((role) => (
+                {STAFF_ROLES.filter((role) => role !== "Owner").map((role) => (
                   <option key={role} value={role}>
                     {role}
                   </option>
@@ -259,59 +270,83 @@ export default function StaffUsers() {
 
               <tbody>
                 {staff.map((user) => (
-                  <tr
-                    key={user.id}
-                    style={{
-                      borderBottom: "1px solid #f5f5f4",
-                    }}
-                  >
-                    <td style={{ padding: "12px" }}>
-                      {user.name}
-                    </td>
+                  (() => {
+                    const isProtected = isProtectedStaffUser(user);
+                    const roleOptions = isProtected
+                      ? ["Owner"]
+                      : STAFF_ROLES.filter((role) => role !== "Owner");
+                    const isInactive = user.status === "Inactive";
 
-                    <td style={{ padding: "12px" }}>
-                      <select
-                        value={user.role}
-                        onChange={(e) =>
-                          handleRoleChange(
-                            user.id,
-                            e.target.value
-                          )
-                        }
+                    return (
+                      <tr
+                        key={user.id}
                         style={{
-                          ...inputStyle,
-                          minWidth: "140px",
+                          borderBottom: "1px solid #f5f5f4",
                         }}
                       >
-                        {STAFF_ROLES.map((role) => (
-                          <option key={role} value={role}>
-                            {role}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                        <td style={{ padding: "12px" }}>
+                          {user.name}
+                        </td>
 
-                    <td style={{ padding: "12px" }}>
-                      {user.disabled ? "Disabled" : "Active"}
-                    </td>
+                        <td style={{ padding: "12px" }}>
+                          <select
+                            value={user.role}
+                            disabled={isProtected}
+                            onChange={(e) =>
+                              handleRoleChange(
+                                user.id,
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              ...inputStyle,
+                              minWidth: "140px",
+                              opacity: isProtected ? 0.7 : 1,
+                              cursor: isProtected ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            {roleOptions.map((role) => (
+                              <option key={role} value={role}>
+                                {role}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
 
-                    <td style={{ padding: "12px" }}>
-                      {!user.disabled && (
-                        <button
-                          onClick={() =>
-                            handleDisable(user.id)
-                          }
-                          style={{
-                            ...buttonStyle,
-                            background: "#dc2626",
-                            color: "#ffffff",
-                          }}
-                        >
-                          Disable
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                        <td style={{ padding: "12px" }}>
+                          {user.status}
+                        </td>
+
+                        <td style={{ padding: "12px" }}>
+                          {isProtected ? (
+                            <span
+                              style={{
+                                color: "#78716c",
+                                fontWeight: 700,
+                              }}
+                            >
+                              Protected
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                isInactive
+                                  ? handleReactivate(user.id)
+                                  : handleDisable(user.id)
+                              }
+                              style={{
+                                ...buttonStyle,
+                                background: isInactive ? "#16a34a" : "#dc2626",
+                                color: "#ffffff",
+                              }}
+                            >
+                              {isInactive ? "Reactivate" : "Disable"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })()
                 ))}
               </tbody>
             </table>

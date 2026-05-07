@@ -1,5 +1,7 @@
 const STORAGE_KEY = "teeCoStaffUsers";
 const ACTIVE_STAFF_KEY = "teeCoActiveStaffUser";
+const STAFF_USERS_UPDATED_EVENT = "tee-co-staff-users-updated";
+const PROTECTED_OWNER_ID = "staff-owner-default";
 
 export const STAFF_ROLES = ["Owner", "Manager", "Staff"];
 export const STAFF_STATUSES = ["Active", "Inactive"];
@@ -17,15 +19,42 @@ const DEFAULT_STAFF_USERS = [
 ];
 
 function normalizeStaffUser(user) {
+  const isProtectedOwner = user.id === PROTECTED_OWNER_ID;
+  const fallbackRole = isProtectedOwner ? "Owner" : "Staff";
+
   return {
-    id: user.id || `staff-${Date.now()}`,
+    id: user.id || `staff-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: user.name || "New Staff User",
-    role: STAFF_ROLES.includes(user.role) ? user.role : "Staff",
+    role: isProtectedOwner
+      ? "Owner"
+      : user.role === "Owner"
+        ? "Staff"
+        : STAFF_ROLES.includes(user.role)
+          ? user.role
+          : fallbackRole,
     pin: String(user.pin || "0000").replace(/\D/g, "").slice(0, 4).padStart(4, "0"),
-    status: STAFF_STATUSES.includes(user.status) ? user.status : "Active",
+    status: isProtectedOwner
+      ? "Active"
+      : STAFF_STATUSES.includes(user.status)
+        ? user.status
+        : "Active",
     created_at: user.created_at || new Date().toISOString(),
     updated_at: user.updated_at || new Date().toISOString(),
   };
+}
+
+function buildPersistedStaffUsers(users) {
+  const normalizedUsers = Array.isArray(users) ? users.map(normalizeStaffUser) : [];
+  const nonProtectedUsers = normalizedUsers.filter((user) => user.id !== PROTECTED_OWNER_ID);
+  const protectedOwner =
+    normalizedUsers.find((user) => user.id === PROTECTED_OWNER_ID) || DEFAULT_STAFF_USERS[0];
+
+  return [normalizeStaffUser(protectedOwner), ...nonProtectedUsers];
+}
+
+function emitStaffUsersUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(STAFF_USERS_UPDATED_EVENT));
 }
 
 export function getStoredStaffUsers() {
@@ -36,7 +65,9 @@ export function getStoredStaffUsers() {
     if (rawUsers) {
       const parsedUsers = JSON.parse(rawUsers);
       if (Array.isArray(parsedUsers) && parsedUsers.length > 0) {
-        return parsedUsers.map(normalizeStaffUser);
+        const normalizedUsers = buildPersistedStaffUsers(parsedUsers);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUsers));
+        return normalizedUsers;
       }
     }
 
@@ -50,7 +81,9 @@ export function getStoredStaffUsers() {
 
 export function saveStoredStaffUsers(users) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(users.map(normalizeStaffUser)));
+  const normalizedUsers = buildPersistedStaffUsers(users);
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUsers));
+  emitStaffUsersUpdated();
 }
 
 export function createStoredStaffUser(userInput) {
@@ -58,7 +91,7 @@ export function createStoredStaffUser(userInput) {
   const createdAt = new Date().toISOString();
 
   const user = normalizeStaffUser({
-    id: `staff-${Date.now()}`,
+    id: `staff-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: userInput.name,
     role: userInput.role,
     pin: userInput.pin,
@@ -79,9 +112,23 @@ export function updateStoredStaffUser(userId, userInput) {
   const nextUsers = currentUsers.map((user) => {
     if (user.id !== userId) return user;
 
+    const isProtectedOwner = isProtectedStaffUser(user);
+    const nextRole = isProtectedOwner
+      ? "Owner"
+      : userInput.role === undefined
+        ? user.role
+        : userInput.role;
+    const nextStatus = isProtectedOwner
+      ? "Active"
+      : userInput.status === undefined
+        ? user.status
+        : userInput.status;
+
     updatedUser = normalizeStaffUser({
       ...user,
       ...userInput,
+      role: nextRole,
+      status: nextStatus,
       id: user.id,
       created_at: user.created_at,
       updated_at: new Date().toISOString(),
@@ -105,7 +152,16 @@ export function updateStoredStaffUser(userId, userInput) {
 }
 
 export function disableStoredStaffUser(userId) {
+  const staffUser = getStoredStaffUsers().find((user) => user.id === userId);
+  if (staffUser && isProtectedStaffUser(staffUser)) {
+    return staffUser;
+  }
+
   return updateStoredStaffUser(userId, { status: "Inactive" });
+}
+
+export function reactivateStoredStaffUser(userId) {
+  return updateStoredStaffUser(userId, { status: "Active" });
 }
 
 export function validateStaffPin(pin) {
@@ -142,6 +198,34 @@ export function getActiveStaffUser() {
 
 export function isActiveStaffOwner() {
   return getActiveStaffUser()?.role === "Owner";
+}
+
+export function isProtectedStaffUser(user) {
+  return user?.id === PROTECTED_OWNER_ID || user?.role === "Owner";
+}
+
+export function subscribeToStaffUsers(listener) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  function handleStorage(event) {
+    if (!event || event.key === STORAGE_KEY) {
+      listener(getStoredStaffUsers());
+    }
+  }
+
+  function handleCustomEvent() {
+    listener(getStoredStaffUsers());
+  }
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(STAFF_USERS_UPDATED_EVENT, handleCustomEvent);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(STAFF_USERS_UPDATED_EVENT, handleCustomEvent);
+  };
 }
 
 export function buildStaffAuditFields(prefix = "created") {
