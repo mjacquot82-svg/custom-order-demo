@@ -19,10 +19,6 @@ function InstagramIcon() {
   );
 }
 
-function normalizeStatus(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
 function getSidebarCounts() {
   const orders = getStoredOrders();
 
@@ -80,18 +76,48 @@ function AdminSidebar({ pathname, staffUser }) {
   const adminSections = getAdminSections(role);
 
   return (
-    <aside style={{ width: "245px" }}>
+    <aside style={{ width: "250px", minHeight: "100vh", background: "#ffffff", borderRight: "1px solid #e2e8f0", padding: "18px 14px", boxSizing: "border-box", position: "sticky", top: 0, alignSelf: "flex-start" }}>
+      <Link to="/admin" style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none", color: "#171717", marginBottom: "24px" }}>
+        <img src={logo} alt="Tee & Co" style={{ width: "54px", height: "54px", objectFit: "contain", borderRadius: "12px" }} />
+        <div>
+          <strong style={{ display: "block", fontSize: "19px" }}>Tee & Co</strong>
+          <span style={{ color: "#64748b", fontSize: "12px" }}>Central Operations</span>
+        </div>
+      </Link>
+
       {adminSections.map((section) => (
-        <div key={section.title}>
-          {section.links.map((link) => {
-            const active = activeLink === link.to;
-            return (
-              <Link key={link.to} to={link.to} style={{ display: "flex", justifyContent: "space-between", padding: "10px", background: active ? "#171717" : "#ffffff", color: active ? "#ffffff" : "#171717", textDecoration: "none" }}>
-                <span>{link.label}</span>
-                <AttentionBadge count={badgeCounts[link.badgeKey]} />
-              </Link>
-            );
-          })}
+        <div key={section.title} style={{ marginBottom: "18px" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 900, color: "#78716c", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {section.title}
+          </p>
+
+          <div style={{ display: "grid", gap: "6px" }}>
+            {section.links.map((link) => {
+              const active = activeLink === link.to;
+
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    background: active ? "#171717" : "#ffffff",
+                    color: active ? "#ffffff" : "#171717",
+                    textDecoration: "none",
+                    border: active ? "1px solid #171717" : "1px solid #e2e8f0",
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>{link.label}</span>
+                  <AttentionBadge count={badgeCounts[link.badgeKey]} />
+                </Link>
+              );
+            })}
+          </div>
         </div>
       ))}
     </aside>
@@ -112,12 +138,8 @@ function PublicHeader() {
 
         <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
           <div style={{ display: "flex", gap: "12px" }}>
-            <a href="https://facebook.com" target="_blank" rel="noreferrer" style={{ color: "#171717" }}>
-              <FacebookIcon />
-            </a>
-            <a href="https://instagram.com" target="_blank" rel="noreferrer" style={{ color: "#171717" }}>
-              <InstagramIcon />
-            </a>
+            <a href="https://facebook.com" target="_blank" rel="noreferrer" style={{ color: "#171717" }}><FacebookIcon /></a>
+            <a href="https://instagram.com" target="_blank" rel="noreferrer" style={{ color: "#171717" }}><InstagramIcon /></a>
           </div>
 
           <Link to="/login" style={{ background: "#171717", color: "#ffffff", padding: "11px 18px", borderRadius: "12px", textDecoration: "none", fontWeight: 800 }}>
@@ -137,9 +159,9 @@ export default function Layout() {
   return (
     <div>
       {isAdmin ? (
-        <div style={{ display: "flex", gap: "18px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start" }}>
           <AdminSidebar pathname={location.pathname} staffUser={activeStaffUser} />
-          <main style={{ flex: 1 }}>
+          <main style={{ flex: 1, minWidth: 0 }}>
             <Outlet />
           </main>
         </div>
