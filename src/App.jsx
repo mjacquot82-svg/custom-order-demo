@@ -45,19 +45,33 @@ export default function App() {
             <Route path="payment-confirmed" element={<PaymentConfirmed />} />
             <Route path="approval/:orderNumber" element={<ApprovalReview />} />
             <Route path="quote/:orderNumber" element={<QuoteView />} />
+
             <Route path="admin" element={<Dashboard />} />
             <Route path="admin/orders" element={<Orders />} />
             <Route path="admin/orders/new" element={<NewOrder />} />
-            <Route path="admin/sales" element={<Sales />} />
-            <Route path="admin/sales/new" element={<QuickSale />} />
-            <Route path="admin/sales/receipt/:saleNumber" element={<SaleReceipt />} />
             <Route path="admin/orders/:orderNumber" element={<OrderDetail />} />
+
             <Route path="admin/products" element={<Products />} />
             <Route path="admin/queue" element={<Queue />} />
             <Route path="admin/assignments" element={<Assignments />} />
+
             <Route path="admin/customers" element={<Customers />} />
-            <Route path="admin/customers/:customerId" element={<CustomerDetail />} />
-            <Route path="admin/staff-users" element={<StaffUsers />} />
+            <Route
+              path="admin/customers/:customerId"
+              element={<CustomerDetail />}
+            />
+
+            <Route path="admin/sales" element={<Sales />} />
+            <Route path="admin/sales/new" element={<QuickSale />} />
+            <Route
+              path="admin/sales/receipt/:saleNumber"
+              element={<SaleReceipt />}
+            />
+
+            <Route
+              path="admin/staff-users"
+              element={<StaffUsers />}
+            />
           </Route>
         </Routes>
       </BrowserRouter>
