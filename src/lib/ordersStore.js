@@ -1,6 +1,108 @@
+import { useSyncExternalStore } from "react";
+import { demoOrders } from "../data/demoOrders";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 
 const STORAGE_KEY = "teeCoStaffOrders";
+const orderListeners = new Set();
+
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeStoredOrder(order = {}) {
+  const assignedToStaffId = order.assigned_to_staff_id || "";
+  const assignedToStaffName = order.assigned_to_staff_name || "";
+
+  return {
+    ...order,
+    status: order.status || "Awaiting Artwork",
+    assigned_to_staff_id: assignedToStaffId,
+    assigned_to_staff_name: assignedToStaffName,
+    assigned_to_staff_role: order.assigned_to_staff_role || "",
+    needs_assignment:
+      typeof order.needs_assignment === "boolean"
+        ? order.needs_assignment
+        : !assignedToStaffId && !assignedToStaffName,
+  };
+}
+
+function emitOrdersUpdated() {
+  orderListeners.forEach((listener) => listener());
+}
+
+function buildSeedOrder(order, index = 0) {
+  const createdAt = new Date().toISOString();
+
+  return normalizeStoredOrder({
+    ...order,
+    order_number: order.order_number || `TC-SEED-${index + 1}`,
+    customer_name:
+      order.customer_name ||
+      ["ABC Construction", "City Hockey", "Local Customer"][index] ||
+      "Walk-in Customer",
+    garment: order.garment || order.item || "Custom garment",
+    qty: Number(order.qty || 0),
+    due_date: order.due_date || "",
+    source: order.source || "Demo Seed",
+    date: order.date || new Date(createdAt).toLocaleDateString(),
+    created_at: order.created_at || createdAt,
+    activity_log: order.activity_log || [],
+  });
+}
+
+function readStoredOrders() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const rawOrders = window.localStorage.getItem(STORAGE_KEY);
+    const parsedOrders = rawOrders ? JSON.parse(rawOrders) : [];
+
+    return Array.isArray(parsedOrders)
+      ? parsedOrders.map((order) => normalizeStoredOrder(order))
+      : [];
+  } catch (error) {
+    console.error("Unable to read stored Tee & Co orders", error);
+    return [];
+  }
+}
+
+function buildAssignmentUpdates(currentOrder, updates) {
+  const hasAssignmentFields =
+    Object.prototype.hasOwnProperty.call(updates, "assigned_to_staff_id") ||
+    Object.prototype.hasOwnProperty.call(updates, "assigned_to_staff_name") ||
+    Object.prototype.hasOwnProperty.call(updates, "assigned_to_staff_role") ||
+    Object.prototype.hasOwnProperty.call(updates, "assigned_at") ||
+    Object.prototype.hasOwnProperty.call(updates, "needs_assignment");
+
+  if (!hasAssignmentFields) return updates;
+
+  const assignedToStaffId = updates.assigned_to_staff_id || "";
+  const assignedToStaffName = updates.assigned_to_staff_name || "";
+  const assigned = Boolean(assignedToStaffId && assignedToStaffName);
+  const nextStatus = normalizeStatus(updates.status || currentOrder.status);
+  const shouldAdvanceToReadyForProduction =
+    assigned &&
+    ["submitted", "paid", "approved"].includes(nextStatus);
+
+  return {
+    ...updates,
+    assigned_to_staff_id: assignedToStaffId,
+    assigned_to_staff_name: assignedToStaffName,
+    assigned_to_staff_role: updates.assigned_to_staff_role || "",
+    assigned_at:
+      Object.prototype.hasOwnProperty.call(updates, "assigned_at")
+        ? updates.assigned_at
+        : assigned
+        ? currentOrder.assigned_at || new Date().toISOString()
+        : null,
+    needs_assignment: assigned ? false : true,
+    status: shouldAdvanceToReadyForProduction
+      ? "Ready for Production"
+      : updates.status || currentOrder.status,
+    production_ready:
+      shouldAdvanceToReadyForProduction || updates.production_ready || currentOrder.production_ready || false,
+  };
+}
 
 function buildActivityEvent(type, note, timestamp = new Date().toISOString()) {
   const staff = getActiveStaffUser();
@@ -45,21 +147,61 @@ function stripActivityMeta(updates) {
 }
 
 export function getStoredOrders() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const rawOrders = window.localStorage.getItem(STORAGE_KEY);
-    return rawOrders ? JSON.parse(rawOrders) : [];
-  } catch (error) {
-    console.error("Unable to read stored Tee & Co orders", error);
-    return [];
-  }
+  return readStoredOrders();
 }
 
 export function saveStoredOrders(orders) {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+  const normalizedOrders = Array.isArray(orders)
+    ? orders.map((order) => normalizeStoredOrder(order))
+    : [];
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedOrders));
+  emitOrdersUpdated();
+}
+
+export function subscribeToStoredOrders(listener) {
+  if (typeof listener !== "function") {
+    return () => {};
+  }
+
+  orderListeners.add(listener);
+
+  if (typeof window === "undefined") {
+    return () => {
+      orderListeners.delete(listener);
+    };
+  }
+
+  const handleStorage = (event) => {
+    if (!event.key || event.key === STORAGE_KEY) {
+      listener();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    orderListeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+export function useStoredOrders() {
+  return useSyncExternalStore(subscribeToStoredOrders, getStoredOrders, () => []);
+}
+
+export function seedStoredOrders(seedOrders = demoOrders) {
+  const currentOrders = getStoredOrders();
+  if (currentOrders.length) return currentOrders;
+
+  const nextOrders = (Array.isArray(seedOrders) ? seedOrders : []).map((order, index) =>
+    buildSeedOrder(order, index)
+  );
+
+  saveStoredOrders(nextOrders);
+  return nextOrders;
 }
 
 export function createStoredOrder(orderInput) {
@@ -97,25 +239,35 @@ export function findStoredOrder(orderNumber) {
 export function updateStoredOrder(orderNumber, updates) {
   const currentOrders = getStoredOrders();
   const now = new Date().toISOString();
-  const cleanUpdates = stripActivityMeta(updates);
+  let updatedOrder = null;
 
-  const nextOrders = currentOrders.map((order) =>
-    order.order_number === orderNumber
-      ? {
-          ...order,
-          ...cleanUpdates,
-          ...buildStaffAuditFields("updated"),
-          updated_at: now,
-          activity_log: [
-            buildActivityEvent(describeActivityType(updates), describeOrderUpdate(updates), now),
-            ...(order.activity_log || []),
-          ],
-        }
-      : order
-  );
+  const nextOrders = currentOrders.map((order) => {
+    if (order.order_number !== orderNumber) return order;
+
+    const cleanUpdates = stripActivityMeta(
+      buildAssignmentUpdates(order, updates)
+    );
+
+    updatedOrder = normalizeStoredOrder({
+      ...order,
+      ...cleanUpdates,
+      ...buildStaffAuditFields("updated"),
+      updated_at: now,
+      activity_log: [
+        buildActivityEvent(
+          describeActivityType(updates),
+          describeOrderUpdate(updates),
+          now
+        ),
+        ...(order.activity_log || []),
+      ],
+    });
+
+    return updatedOrder;
+  });
 
   saveStoredOrders(nextOrders);
-  return nextOrders.find((order) => order.order_number === orderNumber);
+  return updatedOrder;
 }
 
 export function duplicateStoredOrder(orderNumber) {

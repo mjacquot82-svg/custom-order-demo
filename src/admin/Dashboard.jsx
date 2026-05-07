@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { getStoredOrders } from "../lib/ordersStore";
+import { useStoredOrders } from "../lib/ordersStore";
 import { getStoredQuickSales } from "../lib/salesStore";
 import DashboardAssignmentsPanel from "../dashboard/DashboardAssignmentsPanel";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
@@ -29,7 +29,7 @@ function Section({ title, children }) {
 }
 
 export default function Dashboard() {
-  const orders = getStoredOrders();
+  const orders = useStoredOrders();
   const quickSales = getStoredQuickSales();
   const metrics = buildOperationalMetrics(orders);
   const isOwner = isActiveStaffOwner();

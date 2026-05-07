@@ -1,6 +1,6 @@
 import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
 import logo from "../assets/icon-512.png";
-import { getStoredOrders } from "../lib/ordersStore";
+import { useStoredOrders } from "../lib/ordersStore";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 
 function FacebookIcon() {
@@ -27,9 +27,7 @@ function InstagramIcon() {
   );
 }
 
-function getSidebarCounts() {
-  const orders = getStoredOrders();
-
+function getSidebarCounts(orders = []) {
   return {
     productionOrders: orders.length,
     productionQueue: orders.filter((order) => order.production_ready).length,
@@ -121,7 +119,8 @@ function AttentionBadge({ count }) {
 }
 
 function AdminSidebar({ pathname, staffUser }) {
-  const badgeCounts = getSidebarCounts();
+  const orders = useStoredOrders();
+  const badgeCounts = getSidebarCounts(orders);
   const activeLink = getActiveSidebarLink(pathname);
   const role = staffUser?.role || "Staff";
   const adminSections = getAdminSections(role);

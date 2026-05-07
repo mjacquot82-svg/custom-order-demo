@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getStoredOrders } from "../lib/ordersStore";
+import { useStoredOrders } from "../lib/ordersStore";
 import StatusBadge from "../components/StatusBadge";
 
 function normalizeStatus(value) {
@@ -62,7 +62,7 @@ export default function Orders() {
     searchParams.get("filter") || "all"
   );
 
-  const orders = getStoredOrders().map(normalizeOrder);
+  const orders = useStoredOrders().map(normalizeOrder);
 
   const filteredOrders = useMemo(
     () =>

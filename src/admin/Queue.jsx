@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { getStoredOrders } from "../lib/ordersStore";
+import { useStoredOrders } from "../lib/ordersStore";
 import { buildWorkerQueueSections } from "../queue/buildWorkerQueueSections";
 import { buildUnassignedQueueSection } from "../queue/buildUnassignedQueueSection";
 import { buildQueueWorkerSummary } from "../queue/buildQueueWorkerSummary";
@@ -81,7 +81,7 @@ function OrderCard({ order }) {
 }
 
 export default function Queue() {
-  const orders = sortQueueByPriority(getStoredOrders().map(normalizeOrder));
+  const orders = sortQueueByPriority(useStoredOrders().map(normalizeOrder));
   const workerSections = buildWorkerQueueSections(orders).map((section) => ({
     ...section,
     orders: sortQueueByPriority(section.orders),

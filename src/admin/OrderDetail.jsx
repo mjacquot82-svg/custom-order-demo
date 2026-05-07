@@ -91,7 +91,8 @@ export default function OrderDetail() {
     saveOrderUpdates({
       assigned_to_staff_id: worker?.id || "",
       assigned_to_staff_name: worker?.name || "",
-      assigned_at: new Date().toISOString(),
+      assigned_to_staff_role: worker?.role || "",
+      assigned_at: worker ? new Date().toISOString() : null,
       needs_assignment: !worker,
     });
   }
