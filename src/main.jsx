@@ -2,9 +2,15 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
-createRoot(document.getElementById('root')).render(
+const root = createRoot(document.getElementById('root'))
+
+root.render(
   <App />,
 )
+
+requestAnimationFrame(() => {
+  document.body.classList.add('app-ready')
+})
 
 // Register service worker for installable desktop/mobile app support
 if ('serviceWorker' in navigator) {
