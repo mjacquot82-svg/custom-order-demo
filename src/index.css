@@ -9,6 +9,19 @@ body {
   color: #0f172a;
 }
 
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+header img,
+aside img {
+  width: auto !important;
+  height: auto !important;
+  contain: layout paint size;
+}
+
 .home-main-content {
   --home-stack-gap: 18px;
   --home-section-gap: 12px;
@@ -247,73 +260,5 @@ body {
     width: 100%;
     min-height: 44px !important;
     box-sizing: border-box;
-  }
-}
-
-@media (min-width: 900px) {
-  .home-main-content {
-    --home-stack-gap: 18px;
-    grid-template-columns: minmax(180px, 0.6fr) minmax(0, 4.4fr) minmax(180px, 0.6fr);
-    grid-template-areas:
-      "hero hero hero"
-      "steps categories decorations"
-      ". popular ."
-      "trust trust trust"
-      "support support support";
-    align-items: start;
-  }
-
-  .home-top-cta {
-    grid-area: hero;
-  }
-
-  .home-category-row-shell {
-    grid-area: categories;
-  }
-
-  .home-feature-frame {
-    display: contents;
-  }
-
-  .home-popular-column {
-    gap: 6px;
-  }
-
-  .home-category-grid,
-  .home-three-card-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .home-card-row-shell,
-  .home-popular-grid-shell {
-    max-width: 860px;
-    margin: 0 auto;
-  }
-
-  .home-popular-header {
-    width: 100%;
-    max-width: 860px;
-    margin: 0 auto;
-  }
-
-  .home-trust-strip {
-    grid-area: trust;
-  }
-
-  .home-support-card {
-    grid-area: support;
-  }
-
-  .home-steps-grid,
-  .home-decoration-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .home-trust-strip {
-    margin-top: -4px;
-  }
-
-  .home-support-card {
-    margin-top: -6px;
   }
 }
