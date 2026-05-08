@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { normalizeProductionType } from "../constants/productionTypes";
-import { useStoredOrders } from "../lib/ordersStore";
+import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import StatusBadge from "../components/StatusBadge";
-
-function normalizeStatus(value) {
-  return String(value || "").trim().toLowerCase();
-}
+import {
+  canAdvanceOperationalStatus,
+  getNextOperationalStatus,
+  isCompletedOperationalStatus,
+  isReadyForProductionStatus,
+  normalizeOperationalStatus,
+  sortOrdersByOperationalStatus,
+} from "../orders/orderWorkflow";
 
 function normalizeOrder(order) {
   return {
     ...order,
     customer_name: order.customer_name || "Walk-in Customer",
     garment: order.garment || order.item || "Custom garment",
-    assigned_to_staff_name:
-      order.assigned_to_staff_name || "Unassigned",
+    assigned_to_staff_name: order.assigned_to_staff_name || "Unassigned",
     decoration_type: normalizeProductionType(order.decoration_type),
-    status: order.status || "Awaiting Artwork",
+    status: normalizeOperationalStatus(order.status || "New"),
   };
 }
 
@@ -51,7 +54,7 @@ function tabMatchesOrder(order, activeTab) {
   }
 
   if (activeTab === "production") {
-    return order.operational_visible !== false;
+    return order.operational_visible !== false && !isCompletedOperationalStatus(order.status);
   }
 
   return true;
@@ -68,7 +71,7 @@ export default function Orders() {
     setActiveTabKey(activeFilter);
   }, [activeFilter]);
 
-  const orders = useStoredOrders().map(normalizeOrder);
+  const orders = sortOrdersByOperationalStatus(useStoredOrders().map(normalizeOrder));
 
   const filteredOrders = useMemo(
     () =>
@@ -81,6 +84,26 @@ export default function Orders() {
   function selectTab(tabKey) {
     setActiveTabKey(tabKey);
     setSearchParams(tabKey === "all" ? {} : { filter: tabKey });
+  }
+
+  function handleAdvanceStatus(order) {
+    const nextStatus = getNextOperationalStatus(order.status);
+    const updates = {
+      status: nextStatus,
+      activity_type: "status_change",
+      activity_note: `Status changed to ${nextStatus}.`,
+    };
+
+    if (nextStatus === "In Production") {
+      updates.production_started_at = order.production_started_at || new Date().toISOString();
+      updates.production_ready = true;
+    }
+
+    if (nextStatus === "Completed") {
+      updates.completed_at = new Date().toISOString();
+    }
+
+    updateStoredOrder(order.order_number, updates);
   }
 
   return (
@@ -198,6 +221,9 @@ export default function Orders() {
                 <th style={{ padding: "12px 8px", textAlign: "left" }}>
                   Status
                 </th>
+                <th style={{ padding: "12px 8px", textAlign: "left" }}>
+                  Action
+                </th>
               </tr>
             </thead>
 
@@ -235,12 +261,20 @@ export default function Orders() {
                   <td style={{ padding: "14px 8px" }}>
                     <span
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        borderRadius: "999px",
+                        padding: "6px 10px",
                         color:
                           order.assigned_to_staff_name ===
                           "Unassigned"
                             ? "#b45309"
                             : "#166534",
                         fontWeight: 700,
+                        background:
+                          order.assigned_to_staff_name === "Unassigned"
+                            ? "#fff7ed"
+                            : "#ecfdf5",
                       }}
                     >
                       {order.assigned_to_staff_name}
@@ -250,12 +284,37 @@ export default function Orders() {
                   <td style={{ padding: "14px 8px" }}>
                     <StatusBadge status={order.status} />
                   </td>
+
+                  <td style={{ padding: "14px 8px" }}>
+                    {canAdvanceOperationalStatus(order.status) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleAdvanceStatus(order)}
+                        style={{
+                          border: "none",
+                          background: isReadyForProductionStatus(order.status)
+                            ? "#171717"
+                            : "#334155",
+                          color: "#ffffff",
+                          borderRadius: "10px",
+                          padding: "9px 12px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Mark {getNextOperationalStatus(order.status)}
+                      </button>
+                    ) : (
+                      <span style={{ color: "#64748b", fontWeight: 700 }}>
+                        Complete
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {filteredOrders.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     style={{
                       padding: "24px 8px",
                       textAlign: "center",

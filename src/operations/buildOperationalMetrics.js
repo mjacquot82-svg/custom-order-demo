@@ -2,10 +2,10 @@ import {
   normalizeProductionType,
   PRODUCTION_TYPES,
 } from "../constants/productionTypes";
-
-function normalize(value) {
-  return String(value || "").trim().toLowerCase();
-}
+import {
+  isCompletedOperationalStatus,
+  normalizeOperationalStatus,
+} from "../orders/orderWorkflow";
 
 export function buildOperationalMetrics(orders = []) {
   const today = new Date();
@@ -28,12 +28,12 @@ export function buildOperationalMetrics(orders = []) {
       return;
     }
 
-    const status = normalize(order.status);
+    const status = normalizeOperationalStatus(order.status);
 
     if (order.due_date) {
       const dueDate = new Date(`${order.due_date}T00:00:00`);
 
-      if (dueDate < today && status !== "completed") {
+      if (dueDate < today && !isCompletedOperationalStatus(status)) {
         overdue += 1;
       }
 
@@ -42,11 +42,11 @@ export function buildOperationalMetrics(orders = []) {
       }
     }
 
-    if (["in production", "printing", "ready for production"].includes(status)) {
+    if (["Awaiting Production", "In Production"].includes(status)) {
       activeProduction += 1;
     }
 
-    if (status === "ready for pickup") {
+    if (status === "Ready for Pickup") {
       readyForPickup += 1;
     }
 

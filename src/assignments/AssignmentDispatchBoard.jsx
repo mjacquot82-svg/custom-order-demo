@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { buildAssignmentDispatchGroups } from "./buildAssignmentDispatchGroups";
+import StatusBadge from "../components/StatusBadge";
 
 export default function AssignmentDispatchBoard({ orders = [] }) {
   const groups = buildAssignmentDispatchGroups(orders);
@@ -56,14 +58,18 @@ export default function AssignmentDispatchBoard({ orders = [] }) {
             }}
           >
             {group.orders.map((order) => (
-              <article
+              <Link
                 key={order.order_number}
+                to={`/admin/orders/${order.order_number}`}
                 style={{
+                  display: "grid",
+                  gap: "6px",
+                  textDecoration: "none",
+                  color: "#0f172a",
                   border: "1px dashed #cbd5e1",
                   borderRadius: "14px",
                   padding: "12px",
                   background: "#f8fafc",
-                  cursor: "grab",
                 }}
               >
                 <strong>{order.order_number}</strong>
@@ -72,8 +78,13 @@ export default function AssignmentDispatchBoard({ orders = [] }) {
                   <span>{order.customer_name || "Walk-in Customer"}</span>
                   <span>{order.garment || order.item || "Custom garment"}</span>
                   <span>Due: {order.due_date || "—"}</span>
+                  <span>Assigned: {order.assigned_to_staff_name || "Unassigned"}</span>
                 </div>
-              </article>
+
+                <div style={{ marginTop: "4px" }}>
+                  <StatusBadge status={order.status} />
+                </div>
+              </Link>
             ))}
           </div>
         </section>

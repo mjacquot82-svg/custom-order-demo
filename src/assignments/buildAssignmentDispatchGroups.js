@@ -1,6 +1,7 @@
-function normalize(value) {
-  return String(value || "").trim().toLowerCase();
-}
+import {
+  isCompletedOperationalStatus,
+  sortOrdersByOperationalStatus,
+} from "../orders/orderWorkflow";
 
 export function buildAssignmentDispatchGroups(orders = []) {
   const grouped = {};
@@ -23,16 +24,14 @@ export function buildAssignmentDispatchGroups(orders = []) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      return dueDate < today && normalize(order.status) !== "completed";
+      return dueDate < today && !isCompletedOperationalStatus(order.status);
     }).length;
 
     return {
       workerName,
       overdueCount,
       orderCount: workerOrders.length,
-      orders: workerOrders.sort((a, b) => {
-        return String(a.due_date || "").localeCompare(String(b.due_date || ""));
-      }),
+      orders: sortOrdersByOperationalStatus(workerOrders),
     };
   });
 }

@@ -129,7 +129,7 @@ export default function WorkOrder() {
             </div>
             <div style={{ minWidth: "220px" }}>
               <p><strong>Status:</strong></p>
-              <StatusBadge status={order.status || "Awaiting Artwork"} />
+              <StatusBadge status={order.status || "New"} />
               <p style={{ marginTop: "16px" }}><strong>Production Ready:</strong> {order.production_ready ? "Yes" : "No"}</p>
               <p><strong>Deposit:</strong> {order.deposit?.status || "not set"}</p>
             </div>

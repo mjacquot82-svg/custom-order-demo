@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { findStoredOrder, updateStoredOrder } from "../lib/ordersStore";
+import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { getStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
@@ -12,6 +12,10 @@ import ProductionInstructionsPanel from "../order-detail/ProductionInstructionsP
 import ArtworkPreviewPanel from "../order-detail/ArtworkPreviewPanel";
 import PrintableProductionTicket from "../order-detail/PrintableProductionTicket";
 import { buildOrderUrgency } from "../order-detail/buildOrderUrgency";
+import {
+  getNextOperationalStatus,
+  normalizeOperationalStatus,
+} from "../orders/orderWorkflow";
 
 const cardStyle = {
   background: "#ffffff",
@@ -33,18 +37,18 @@ function money(value) {
 
 export default function OrderDetail() {
   const { orderNumber } = useParams();
-  const [order, setOrder] = useState(null);
+  const storedOrders = useStoredOrders();
+  const order = useMemo(
+    () => storedOrders.find((entry) => entry.order_number === orderNumber) || null,
+    [orderNumber, storedOrders]
+  );
   const [staffUsers, setStaffUsers] = useState([]);
 
   useEffect(() => {
-    const stored = findStoredOrder(orderNumber);
-    if (!stored) return;
-
-    setOrder(stored);
     setStaffUsers(
       getStoredStaffUsers().filter((staffUser) => staffUser.status !== "Inactive")
     );
-  }, [orderNumber]);
+  }, [orderNumber, storedOrders]);
 
   const selectedProduct = useMemo(() => {
     if (!order) return null;
@@ -82,13 +86,22 @@ export default function OrderDetail() {
       ...updates,
     });
 
-    if (updated) {
-      setOrder(updated);
-    }
+    return updated;
   }
 
   function handleAssign(staffId) {
     const worker = staffUsers.find((staff) => staff.id === staffId);
+    const previousAssignment = order.assigned_to_staff_name || "";
+    const nextAssignment = worker?.name || "";
+
+    let activityNote = "Assignment unchanged.";
+    if (!previousAssignment && nextAssignment) {
+      activityNote = `Assigned to ${nextAssignment}.`;
+    } else if (previousAssignment && !nextAssignment) {
+      activityNote = `Unassigned from ${previousAssignment}.`;
+    } else if (previousAssignment && nextAssignment && previousAssignment !== nextAssignment) {
+      activityNote = `Reassigned from ${previousAssignment} to ${nextAssignment}.`;
+    }
 
     saveOrderUpdates({
       assigned_to_staff_id: worker?.id || "",
@@ -96,28 +109,30 @@ export default function OrderDetail() {
       assigned_to_staff_role: worker?.role || "",
       assigned_at: worker ? new Date().toISOString() : null,
       needs_assignment: !worker,
+      activity_type: "assignment",
+      activity_note: activityNote,
     });
   }
 
-  function handleStartProduction() {
-    saveOrderUpdates({
-      status: "In Production",
-      production_ready: true,
-      production_started_at: new Date().toISOString(),
-    });
-  }
+  function handleAdvanceStatus() {
+    const nextStatus = getNextOperationalStatus(order.status);
+    const now = new Date().toISOString();
+    const nextUpdates = {
+      status: nextStatus,
+      activity_type: "status_change",
+      activity_note: `Status changed to ${nextStatus}.`,
+    };
 
-  function handlePauseProduction() {
-    saveOrderUpdates({
-      status: "On Hold",
-    });
-  }
+    if (normalizeOperationalStatus(nextStatus) === "In Production") {
+      nextUpdates.production_started_at = order.production_started_at || now;
+      nextUpdates.production_ready = true;
+    }
 
-  function handleCompleteProduction() {
-    saveOrderUpdates({
-      status: "Completed",
-      completed_at: new Date().toISOString(),
-    });
+    if (normalizeOperationalStatus(nextStatus) === "Completed") {
+      nextUpdates.completed_at = now;
+    }
+
+    saveOrderUpdates(nextUpdates);
   }
 
   return (
@@ -220,9 +235,7 @@ export default function OrderDetail() {
             order={order}
             staffUsers={staffUsers}
             onAssign={handleAssign}
-            onStart={handleStartProduction}
-            onPause={handlePauseProduction}
-            onComplete={handleCompleteProduction}
+            onAdvanceStatus={handleAdvanceStatus}
           />
 
           <section style={cardStyle}>

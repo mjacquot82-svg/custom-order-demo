@@ -299,7 +299,7 @@ export default function CustomerDetail() {
                       <td style={{ padding: "12px 8px" }}>{order.garment || "—"}</td>
                       <td style={{ padding: "12px 8px" }}>{order.qty || "—"}</td>
                       <td style={{ padding: "12px 8px" }}>
-                        <StatusBadge status={order.status || "Awaiting Artwork"} />
+                        <StatusBadge status={order.status || "New"} />
                       </td>
                       <td style={{ padding: "12px 8px" }}>{order.due_date || "—"}</td>
                       <td style={{ padding: "12px 8px" }}>

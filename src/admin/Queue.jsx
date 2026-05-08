@@ -5,6 +5,12 @@ import { buildWorkerQueueSections } from "../queue/buildWorkerQueueSections";
 import { buildUnassignedQueueSection } from "../queue/buildUnassignedQueueSection";
 import { buildQueueWorkerSummary } from "../queue/buildQueueWorkerSummary";
 import { buildQueuePriority, sortQueueByPriority } from "../queue/buildQueuePriority";
+import StatusBadge from "../components/StatusBadge";
+import {
+  isCompletedOperationalStatus,
+  normalizeOperationalStatus,
+  sortOrdersByOperationalStatus,
+} from "../orders/orderWorkflow";
 
 function normalizeOrder(order) {
   return {
@@ -13,6 +19,7 @@ function normalizeOrder(order) {
     garment: order.garment || order.item || "Custom garment",
     assigned_to_staff_name: order.assigned_to_staff_name || "Unassigned",
     decoration_type: normalizeProductionType(order.decoration_type),
+    status: normalizeOperationalStatus(order.status),
   };
 }
 
@@ -77,6 +84,9 @@ function OrderCard({ order }) {
       <span>{order.decoration_type}</span>
       <span>Due: {order.due_date || "—"}</span>
       <span>Assigned: {order.assigned_to_staff_name || "Unassigned"}</span>
+      <div>
+        <StatusBadge status={order.status} />
+      </div>
     </Link>
   );
 }
@@ -87,23 +97,27 @@ export default function Queue() {
       .map(normalizeOrder)
       .filter((order) => order.operational_visible !== false)
   );
-  const workerSections = buildWorkerQueueSections(orders).map((section) => ({
+  const activeOrders = orders.filter((order) => !isCompletedOperationalStatus(order.status));
+  const completedOrders = sortOrdersByOperationalStatus(
+    orders.filter((order) => isCompletedOperationalStatus(order.status))
+  );
+  const workerSections = buildWorkerQueueSections(activeOrders).map((section) => ({
     ...section,
     orders: sortQueueByPriority(section.orders),
   }));
-  const unassignedSection = buildUnassignedQueueSection(orders);
+  const unassignedSection = buildUnassignedQueueSection(activeOrders);
   const workerSummary = buildQueueWorkerSummary(workerSections);
 
   const overdueCount = orders.filter((order) => buildQueuePriority(order).overdue).length;
   const dueSoonCount = orders.filter((order) => buildQueuePriority(order).dueSoon).length;
-  const pausedCount = orders.filter((order) => buildQueuePriority(order).paused).length;
+  const completedCount = completedOrders.length;
 
   return (
     <div style={{ maxWidth: "1360px", margin: "0 auto", padding: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", gap: "12px", flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0 }}>Production Queue</h1>
-          <p style={{ margin: "6px 0 0", color: "#64748b" }}>Priority-sorted production queue with overdue, due-soon, paused, and assignment warnings.</p>
+          <p style={{ margin: "6px 0 0", color: "#64748b" }}>Priority-sorted production queue with workflow status ordering, assignment visibility, and completed work separated from active operations.</p>
         </div>
         <Link to="/admin/assignments" style={{ background: "#171717", color: "#ffffff", textDecoration: "none", borderRadius: "12px", padding: "12px 16px", fontWeight: 700 }}>Open Assignments</Link>
       </div>
@@ -111,7 +125,7 @@ export default function Queue() {
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "18px" }}>
         <div style={{ background: "#fef2f2", borderRadius: "16px", padding: "14px", border: "1px solid #fecaca" }}><strong style={{ color: "#b91c1c" }}>Overdue</strong><h2>{overdueCount}</h2></div>
         <div style={{ background: "#fffbeb", borderRadius: "16px", padding: "14px", border: "1px solid #fde68a" }}><strong style={{ color: "#b45309" }}>Due Soon</strong><h2>{dueSoonCount}</h2></div>
-        <div style={{ background: "#f8fafc", borderRadius: "16px", padding: "14px", border: "1px solid #e2e8f0" }}><strong style={{ color: "#475569" }}>Paused / Hold</strong><h2>{pausedCount}</h2></div>
+        <div style={{ background: "#f5f5f4", borderRadius: "16px", padding: "14px", border: "1px solid #d6d3d1" }}><strong style={{ color: "#57534e" }}>Completed</strong><h2>{completedCount}</h2></div>
       </section>
 
       <section style={{ background: "#ffffff", borderRadius: "18px", padding: "16px", marginBottom: "18px", border: "1px solid #e2e8f0" }}>
@@ -144,6 +158,16 @@ export default function Queue() {
           </section>
         ))}
       </div>
+
+      {completedOrders.length > 0 && (
+        <section style={{ background: "#fafaf9", borderRadius: "18px", padding: "16px", border: "1px solid #e7e5e4", marginTop: "18px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
+            <h2 style={{ margin: 0 }}>Completed Orders</h2>
+            <span style={{ color: "#57534e", fontWeight: 700 }}>{completedOrders.length} closed jobs</span>
+          </div>
+          <div style={{ display: "grid", gap: "10px" }}>{completedOrders.map((order) => <OrderCard key={order.order_number} order={order} />)}</div>
+        </section>
+      )}
     </div>
   );
 }

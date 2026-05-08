@@ -1,6 +1,11 @@
 import { useSyncExternalStore } from "react";
 import { demoOrders } from "../data/demoOrders";
 import { normalizeProductionType } from "../constants/productionTypes";
+import {
+  isActiveOperationalStatus,
+  isReadyForProductionStatus,
+  normalizeOperationalStatus,
+} from "../orders/orderWorkflow";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 
 const STORAGE_KEY = "teeCoStaffOrders";
@@ -9,10 +14,6 @@ const EMPTY_ORDERS = [];
 
 let cachedOrdersRaw = null;
 let cachedOrdersSnapshot = EMPTY_ORDERS;
-
-function normalizeStatus(value) {
-  return String(value || "").trim().toLowerCase();
-}
 
 function normalizeArtworkFiles(files) {
   return Array.isArray(files) ? files.filter(Boolean) : [];
@@ -41,19 +42,11 @@ function normalizeStoredOrder(order = {}) {
   const assignedToStaffId = order.assigned_to_staff_id || "";
   const assignedToStaffName = order.assigned_to_staff_name || "";
   const hasAssignedStaff = Boolean(assignedToStaffId);
-  const status = order.status || "Awaiting Artwork";
-  const normalizedStatus = normalizeStatus(status);
+  const status = normalizeOperationalStatus(order.status || "New");
   const artworkFiles = normalizeArtworkFiles(order.artwork_files);
   const placements = normalizePlacements(order);
   const primaryPlacement = placements[0] || null;
   const primaryArtwork = artworkFiles[0] || null;
-  const productionReadyStatuses = [
-    "approved",
-    "ready for production",
-    "in production",
-    "printing",
-    "ready for pickup",
-  ];
 
   return {
     ...order,
@@ -81,11 +74,11 @@ function normalizeStoredOrder(order = {}) {
     production_ready:
       typeof order.production_ready === "boolean"
         ? order.production_ready
-        : productionReadyStatuses.includes(normalizedStatus),
+        : isReadyForProductionStatus(status),
     operational_visible:
       typeof order.operational_visible === "boolean"
         ? order.operational_visible
-        : normalizedStatus !== "completed",
+        : isActiveOperationalStatus(status),
   };
 }
 
@@ -169,10 +162,9 @@ function buildAssignmentUpdates(currentOrder, updates) {
     ? updates.assigned_to_staff_role || ""
     : currentOrder.assigned_to_staff_role || "";
   const assigned = Boolean(assignedToStaffId);
-  const nextStatus = normalizeStatus(updates.status || currentOrder.status);
-  const shouldAdvanceToReadyForProduction =
-    assigned &&
-    ["submitted", "paid", "approved"].includes(nextStatus);
+  const nextStatus = normalizeOperationalStatus(
+    updates.status || currentOrder.status
+  );
 
   return {
     ...updates,
@@ -186,11 +178,11 @@ function buildAssignmentUpdates(currentOrder, updates) {
         ? currentOrder.assigned_at || new Date().toISOString()
         : null,
     needs_assignment: assigned ? false : true,
-    status: shouldAdvanceToReadyForProduction
-      ? "Ready for Production"
-      : updates.status || currentOrder.status,
+    status: nextStatus,
     production_ready:
-      shouldAdvanceToReadyForProduction || updates.production_ready || currentOrder.production_ready || false,
+      Object.prototype.hasOwnProperty.call(updates, "production_ready")
+        ? updates.production_ready
+        : isReadyForProductionStatus(nextStatus),
   };
 }
 
@@ -205,6 +197,26 @@ function buildActivityEvent(type, note, timestamp = new Date().toISOString()) {
     staff_name: staff?.name || "Unknown Staff",
     staff_role: staff?.role || "",
     created_at: timestamp,
+  };
+}
+
+function buildWorkflowDerivedUpdates(currentOrder, updates) {
+  const nextStatus = normalizeOperationalStatus(updates.status || currentOrder.status);
+  const shouldDeriveStatus = Object.prototype.hasOwnProperty.call(updates, "status");
+
+  return {
+    ...updates,
+    status: nextStatus,
+    production_ready: shouldDeriveStatus
+      ? isReadyForProductionStatus(nextStatus)
+      : Object.prototype.hasOwnProperty.call(updates, "production_ready")
+      ? updates.production_ready
+      : currentOrder.production_ready,
+    operational_visible: shouldDeriveStatus
+      ? isActiveOperationalStatus(nextStatus)
+      : Object.prototype.hasOwnProperty.call(updates, "operational_visible")
+      ? updates.operational_visible
+      : currentOrder.operational_visible,
   };
 }
 
@@ -304,7 +316,7 @@ export function createStoredOrder(orderInput) {
     ...orderInput,
     ...createdAuditFields,
     order_number: orderNumber,
-    status: orderInput.status || "Awaiting Artwork",
+    status: normalizeOperationalStatus(orderInput.status || "New"),
     date: new Date(createdAt).toLocaleDateString(),
     created_at: createdAt,
     source: orderInput.source || "Staff Entry",
@@ -335,7 +347,7 @@ export function updateStoredOrder(orderNumber, updates) {
     if (order.order_number !== orderNumber) return order;
 
     const cleanUpdates = stripActivityMeta(
-      buildAssignmentUpdates(order, updates)
+      buildWorkflowDerivedUpdates(order, buildAssignmentUpdates(order, updates))
     );
 
     updatedOrder = normalizeStoredOrder({
@@ -366,7 +378,7 @@ export function duplicateStoredOrder(orderNumber) {
 
   const copiedOrder = {
     ...original,
-    status: "Awaiting Artwork",
+    status: "New",
     approval_status: "Not Sent",
     approval_note: "",
     approval_sent_at: null,

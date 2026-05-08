@@ -1,30 +1,10 @@
-const workflowStages = [
-  "Quote",
-  "Approval",
-  "Deposit",
-  "Production",
-  "Ready",
-  "Picked Up",
-];
-
-function normalize(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function getCurrentStageIndex(order = {}) {
-  const status = normalize(order.status);
-
-  if (["completed", "picked up"].includes(status)) return 5;
-  if (status === "ready for pickup") return 4;
-  if (["in production", "printing", "ready for production"].includes(status)) return 3;
-  if (status.includes("deposit")) return 2;
-  if (["approved", "awaiting approval"].includes(status)) return 1;
-
-  return 0;
-}
+import {
+  getOperationalStatusIndex,
+  OPERATIONAL_ORDER_STATUSES,
+} from "../orders/orderWorkflow";
 
 export default function ProductionProgressTracker({ order }) {
-  const currentStage = getCurrentStageIndex(order);
+  const currentStage = Math.max(0, getOperationalStatusIndex(order.status));
 
   return (
     <section
@@ -44,7 +24,7 @@ export default function ProductionProgressTracker({ order }) {
           gap: "10px",
         }}
       >
-        {workflowStages.map((stage, index) => {
+        {OPERATIONAL_ORDER_STATUSES.map((stage, index) => {
           const complete = index < currentStage;
           const active = index === currentStage;
 

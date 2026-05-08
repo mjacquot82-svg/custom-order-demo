@@ -7,14 +7,18 @@ import {
 } from "../lib/ordersStore";
 import { getStoredStaffUsers } from "../lib/staffUsersStore";
 import AssignmentDispatchBoard from "../assignments/AssignmentDispatchBoard";
+import {
+  isActiveOperationalStatus,
+  isCompletedOperationalStatus,
+  normalizeOperationalStatus,
+  sortOrdersByOperationalStatus,
+} from "../orders/orderWorkflow";
 
-const openStatuses = ["awaiting artwork", "mockup sent", "awaiting approval", "approved", "awaiting deposit", "in production", "printing", "ready for pickup", "on hold"];
 const cardStyle = { background: "#ffffff", borderRadius: "20px", padding: "22px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", border: "1px solid #e7e5e4" };
 const selectStyle = { width: "100%", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "10px 11px", background: "#ffffff", color: "#0f172a", fontWeight: 700 };
-function normalizeStatus(value) { return String(value || "").trim().toLowerCase(); }
-function isOpenOrder(order) { const status = normalizeStatus(order.status); return order.operational_visible !== false && (openStatuses.includes(status) || Boolean(order.production_ready) || Boolean(order.needs_assignment)); }
-function normalizeOrder(order, index = 0) { return { ...order, customer_name: order.customer_name || ["ABC Construction", "City Hockey", "Local Customer"][index] || "Walk-in Customer", garment: order.garment || order.item || "Custom garment", status: order.status === "Submitted" || order.status === "Paid" ? "Approved" : order.status || "Awaiting Artwork", qty: Number(order.qty || 0), due_date: order.due_date || "", assigned_to_staff_id: order.assigned_to_staff_id || "", assigned_to_staff_name: order.assigned_to_staff_name || "", operational_visible: order.operational_visible !== false }; }
-function isOverdue(order) { if (!order.due_date) return false; const due = new Date(`${order.due_date}T00:00:00`); const today = new Date(); today.setHours(0,0,0,0); return due < today && normalizeStatus(order.status) !== "completed"; }
+function isOpenOrder(order) { return order.operational_visible !== false && isActiveOperationalStatus(order.status); }
+function normalizeOrder(order, index = 0) { return { ...order, customer_name: order.customer_name || ["ABC Construction", "City Hockey", "Local Customer"][index] || "Walk-in Customer", garment: order.garment || order.item || "Custom garment", status: normalizeOperationalStatus(order.status || "New"), qty: Number(order.qty || 0), due_date: order.due_date || "", assigned_to_staff_id: order.assigned_to_staff_id || "", assigned_to_staff_name: order.assigned_to_staff_name || "", operational_visible: order.operational_visible !== false }; }
+function isOverdue(order) { if (!order.due_date) return false; const due = new Date(`${order.due_date}T00:00:00`); const today = new Date(); today.setHours(0,0,0,0); return due < today && !isCompletedOperationalStatus(order.status); }
 function formatWorkerName(worker) { return `${worker.name}${worker.role ? ` (${worker.role})` : ""}`; }
 
 function UrgentAssignmentCard({ order, staffUsers, onAssign }) {
@@ -46,7 +50,7 @@ export default function Assignments() {
     []
   );
   const orders = useMemo(
-    () => storedOrders.map(normalizeOrder).filter(isOpenOrder),
+    () => sortOrdersByOperationalStatus(storedOrders.map(normalizeOrder).filter(isOpenOrder)),
     [storedOrders]
   );
   const unassignedOrders = orders.filter((order) => !order.assigned_to_staff_id).sort((a, b) => String(a.due_date || "").localeCompare(String(b.due_date || "")));
@@ -55,7 +59,19 @@ export default function Assignments() {
 
   function handleAssign(order, staffId) {
     const selectedWorker = staffUsers.find((worker) => worker.id === staffId);
-    updateStoredOrder(order.order_number, { assigned_to_staff_id: selectedWorker?.id || "", assigned_to_staff_name: selectedWorker?.name || "", assigned_to_staff_role: selectedWorker?.role || "", assigned_at: selectedWorker ? new Date().toISOString() : null, needs_assignment: !selectedWorker, activity_type: "assignment", activity_note: selectedWorker ? `Assigned to ${selectedWorker.name}.` : "Worker assignment removed." });
+    const previousAssignment = order.assigned_to_staff_name || "";
+    const nextAssignment = selectedWorker?.name || "";
+    const activityNote = !previousAssignment && nextAssignment
+      ? `Assigned to ${nextAssignment}.`
+      : previousAssignment && !nextAssignment
+      ? `Unassigned from ${previousAssignment}.`
+      : previousAssignment && nextAssignment && previousAssignment !== nextAssignment
+      ? `Reassigned from ${previousAssignment} to ${nextAssignment}.`
+      : selectedWorker
+      ? `Assignment confirmed for ${nextAssignment}.`
+      : "Assignment cleared.";
+
+    updateStoredOrder(order.order_number, { assigned_to_staff_id: selectedWorker?.id || "", assigned_to_staff_name: selectedWorker?.name || "", assigned_to_staff_role: selectedWorker?.role || "", assigned_at: selectedWorker ? new Date().toISOString() : null, needs_assignment: !selectedWorker, activity_type: "assignment", activity_note: activityNote });
   }
 
   return (

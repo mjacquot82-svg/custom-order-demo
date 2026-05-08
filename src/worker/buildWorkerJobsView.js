@@ -1,3 +1,5 @@
+import { normalizeOperationalStatus } from "../orders/orderWorkflow";
+
 export function buildWorkerJobsView(orders = [], worker = "") {
   const workerId =
     worker && typeof worker === "object" ? worker.id || "" : "";
@@ -17,20 +19,25 @@ export function buildWorkerJobsView(orders = [], worker = "") {
   };
 
   workerOrders.forEach((order) => {
-    const status = String(order.status || "").toLowerCase();
+    const status = normalizeOperationalStatus(order.status);
 
-    if (["completed", "picked up"].includes(status)) {
+    if (status === "Completed") {
       grouped.completed.push(order);
       return;
     }
 
-    if (["on hold", "paused"].includes(status)) {
-      grouped.paused.push(order);
+    if (status === "Picked Up") {
+      grouped.completed.push(order);
       return;
     }
 
-    if (["in production", "printing"].includes(status)) {
+    if (status === "In Production") {
       grouped.inProgress.push(order);
+      return;
+    }
+
+    if (status === "Ready for Pickup") {
+      grouped.paused.push(order);
       return;
     }
 

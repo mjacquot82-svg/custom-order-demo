@@ -1,6 +1,8 @@
-function normalize(value) {
-  return String(value || "").trim().toLowerCase();
-}
+import {
+  getOperationalStatusIndex,
+  isCompletedOperationalStatus,
+  normalizeOperationalStatus,
+} from "../orders/orderWorkflow";
 
 export function buildQueuePriority(order = {}) {
   const today = new Date();
@@ -13,24 +15,26 @@ export function buildQueuePriority(order = {}) {
   if (order.due_date) {
     const dueDate = new Date(`${order.due_date}T00:00:00`);
     daysUntilDue = Math.ceil((dueDate - today) / 86400000);
-    overdue = daysUntilDue < 0 && normalize(order.status) !== "completed";
+    overdue = daysUntilDue < 0 && !isCompletedOperationalStatus(order.status);
     dueSoon = !overdue && daysUntilDue <= 2;
   }
 
   const unassigned = !order.assigned_to_staff_id && !order.assigned_to_staff_name;
-  const paused = ["on hold", "paused"].includes(normalize(order.status));
+  const status = normalizeOperationalStatus(order.status);
+  const completed = status === "Completed";
 
   let priorityScore = 0;
   if (overdue) priorityScore += 100;
   if (dueSoon) priorityScore += 50;
   if (unassigned) priorityScore += 25;
-  if (paused) priorityScore += 10;
+  priorityScore += Math.max(0, 20 - getOperationalStatusIndex(status));
+  if (completed) priorityScore -= 200;
 
   return {
     overdue,
     dueSoon,
     unassigned,
-    paused,
+    completed,
     daysUntilDue,
     priorityScore,
     priorityLabel: overdue
@@ -39,8 +43,8 @@ export function buildQueuePriority(order = {}) {
       ? "Due Soon"
       : unassigned
       ? "Needs Assignment"
-      : paused
-      ? "Paused"
+      : completed
+      ? "Completed"
       : "Normal",
   };
 }
