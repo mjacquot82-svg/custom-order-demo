@@ -52,26 +52,30 @@ function getAdminSections(role) {
     {
       title: "Overview",
       links: [
-        { to: "/admin", label: "Dashboard" },
-        { to: "/admin/staff-users", label: "Manage Staff" },
+        { to: "/admin", label: "Dashboard", navKey: "dashboard" },
+        { to: "/admin/orders", label: "Orders", navKey: "orders" },
+        { to: "/admin/staff-users", label: "Manage Staff", navKey: "staffUsers" },
       ],
     },
     {
       title: "Production",
       links: [
         {
-          to: "/admin/orders",
+          to: "/admin/orders?filter=production",
           label: "Production Orders",
+          navKey: "productionOrders",
           badgeKey: "productionOrders",
         },
         {
           to: "/admin/queue",
           label: "Production Queue",
+          navKey: "productionQueue",
           badgeKey: "productionQueue",
         },
         {
           to: "/admin/assignments",
           label: "Assignments",
+          navKey: "assignments",
           badgeKey: "assignments",
         },
       ],
@@ -79,22 +83,28 @@ function getAdminSections(role) {
     {
       title: "Records",
       links: [
-        { to: "/admin/customers", label: "Customers" },
+        { to: "/admin/customers", label: "Customers", navKey: "customers" },
         ...(isOwner
-          ? [{ to: "/admin/products", label: "Products" }]
+          ? [{ to: "/admin/products", label: "Products", navKey: "products" }]
           : []),
       ],
     },
   ];
 }
 
-function getActiveSidebarLink(pathname) {
-  if (pathname.startsWith("/admin/assignments")) return "/admin/assignments";
-  if (pathname.startsWith("/admin/orders")) return "/admin/orders";
-  if (pathname.startsWith("/admin/queue")) return "/admin/queue";
-  if (pathname.startsWith("/admin/products")) return "/admin/products";
-  if (pathname.startsWith("/admin/staff-users")) return "/admin/staff-users";
-  if (pathname === "/admin") return "/admin";
+function getActiveSidebarLink(pathname, search) {
+  const orderFilter = new URLSearchParams(search).get("filter");
+
+  if (pathname.startsWith("/admin/assignments")) return "assignments";
+  if (pathname.startsWith("/admin/queue")) return "productionQueue";
+  if (pathname.startsWith("/admin/products")) return "products";
+  if (pathname.startsWith("/admin/customers")) return "customers";
+  if (pathname.startsWith("/admin/staff-users")) return "staffUsers";
+  if (pathname === "/admin/orders") {
+    return orderFilter === "production" ? "productionOrders" : "orders";
+  }
+  if (pathname.startsWith("/admin/orders/")) return "productionOrders";
+  if (pathname === "/admin") return "dashboard";
   return "";
 }
 
@@ -123,10 +133,10 @@ function AttentionBadge({ count }) {
   );
 }
 
-function AdminSidebar({ pathname, staffUser }) {
+function AdminSidebar({ pathname, search, staffUser }) {
   const orders = useStoredOrders();
   const badgeCounts = getSidebarCounts(orders);
-  const activeLink = getActiveSidebarLink(pathname);
+  const activeLink = getActiveSidebarLink(pathname, search);
   const role = staffUser?.role || "Staff";
   const adminSections = getAdminSections(role);
 
@@ -230,7 +240,7 @@ function AdminSidebar({ pathname, staffUser }) {
 
           <div style={{ display: "grid", gap: "6px" }}>
             {section.links.map((link) => {
-              const active = activeLink === link.to;
+              const active = activeLink === (link.navKey || link.to);
 
               return (
                 <Link
@@ -549,6 +559,7 @@ export default function Layout() {
         <div style={{ display: "flex", alignItems: "flex-start" }}>
           <AdminSidebar
             pathname={location.pathname}
+            search={location.search}
             staffUser={activeStaffUser}
           />
 

@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
 import { getStoredQuickSales } from "../lib/salesStore";
 import DashboardAssignmentsPanel from "../dashboard/DashboardAssignmentsPanel";
@@ -7,15 +6,6 @@ import { buildOperationalMetrics } from "../operations/buildOperationalMetrics";
 
 function currency(value) {
   return `$${Number(value || 0).toFixed(2)}`;
-}
-
-function ActionCard({ to, title, description, primary }) {
-  return (
-    <Link to={to} style={{ display: "block", textDecoration: "none", background: primary ? "#171717" : "#ffffff", color: primary ? "#ffffff" : "#171717", border: primary ? "1px solid #171717" : "1px solid #e2e8f0", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-      <h3 style={{ margin: "0 0 8px" }}>{title}</h3>
-      <p style={{ margin: 0, color: primary ? "#e7e5e4" : "#64748b" }}>{description}</p>
-    </Link>
-  );
 }
 
 function Section({ title, children }) {
@@ -74,15 +64,6 @@ export default function Dashboard() {
               <h2 style={{ margin: "8px 0 0" }}>{total} jobs</h2>
             </article>
           ))}
-        </div>
-      </Section>
-
-      <Section title="Operations Shortcuts">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" }}>
-          <ActionCard to="/admin/assignments" title="Assignments" description="Dispatch and rebalance production workload." primary />
-          <ActionCard to="/admin/queue" title="Production Queue" description="Monitor production status and overdue jobs." />
-          <ActionCard to="/admin/orders" title="Orders" description="Manage production orders and workflow history." />
-          <ActionCard to="/admin/products" title="Products" description="Manage garments, pricing, and production types." />
         </div>
       </Section>
     </div>
