@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import logo from "../assets/icon-512.png";
 import { useStoredOrders } from "../lib/ordersStore";
 import {
   clearActiveStaffSession,
@@ -8,6 +7,8 @@ import {
   subscribeToActiveStaffUser,
 } from "../lib/staffUsersStore";
 import { getUserInitials } from "../utils/getUserInitials";
+
+const ADMIN_LOGO_SRC = "/tee&co512x512.png";
 
 function FacebookIcon() {
   return (
@@ -173,10 +174,13 @@ function AdminSidebar({ pathname, staffUser }) {
           }}
         >
           <img
-            src={logo}
+            className="tee-co-logo"
+            src={ADMIN_LOGO_SRC}
             alt="Tee & Co"
             width="54"
             height="54"
+            loading="eager"
+            decoding="sync"
             style={{
               width: "54px",
               height: "54px",
@@ -308,7 +312,8 @@ function PublicHeader() {
             }}
           >
             <img
-              src={logo}
+              className="tee-co-logo"
+              src={ADMIN_LOGO_SRC}
               alt="Tee & Co"
               width="56"
               height="56"
