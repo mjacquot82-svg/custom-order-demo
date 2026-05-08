@@ -7,6 +7,7 @@ import {
   getActiveStaffUser,
   subscribeToActiveStaffUser,
 } from "../lib/staffUsersStore";
+import { getUserInitials } from "../utils/getUserInitials";
 
 function FacebookIcon() {
   return (
@@ -390,20 +391,9 @@ function PublicHeader() {
   );
 }
 
-function buildStaffInitials(staffUser) {
-  const name = String(staffUser?.name || "").trim();
-  if (!name) return "--";
-
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-}
-
 function AdminWorkspaceHeader({ staffUser }) {
   const navigate = useNavigate();
-  const initials = buildStaffInitials(staffUser);
+  const initials = getUserInitials(staffUser?.name);
   const displayName = staffUser?.name || "No active user";
   const displayRole = staffUser?.role || "Not signed in";
 
