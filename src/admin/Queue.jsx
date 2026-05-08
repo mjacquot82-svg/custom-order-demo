@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { normalizeProductionType } from "../constants/productionTypes";
 import { useStoredOrders } from "../lib/ordersStore";
 import { buildWorkerQueueSections } from "../queue/buildWorkerQueueSections";
 import { buildUnassignedQueueSection } from "../queue/buildUnassignedQueueSection";
@@ -11,7 +12,7 @@ function normalizeOrder(order) {
     customer_name: order.customer_name || "Walk-in Customer",
     garment: order.garment || order.item || "Custom garment",
     assigned_to_staff_name: order.assigned_to_staff_name || "Unassigned",
-    decoration_type: order.decoration_type || "Screen Printing",
+    decoration_type: normalizeProductionType(order.decoration_type),
   };
 }
 
@@ -81,7 +82,11 @@ function OrderCard({ order }) {
 }
 
 export default function Queue() {
-  const orders = sortQueueByPriority(useStoredOrders().map(normalizeOrder));
+  const orders = sortQueueByPriority(
+    useStoredOrders()
+      .map(normalizeOrder)
+      .filter((order) => order.operational_visible !== false)
+  );
   const workerSections = buildWorkerQueueSections(orders).map((section) => ({
     ...section,
     orders: sortQueueByPriority(section.orders),

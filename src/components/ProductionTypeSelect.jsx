@@ -4,6 +4,7 @@ export default function ProductionTypeSelect({
   value,
   onChange,
   label = "Production Type",
+  options = PRODUCTION_TYPES,
 }) {
   return (
     <label
@@ -29,7 +30,7 @@ export default function ProductionTypeSelect({
           background: "#ffffff",
         }}
       >
-        {PRODUCTION_TYPES.map((type) => (
+        {options.map((type) => (
           <option key={type} value={type}>
             {type}
           </option>

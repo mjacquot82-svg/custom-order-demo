@@ -35,10 +35,16 @@ function InstagramIcon() {
 }
 
 function getSidebarCounts(orders = []) {
+  const activeOrders = orders.filter(
+    (order) => order.operational_visible !== false
+  );
+
   return {
-    productionOrders: orders.length,
-    productionQueue: orders.filter((order) => order.production_ready).length,
-    assignments: orders.filter(
+    productionOrders: activeOrders.length,
+    productionQueue: activeOrders.filter(
+      (order) => order.production_ready || order.needs_assignment
+    ).length,
+    assignments: activeOrders.filter(
       (order) =>
         order.needs_assignment || !order.assigned_to_staff_id
     ).length,
@@ -46,9 +52,16 @@ function getSidebarCounts(orders = []) {
 }
 
 function getAdminSections(role) {
-  const isOwner = role === "Owner";
+  const canManageCatalog = role === "Owner";
 
   return [
+    {
+      title: "Actions",
+      links: [
+        { to: "/admin/orders/new", label: "New Order", navKey: "newOrder" },
+        { to: "/admin/sales/new", label: "Quick Sale", navKey: "quickSale" },
+      ],
+    },
     {
       title: "Overview",
       links: [
@@ -84,7 +97,7 @@ function getAdminSections(role) {
       title: "Records",
       links: [
         { to: "/admin/customers", label: "Customers", navKey: "customers" },
-        ...(isOwner
+        ...(canManageCatalog
           ? [{ to: "/admin/products", label: "Products", navKey: "products" }]
           : []),
       ],
@@ -100,6 +113,8 @@ function getActiveSidebarLink(pathname, search) {
   if (pathname.startsWith("/admin/products")) return "products";
   if (pathname.startsWith("/admin/customers")) return "customers";
   if (pathname.startsWith("/admin/staff-users")) return "staffUsers";
+  if (pathname === "/admin/orders/new") return "newOrder";
+  if (pathname === "/admin/sales/new") return "quickSale";
   if (pathname === "/admin/orders") {
     return orderFilter === "production" ? "productionOrders" : "orders";
   }

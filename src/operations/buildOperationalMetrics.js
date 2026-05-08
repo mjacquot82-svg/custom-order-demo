@@ -1,3 +1,8 @@
+import {
+  normalizeProductionType,
+  PRODUCTION_TYPES,
+} from "../constants/productionTypes";
+
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -12,10 +17,17 @@ export function buildOperationalMetrics(orders = []) {
   let readyForPickup = 0;
   let needsAssignment = 0;
 
-  const productionTypes = {};
+  const productionTypes = PRODUCTION_TYPES.reduce((totals, type) => {
+    totals[type] = 0;
+    return totals;
+  }, {});
   const workerLoad = {};
 
   orders.forEach((order) => {
+    if (order.operational_visible === false) {
+      return;
+    }
+
     const status = normalize(order.status);
 
     if (order.due_date) {
@@ -42,7 +54,7 @@ export function buildOperationalMetrics(orders = []) {
       needsAssignment += 1;
     }
 
-    const productionType = order.decoration_type || "Screen Printing";
+    const productionType = normalizeProductionType(order.decoration_type);
     productionTypes[productionType] = (productionTypes[productionType] || 0) + 1;
 
     const worker = order.assigned_to_staff_name || "Unassigned";

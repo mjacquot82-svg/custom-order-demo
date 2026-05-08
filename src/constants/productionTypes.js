@@ -1,6 +1,7 @@
 export const PRODUCTION_TYPES = [
-  "Screen Printing",
+  "Screen Print",
   "DTF",
+  "Embroidery",
 ];
 
 export function normalizeProductionType(value = "") {
@@ -10,12 +11,16 @@ export function normalizeProductionType(value = "") {
     normalized.includes("screen") ||
     normalized.includes("print")
   ) {
-    return "Screen Printing";
+    return "Screen Print";
   }
 
   if (normalized.includes("dtf")) {
     return "DTF";
   }
 
-  return "Screen Printing";
+  if (normalized.includes("embroider")) {
+    return "Embroidery";
+  }
+
+  return "Screen Print";
 }

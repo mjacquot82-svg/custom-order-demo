@@ -21,6 +21,9 @@ export default function Dashboard() {
   const orders = useStoredOrders();
   const quickSales = getStoredQuickSales();
   const metrics = buildOperationalMetrics(orders);
+  const operationalOrderCount = orders.filter(
+    (order) => order.operational_visible !== false
+  ).length;
 
   const todaysSalesTotal = quickSales.reduce((total, sale) => total + Number(sale.total || 0), 0);
 
@@ -41,7 +44,7 @@ export default function Dashboard() {
       <Section title="Revenue Snapshot">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
           <div style={{ background: "#f8fafc", borderRadius: "18px", padding: "18px", border: "1px solid #e2e8f0" }}><p style={{ margin: 0, color: "#64748b", fontWeight: 800 }}>Quick Sales Revenue</p><h2 style={{ margin: "8px 0 0" }}>{currency(todaysSalesTotal)}</h2></div>
-          <div style={{ background: "#f8fafc", borderRadius: "18px", padding: "18px", border: "1px solid #e2e8f0" }}><p style={{ margin: 0, color: "#64748b", fontWeight: 800 }}>Production Orders</p><h2 style={{ margin: "8px 0 0" }}>{orders.length}</h2></div>
+          <div style={{ background: "#f8fafc", borderRadius: "18px", padding: "18px", border: "1px solid #e2e8f0" }}><p style={{ margin: 0, color: "#64748b", fontWeight: 800 }}>Production Orders</p><h2 style={{ margin: "8px 0 0" }}>{operationalOrderCount}</h2></div>
         </div>
       </Section>
 

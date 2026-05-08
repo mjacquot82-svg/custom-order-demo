@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ProductionTypeSelect from "../components/ProductionTypeSelect";
+import {
+  normalizeProductionType,
+  PRODUCTION_TYPES,
+} from "../constants/productionTypes";
 import { createStoredOrder } from "../lib/ordersStore";
 import { getStoredProducts } from "../lib/productsStore";
 import {
@@ -69,6 +74,14 @@ function findCustomerSuggestions(customers, value) {
     .slice(0, 5);
 }
 
+function getDecorationOptions(product) {
+  const normalizedOptions = Array.isArray(product?.decoration_types)
+    ? product.decoration_types.map((type) => normalizeProductionType(type))
+    : [];
+
+  return Array.from(new Set([...PRODUCTION_TYPES, ...normalizedOptions]));
+}
+
 const fieldStyle = {
   border: "1px solid #cbd5e1",
   borderRadius: "12px",
@@ -104,7 +117,7 @@ export default function NewOrder() {
     brand_model: "",
     garment_color: "",
     placement: "",
-    decoration_type: "",
+    decoration_type: "Screen Print",
     due_date: "",
     notes: "",
     source: "Walk-in",
@@ -123,9 +136,7 @@ export default function NewOrder() {
   const sizeKeys = selectedProduct?.sizes?.length ? selectedProduct.sizes : fallbackSizeKeys;
   const colorOptions = selectedProduct?.colors?.length ? selectedProduct.colors : [];
   const placementOptions = selectedProduct?.placements?.length ? selectedProduct.placements : [];
-  const decorationOptions = selectedProduct?.decoration_types?.length
-    ? selectedProduct.decoration_types
-    : [];
+  const decorationOptions = getDecorationOptions(selectedProduct);
 
   const totalQty = useMemo(() => {
     return Object.values(sizes).reduce((total, value) => {
@@ -199,7 +210,7 @@ export default function NewOrder() {
         brand_model: "",
         garment_color: "",
         placement: "",
-        decoration_type: "",
+        decoration_type: "Screen Print",
       }));
       setSizes(buildSizeState(fallbackSizeKeys));
       return;
@@ -213,7 +224,7 @@ export default function NewOrder() {
       brand_model: product.brand_model || "",
       garment_color: product.colors?.[0] || "",
       placement: product.placements?.[0] || "",
-      decoration_type: product.decoration_types?.[0] || "",
+      decoration_type: getDecorationOptions(product)[0] || "Screen Print",
     }));
     setSizes(buildSizeState(product.sizes?.length ? product.sizes : fallbackSizeKeys));
   }
@@ -256,6 +267,7 @@ export default function NewOrder() {
       product_notes: selectedProduct?.notes || "",
       qty: totalQty,
       size_breakdown: normalizedSizes,
+      decoration_type: normalizeProductionType(form.decoration_type),
     });
 
     linkOrderToCustomer(customerId, order.order_number);
@@ -291,6 +303,41 @@ export default function NewOrder() {
             Select an existing customer or enter a new one, then choose a catalog garment for production.
           </p>
         </div>
+
+        <section style={{ background: "#171717", color: "#ffffff", borderRadius: "18px", padding: "18px", marginBottom: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
+            <div>
+              <h2 style={{ margin: "0 0 8px", fontSize: "22px" }}>Start Intake</h2>
+              <p style={{ margin: 0, color: "rgba(255,255,255,0.82)" }}>
+                Choose how the customer came in so staff can move quickly from counter or phone straight into production intake.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {["Walk-in", "Phone"].map((source) => {
+                const active = form.source === source;
+
+                return (
+                  <button
+                    key={source}
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, source }))}
+                    style={{
+                      border: active ? "1px solid #ffffff" : "1px solid rgba(255,255,255,0.28)",
+                      background: active ? "#ffffff" : "transparent",
+                      color: active ? "#171717" : "#ffffff",
+                      borderRadius: "12px",
+                      padding: "12px 16px",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {source === "Walk-in" ? "Walk-in Counter Order" : "Phone Order"}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
         <section style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "18px", padding: "18px", marginBottom: "20px" }}>
           <h2 style={{ margin: "0 0 12px", fontSize: "20px" }}>Customer</h2>
@@ -411,16 +458,17 @@ export default function NewOrder() {
               )}
             </label>
 
-            <label style={labelStyle}>
-              Decoration Type
-              {decorationOptions.length ? (
-                <select name="decoration_type" value={form.decoration_type} onChange={updateField} style={fieldStyle}>
-                  {decorationOptions.map((method) => <option key={method}>{method}</option>)}
-                </select>
-              ) : (
-                <input name="decoration_type" value={form.decoration_type} onChange={updateField} placeholder="Embroidery" style={fieldStyle} />
-              )}
-            </label>
+            <ProductionTypeSelect
+              value={form.decoration_type}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  decoration_type: event.target.value,
+                }))
+              }
+              label="Production Type"
+              options={decorationOptions}
+            />
 
             <label style={labelStyle}>
               Logo Placement

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { demoOrders } from "../data/demoOrders";
+import { normalizeProductionType } from "../constants/productionTypes";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 
 const STORAGE_KEY = "teeCoStaffOrders";
@@ -17,10 +18,22 @@ function normalizeStoredOrder(order = {}) {
   const assignedToStaffId = order.assigned_to_staff_id || "";
   const assignedToStaffName = order.assigned_to_staff_name || "";
   const hasAssignedStaff = Boolean(assignedToStaffId);
+  const status = order.status || "Awaiting Artwork";
+  const normalizedStatus = normalizeStatus(status);
+  const productionReadyStatuses = [
+    "approved",
+    "ready for production",
+    "in production",
+    "printing",
+    "ready for pickup",
+  ];
 
   return {
     ...order,
-    status: order.status || "Awaiting Artwork",
+    status,
+    decoration_type: normalizeProductionType(
+      order.decoration_type || order.production_type || ""
+    ),
     assigned_to_staff_id: assignedToStaffId,
     assigned_to_staff_name: assignedToStaffName,
     assigned_to_staff_role: order.assigned_to_staff_role || "",
@@ -28,6 +41,14 @@ function normalizeStoredOrder(order = {}) {
       typeof order.needs_assignment === "boolean"
         ? order.needs_assignment
         : !hasAssignedStaff,
+    production_ready:
+      typeof order.production_ready === "boolean"
+        ? order.production_ready
+        : productionReadyStatuses.includes(normalizedStatus),
+    operational_visible:
+      typeof order.operational_visible === "boolean"
+        ? order.operational_visible
+        : normalizedStatus !== "completed",
   };
 }
 

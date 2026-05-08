@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { normalizeProductionType } from "../constants/productionTypes";
 import { useStoredOrders } from "../lib/ordersStore";
 import StatusBadge from "../components/StatusBadge";
 
@@ -14,8 +15,7 @@ function normalizeOrder(order) {
     garment: order.garment || order.item || "Custom garment",
     assigned_to_staff_name:
       order.assigned_to_staff_name || "Unassigned",
-    decoration_type:
-      order.decoration_type || "Screen Printing",
+    decoration_type: normalizeProductionType(order.decoration_type),
     status: order.status || "Awaiting Artwork",
   };
 }
@@ -25,7 +25,8 @@ const statusTabs = [
   { key: "production", label: "Production" },
   { key: "assignments", label: "Needs Assignment" },
   { key: "dtf", label: "DTF" },
-  { key: "screen", label: "Screen Printing" },
+  { key: "embroidery", label: "Embroidery" },
+  { key: "screen", label: "Screen Print" },
 ];
 
 function tabMatchesOrder(order, activeTab) {
@@ -41,16 +42,16 @@ function tabMatchesOrder(order, activeTab) {
     return normalizeStatus(order.decoration_type) === "dtf";
   }
 
+  if (activeTab === "embroidery") {
+    return normalizeStatus(order.decoration_type) === "embroidery";
+  }
+
   if (activeTab === "screen") {
     return normalizeStatus(order.decoration_type).includes("screen");
   }
 
   if (activeTab === "production") {
-    return [
-      "approved",
-      "in production",
-      "printing",
-    ].includes(normalizeStatus(order.status));
+    return order.operational_visible !== false;
   }
 
   return true;
@@ -58,9 +59,14 @@ function tabMatchesOrder(order, activeTab) {
 
 export default function Orders() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const activeFilter = searchParams.get("filter") || "all";
   const [activeTabKey, setActiveTabKey] = useState(
-    searchParams.get("filter") || "all"
+    activeFilter
   );
+
+  useEffect(() => {
+    setActiveTabKey(activeFilter);
+  }, [activeFilter]);
 
   const orders = useStoredOrders().map(normalizeOrder);
 
@@ -101,19 +107,35 @@ export default function Orders() {
             </p>
           </div>
 
-          <Link
-            to="/admin/assignments"
-            style={{
-              background: "#171717",
-              color: "#ffffff",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              textDecoration: "none",
-              fontWeight: 700,
-            }}
-          >
-            Open Assignments
-          </Link>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <Link
+              to="/admin/orders/new"
+              style={{
+                background: "#171717",
+                color: "#ffffff",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              New Order
+            </Link>
+            <Link
+              to="/admin/assignments"
+              style={{
+                background: "#ffffff",
+                color: "#171717",
+                border: "1px solid #d6d3d1",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              Open Assignments
+            </Link>
+          </div>
         </div>
 
         <div
@@ -230,6 +252,20 @@ export default function Orders() {
                   </td>
                 </tr>
               ))}
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="6"
+                    style={{
+                      padding: "24px 8px",
+                      textAlign: "center",
+                      color: "#64748b",
+                    }}
+                  >
+                    No orders match this workflow view yet.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
