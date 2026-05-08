@@ -1,7 +1,12 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import logo from "../assets/icon-512.png";
 import { useStoredOrders } from "../lib/ordersStore";
-import { getActiveStaffUser } from "../lib/staffUsersStore";
+import {
+  clearActiveStaffSession,
+  getActiveStaffUser,
+  subscribeToActiveStaffUser,
+} from "../lib/staffUsersStore";
 
 function FacebookIcon() {
   return (
@@ -385,12 +390,163 @@ function PublicHeader() {
   );
 }
 
+function buildStaffInitials(staffUser) {
+  const name = String(staffUser?.name || "").trim();
+  if (!name) return "--";
+
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+function AdminWorkspaceHeader({ staffUser }) {
+  const navigate = useNavigate();
+  const initials = buildStaffInitials(staffUser);
+  const displayName = staffUser?.name || "No active user";
+  const displayRole = staffUser?.role || "Not signed in";
+
+  function handleLogout() {
+    clearActiveStaffSession();
+    navigate("/");
+  }
+
+  return (
+    <header
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        padding: "18px 24px 0",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: "12px",
+            flexWrap: "wrap",
+            background: "#ffffff",
+            border: "1px solid #e2e8f0",
+            borderRadius: "16px",
+            padding: "10px 12px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            maxWidth: "100%",
+          }}
+        >
+          <div
+            aria-hidden="true"
+            style={{
+              width: "42px",
+              height: "42px",
+              borderRadius: "999px",
+              background: "#171717",
+              color: "#ffffff",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 900,
+              fontSize: "14px",
+              flexShrink: 0,
+            }}
+          >
+            {initials}
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <p
+              style={{
+                margin: 0,
+                color: "#171717",
+                fontWeight: 800,
+                lineHeight: 1.2,
+                wordBreak: "break-word",
+              }}
+            >
+              {displayName}
+            </p>
+
+            <p
+              style={{
+                margin: "3px 0 0",
+                color: "#64748b",
+                fontSize: "13px",
+                fontWeight: 700,
+                lineHeight: 1.2,
+              }}
+            >
+              ({displayRole})
+            </p>
+          </div>
+
+          {staffUser ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                background: "#171717",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "12px",
+                padding: "10px 14px",
+                fontWeight: 800,
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              Logout
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              style={{
+                background: "#fafaf9",
+                color: "#171717",
+                border: "1px solid #d6d3d1",
+                borderRadius: "12px",
+                padding: "10px 14px",
+                fontWeight: 800,
+                textDecoration: "none",
+                flexShrink: 0,
+              }}
+            >
+              Login
+            </Link>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
 export default function Layout() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
-  const activeStaffUser = isAdmin
-    ? getActiveStaffUser()
-    : null;
+  const [activeStaffUser, setActiveStaffUser] = useState(() =>
+    isAdmin ? getActiveStaffUser() : null
+  );
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setActiveStaffUser(null);
+      return undefined;
+    }
+
+    setActiveStaffUser(getActiveStaffUser());
+
+    return subscribeToActiveStaffUser((nextStaffUser) => {
+      setActiveStaffUser(nextStaffUser);
+    });
+  }, [isAdmin]);
 
   return (
     <div>
@@ -401,9 +557,13 @@ export default function Layout() {
             staffUser={activeStaffUser}
           />
 
-          <main style={{ flex: 1, minWidth: 0 }}>
-            <Outlet />
-          </main>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <AdminWorkspaceHeader staffUser={activeStaffUser} />
+
+            <main style={{ minWidth: 0 }}>
+              <Outlet />
+            </main>
+          </div>
         </div>
       ) : (
         <>

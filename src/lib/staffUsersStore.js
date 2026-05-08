@@ -1,6 +1,7 @@
 const STORAGE_KEY = "teeCoStaffUsers";
 const ACTIVE_STAFF_KEY = "teeCoActiveStaffUser";
 const STAFF_USERS_UPDATED_EVENT = "tee-co-staff-users-updated";
+const ACTIVE_STAFF_UPDATED_EVENT = "tee-co-active-staff-updated";
 const PROTECTED_OWNER_ID = "staff-owner-default";
 
 export const STAFF_ROLES = ["Owner", "Manager", "Staff"];
@@ -104,6 +105,11 @@ function buildPersistedStaffUsers(users) {
 function emitStaffUsersUpdated() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(STAFF_USERS_UPDATED_EVENT));
+}
+
+function emitActiveStaffUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(ACTIVE_STAFF_UPDATED_EVENT));
 }
 
 export function getStoredStaffUsers() {
@@ -227,21 +233,59 @@ export function setActiveStaffUser(user) {
   if (typeof window === "undefined") return;
   if (!user) {
     window.localStorage.removeItem(ACTIVE_STAFF_KEY);
+    window.sessionStorage.removeItem(ACTIVE_STAFF_KEY);
+    emitActiveStaffUpdated();
     return;
   }
 
-  window.localStorage.setItem(
-    ACTIVE_STAFF_KEY,
-    JSON.stringify({ id: user.id, name: user.name, role: user.role })
-  );
+  const nextActiveUser = JSON.stringify({
+    id: user.id,
+    name: user.name,
+    role: user.role,
+  });
+
+  window.localStorage.setItem(ACTIVE_STAFF_KEY, nextActiveUser);
+  emitActiveStaffUpdated();
+}
+
+export function clearActiveStaffSession() {
+  setActiveStaffUser(null);
 }
 
 export function getActiveStaffUser() {
   if (typeof window === "undefined") return null;
 
   try {
-    const rawUser = window.localStorage.getItem(ACTIVE_STAFF_KEY);
-    return rawUser ? JSON.parse(rawUser) : null;
+    const rawUser =
+      window.localStorage.getItem(ACTIVE_STAFF_KEY) ||
+      window.sessionStorage.getItem(ACTIVE_STAFF_KEY);
+    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+
+    if (!parsedUser?.id) {
+      return null;
+    }
+
+    const matchedUser = getStoredStaffUsers().find(
+      (user) => user.id === parsedUser.id
+    );
+
+    if (!matchedUser || matchedUser.status === "Inactive") {
+      clearActiveStaffSession();
+      return null;
+    }
+
+    if (
+      matchedUser.name !== parsedUser.name ||
+      matchedUser.role !== parsedUser.role
+    ) {
+      setActiveStaffUser(matchedUser);
+    }
+
+    return {
+      id: matchedUser.id,
+      name: matchedUser.name,
+      role: matchedUser.role,
+    };
   } catch (error) {
     console.error("Unable to read active Tee & Co staff user", error);
     return null;
@@ -294,6 +338,30 @@ export function subscribeToStaffUsers(listener) {
   return () => {
     window.removeEventListener("storage", handleStorage);
     window.removeEventListener(STAFF_USERS_UPDATED_EVENT, handleCustomEvent);
+  };
+}
+
+export function subscribeToActiveStaffUser(listener) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  function notifyActiveStaff() {
+    listener(getActiveStaffUser());
+  }
+
+  function handleStorage(event) {
+    if (!event || !event.key || event.key === ACTIVE_STAFF_KEY) {
+      notifyActiveStaff();
+    }
+  }
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(ACTIVE_STAFF_UPDATED_EVENT, notifyActiveStaff);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(ACTIVE_STAFF_UPDATED_EVENT, notifyActiveStaff);
   };
 }
 

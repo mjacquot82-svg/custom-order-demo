@@ -1,6 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { getStoredStaffUsers, validateStaffPin } from "../lib/staffUsersStore";
+import {
+  getStoredStaffUsers,
+  setActiveStaffUser,
+  validateStaffPin,
+} from "../lib/staffUsersStore";
 
 const inputStyle = {
   width: "100%",
@@ -37,6 +41,11 @@ export default function Login() {
   function handleShopLogin(event) {
     event.preventDefault();
 
+    if (!staffUsers.length) {
+      setPinError("No active staff users are available.");
+      return;
+    }
+
     const selectedUser = staffUsers.find((user) => user.id === selectedStaffId);
     const matchedUser = validateStaffPin(pin);
 
@@ -46,10 +55,7 @@ export default function Login() {
       return;
     }
 
-    window.localStorage.setItem(
-      "teeCoActiveStaffUser",
-      JSON.stringify({ id: matchedUser.id, name: matchedUser.name, role: matchedUser.role })
-    );
+    setActiveStaffUser(matchedUser);
 
     navigate("/admin");
   }
@@ -288,6 +294,7 @@ export default function Login() {
                     clearPin();
                   }}
                   style={inputStyle}
+                  disabled={!staffUsers.length}
                 >
                   {staffUsers.map((user) => (
                     <option key={user.id} value={user.id}>
@@ -370,7 +377,9 @@ export default function Login() {
             </form>
 
             <p style={{ margin: "16px 0 0", color: "#78716c", fontSize: "13px", lineHeight: 1.5 }}>
-              Demo default: Owner / Admin uses PIN 1234.
+              {staffUsers.length
+                ? "Demo default: Owner / Admin uses PIN 1234."
+                : "No active staff users are currently available."}
             </p>
           </>
         )}
