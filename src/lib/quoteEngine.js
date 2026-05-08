@@ -1,5 +1,8 @@
 export function getPlacementUnitPrice(product, placementName, quantity = 0) {
-  const priceConfig = product?.placement_prices?.[placementName];
+  const configEntry = Array.isArray(product?.placement_config)
+    ? product.placement_config.find((placement) => placement?.label === placementName)
+    : null;
+  const priceConfig = product?.placement_prices?.[placementName] ?? configEntry?.price;
 
   if (Array.isArray(priceConfig)) {
     const sortedTiers = [...priceConfig].sort((a, b) => Number(b.min || 0) - Number(a.min || 0));
@@ -69,6 +72,7 @@ export function generateQuoteSnapshot(order, product) {
 
   const setup_fees = Array.isArray(order?.setup_fees) ? order.setup_fees : [];
   const placementSubtotal = placement_lines.reduce((total, line) => total + Number(line.line_total || 0), 0);
+  const decoratedProductionSubtotal = productionSubtotal + placementSubtotal;
   const production_lines = productionMethod
     ? [
         {
@@ -93,7 +97,8 @@ export function generateQuoteSnapshot(order, product) {
     placement_lines,
     production_method: productionMethod,
     production_lines,
-    production_subtotal: productionSubtotal,
+    production_subtotal: decoratedProductionSubtotal,
+    production_method_subtotal: productionSubtotal,
     setup_fees,
     placement_subtotal: placementSubtotal,
     setup_subtotal: setupSubtotal,

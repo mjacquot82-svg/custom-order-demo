@@ -251,8 +251,13 @@ export default function OrderDetail() {
                 </span>
 
                 <span>
-                  <strong>Production Charges:</strong>
+                  <strong>Production Pricing:</strong>
                   {money(quoteSnapshot.production_subtotal)}
+                </span>
+
+                <span>
+                  <strong>Method-Only Production:</strong>
+                  {money(quoteSnapshot.production_method_subtotal || 0)}
                 </span>
 
                 <span>

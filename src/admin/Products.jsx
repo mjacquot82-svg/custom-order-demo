@@ -108,6 +108,7 @@ function fileToDataUrl(file) {
 }
 
 export default function Products() {
+  const pageRef = useRef(null);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(emptyProduct);
   const [editingProductId, setEditingProductId] = useState(null);
@@ -262,6 +263,8 @@ export default function Products() {
 
     refreshProducts();
     resetForm();
+
+    pageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function handleDelete(productId) {
@@ -274,7 +277,7 @@ export default function Products() {
   }
 
   return (
-    <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
+    <div ref={pageRef} style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div
         style={{
           display: "grid",

@@ -79,7 +79,10 @@ export default function QuoteView() {
           <strong>Placement Charges:</strong> {money(quote.placement_subtotal)}
         </p>
         <p style={{ margin: 0 }}>
-          <strong>Production Charges:</strong> {money(quote.production_subtotal)}
+          <strong>Production Pricing:</strong> {money(quote.production_subtotal)}
+        </p>
+        <p style={{ margin: 0 }}>
+          <strong>Method-Only Production:</strong> {money(quote.production_method_subtotal || 0)}
         </p>
         <p style={{ margin: 0 }}>
           <strong>Digitizing / Setup:</strong> {money(quote.setup_subtotal)}

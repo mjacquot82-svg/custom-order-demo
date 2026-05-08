@@ -623,126 +623,8 @@ export default function NewOrder() {
                 )}
               </div>
             </div>
-          </div>
 
-          <div className="new-order-production-panel">
-            <section className="new-order-card new-order-summary-card">
-              <div className="new-order-card-header">
-                <div>
-                  <p className="new-order-section-kicker">Live Quote</p>
-                  <h2>Pricing Summary</h2>
-                </div>
-                <span className="new-order-selection-count">Qty {totalQty}</span>
-              </div>
-
-              <div className="new-order-summary-shell">
-                <div className="new-order-summary-block">
-                  <div className="new-order-summary-row">
-                    <span>Garment unit price</span>
-                    <strong>{selectedProduct ? money(liveQuote.garment_unit_price) : "—"}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Quantity</span>
-                    <strong>{totalQty}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Garment subtotal</span>
-                    <strong>{money(liveQuote.garment_subtotal)}</strong>
-                  </div>
-                </div>
-
-                <div className="new-order-summary-block">
-                  <div className="new-order-summary-row">
-                    <span>Placement charges</span>
-                    <strong>{money(liveQuote.placement_subtotal)}</strong>
-                  </div>
-
-                  {liveQuote.placement_lines.length ? (
-                    <div className="new-order-summary-list">
-                      {liveQuote.placement_lines.map((line) => (
-                        <div
-                          key={`${line.placement}-${line.decoration_type}`}
-                          className="new-order-summary-list-row"
-                        >
-                          <span>{line.placement}</span>
-                          <span>{money(line.line_total)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="new-order-muted">No placements selected.</p>
-                  )}
-                </div>
-
-                <div className="new-order-summary-block">
-                  <div className="new-order-summary-row">
-                    <span>Production charges</span>
-                    <strong>{money(liveQuote.production_subtotal)}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>{normalizedDecorationType}</span>
-                    <span>
-                      {totalQty} x {money(liveQuote.production_lines[0]?.unit_price || 0)}
-                    </span>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Digitizing / setup fees</span>
-                    <strong>{money(liveQuote.setup_subtotal)}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Taxes</span>
-                    <span>{liveQuote.taxes_placeholder}</span>
-                  </div>
-                </div>
-
-                <div className="new-order-summary-total">
-                  <span>Grand Total</span>
-                  <strong>{money(liveQuote.total)}</strong>
-                </div>
-              </div>
-            </section>
-
-            <section className="new-order-card">
-              <div className="new-order-card-header">
-                <div>
-                  <p className="new-order-section-kicker">Step 5</p>
-                  <h2>Logo Placements</h2>
-                </div>
-                <span className="new-order-selection-count">
-                  {selectedPlacements.length} selected
-                </span>
-              </div>
-
-              {placementConfig.length ? (
-                <div className="new-order-placement-grid">
-                  {placementConfig.map((placement) => {
-                    const active = selectedPlacements.includes(placement.label);
-
-                    return (
-                      <button
-                        key={placement.id || placement.label}
-                        type="button"
-                        onClick={() => togglePlacement(placement.label)}
-                        className={active ? "new-order-placement-chip active" : "new-order-placement-chip"}
-                      >
-                        <span>{placement.label}</span>
-                        {placement.price > 0 ? (
-                          <small>${Number(placement.price).toFixed(0)}</small>
-                        ) : (
-                          <small>Included</small>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="new-order-muted">
-                  Select a garment to load its allowed production placements.
-                </p>
-              )}
-            </section>
-
-            <section className="new-order-card">
+            <section className="new-order-card new-order-inline-card">
               <div className="new-order-card-header">
                 <div>
                   <p className="new-order-section-kicker">Step 6</p>
@@ -796,47 +678,181 @@ export default function NewOrder() {
                 ) : null}
               </div>
             </section>
+
+            <section className="new-order-card new-order-inline-card new-order-size-card">
+              <div className="new-order-size-header">
+                <div>
+                  <p className="new-order-section-kicker">Size Breakdown</p>
+                  <h2>Size Breakdown</h2>
+                  <p className="new-order-size-note">
+                    Size fields come directly from the selected product.
+                  </p>
+                </div>
+                <span className="new-order-selection-count">Total {totalQty}</span>
+              </div>
+
+              <div className="new-order-size-grid">
+                {sizeKeys.map((size) => (
+                  <label key={size} className="new-order-size-field">
+                    <span>{size}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={sizes[size] || ""}
+                      onChange={(event) => updateSize(size, event.target.value)}
+                      placeholder="0"
+                      style={{ ...fieldStyle, textAlign: "center" }}
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <div className="new-order-production-panel">
+            <section className="new-order-card">
+              <div className="new-order-card-header">
+                <div>
+                  <p className="new-order-section-kicker">Step 5</p>
+                  <h2>Logo Placements</h2>
+                </div>
+                <span className="new-order-selection-count">
+                  {selectedPlacements.length} selected
+                </span>
+              </div>
+
+              {placementConfig.length ? (
+                <div className="new-order-placement-grid">
+                  {placementConfig.map((placement) => {
+                    const active = selectedPlacements.includes(placement.label);
+
+                    return (
+                      <button
+                        key={placement.id || placement.label}
+                        type="button"
+                        onClick={() => togglePlacement(placement.label)}
+                        className={active ? "new-order-placement-chip active" : "new-order-placement-chip"}
+                      >
+                        <span>{placement.label}</span>
+                        {placement.price > 0 ? (
+                          <small>${Number(placement.price).toFixed(0)}</small>
+                        ) : (
+                          <small>Included</small>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="new-order-muted">
+                  Select a garment to load its allowed production placements.
+                </p>
+              )}
+            </section>
+
+            <section className="new-order-card">
+              <div className="new-order-card-header">
+                <div>
+                  <p className="new-order-section-kicker">Step 6</p>
+                  <h2>Operational Details</h2>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+                <label style={labelStyle}>
+                  Needed By
+                  <input type="date" name="due_date" value={form.due_date} onChange={updateField} style={fieldStyle} />
+                </label>
+
+                <label style={labelStyle}>
+                  Notes
+                  <textarea name="notes" value={form.notes} onChange={updateField} placeholder="Artwork notes, customer deadline, reorder details, etc." style={{ ...fieldStyle, minHeight: "120px", resize: "vertical" }} />
+                </label>
+              </div>
+            </section>
+
+            <section className="new-order-card new-order-summary-card">
+              <div className="new-order-card-header">
+                <div>
+                  <p className="new-order-section-kicker">Final Review</p>
+                  <h2>Pricing Summary</h2>
+                </div>
+                <span className="new-order-selection-count">Qty {totalQty}</span>
+              </div>
+
+              <div className="new-order-summary-shell">
+                <div className="new-order-summary-block">
+                  <div className="new-order-summary-row">
+                    <span>Garment unit price</span>
+                    <strong>{selectedProduct ? money(liveQuote.garment_unit_price) : "—"}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Quantity</span>
+                    <strong>{totalQty}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Garment subtotal</span>
+                    <strong>{money(liveQuote.garment_subtotal)}</strong>
+                  </div>
+                </div>
+
+                <div className="new-order-summary-block">
+                  <div className="new-order-summary-row">
+                    <span>Placement charges</span>
+                    <strong>{money(liveQuote.placement_subtotal)}</strong>
+                  </div>
+
+                  {liveQuote.placement_lines.length ? (
+                    <div className="new-order-summary-list">
+                      {liveQuote.placement_lines.map((line) => (
+                        <div
+                          key={`${line.placement}-${line.decoration_type}`}
+                          className="new-order-summary-list-row"
+                        >
+                          <span>{line.placement}</span>
+                          <span>{money(line.line_total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="new-order-muted">No placements selected.</p>
+                  )}
+                </div>
+
+                <div className="new-order-summary-block">
+                  <div className="new-order-summary-row">
+                    <span>Production pricing</span>
+                    <strong>{money(liveQuote.production_subtotal)}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>{normalizedDecorationType}</span>
+                    <span>
+                      {totalQty} x {money(liveQuote.production_lines[0]?.unit_price || 0)}
+                    </span>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Method-only production</span>
+                    <span>{money(liveQuote.production_method_subtotal || 0)}</span>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Digitizing / setup fees</span>
+                    <strong>{money(liveQuote.setup_subtotal)}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Taxes</span>
+                    <span>{liveQuote.taxes_placeholder}</span>
+                  </div>
+                </div>
+
+                <div className="new-order-summary-total">
+                  <span>Grand Total</span>
+                  <strong>{money(liveQuote.total)}</strong>
+                </div>
+              </div>
+            </section>
           </div>
         </section>
-
-        <div
-          style={{
-            marginTop: "24px",
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
-            borderRadius: "18px",
-            padding: "18px",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", alignItems: "center", marginBottom: "14px" }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: "20px" }}>Size Breakdown</h2>
-              <p style={{ margin: "4px 0 0", color: "#64748b" }}>Size fields come directly from the selected product.</p>
-            </div>
-            <strong style={{ fontSize: "18px" }}>Total: {totalQty}</strong>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))", gap: "10px" }}>
-            {sizeKeys.map((size) => (
-              <label key={size} style={{ ...labelStyle, gap: "6px" }}>
-                {size}
-                <input type="number" min="0" inputMode="numeric" value={sizes[size] || ""} onChange={(event) => updateSize(size, event.target.value)} placeholder="0" style={{ ...fieldStyle, textAlign: "center" }} />
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", marginTop: "20px" }}>
-          <label style={labelStyle}>
-            Needed By
-            <input type="date" name="due_date" value={form.due_date} onChange={updateField} style={fieldStyle} />
-          </label>
-
-          <label style={labelStyle}>
-            Notes
-            <textarea name="notes" value={form.notes} onChange={updateField} placeholder="Artwork notes, customer deadline, reorder details, etc." style={{ ...fieldStyle, minHeight: "96px", resize: "vertical" }} />
-          </label>
-        </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
           <button type="button" onClick={() => navigate("/admin/orders")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "13px 18px", cursor: "pointer", fontWeight: 600 }}>

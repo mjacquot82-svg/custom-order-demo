@@ -108,6 +108,10 @@
   padding: 18px;
 }
 
+.new-order-inline-card {
+  background: #ffffff;
+}
+
 .new-order-summary-card {
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.01)),
@@ -237,6 +241,48 @@
 .new-order-upload-shell {
   display: grid;
   gap: 14px;
+}
+
+.new-order-size-card {
+  gap: 14px;
+}
+
+.new-order-size-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.new-order-size-header h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+
+.new-order-size-note {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.new-order-size-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  gap: 10px;
+}
+
+.new-order-size-field {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+  color: #292524;
+}
+
+.new-order-size-field input {
+  min-height: 46px;
+  padding: 10px 12px;
 }
 
 .new-order-upload-button,
