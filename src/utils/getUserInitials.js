@@ -1,19 +1,41 @@
-export function getUserInitials(name) {
-  const trimmedName = String(name ?? "").trim();
+const LETTER_SEQUENCE_PATTERN = /\p{L}+/gu;
+const GENERIC_FILLER_WORDS = new Set(["generic", "account", "user"]);
+const GENERIC_ADMIN_WORDS = new Set(["owner", "admin", "administrator"]);
+const GENERIC_STAFF_WORDS = new Set(["staff"]);
 
-  if (!trimmedName) {
-    return "U";
+function extractSanitizedWords(value) {
+  return String(value ?? "")
+    .trim()
+    .normalize("NFKD")
+    .match(LETTER_SEQUENCE_PATTERN)
+    ?.map((word) => word.toLowerCase())
+    .filter(Boolean) || [];
+}
+
+function isGenericLabel(words, genericWords) {
+  return (
+    words.length > 0 &&
+    words.some((word) => genericWords.has(word)) &&
+    words.every(
+      (word) => genericWords.has(word) || GENERIC_FILLER_WORDS.has(word)
+    )
+  );
+}
+
+export function getUserInitials(name) {
+  const words = extractSanitizedWords(name);
+
+  if (isGenericLabel(words, GENERIC_ADMIN_WORDS)) {
+    return "AD";
   }
 
-  const initials = trimmedName
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => {
-      const sanitizedPart = String(part).replace(/[^\p{L}]/gu, "");
-      return sanitizedPart.charAt(0);
-    })
-    .join("")
-    .toUpperCase();
+  if (isGenericLabel(words, GENERIC_STAFF_WORDS)) {
+    return "ST";
+  }
 
-  return initials || "U";
+  if (words.length >= 2) {
+    return `${words[0].charAt(0)}${words[words.length - 1].charAt(0)}`.toUpperCase();
+  }
+
+  return "U";
 }
