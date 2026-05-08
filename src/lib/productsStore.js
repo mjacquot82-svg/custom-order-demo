@@ -1,3 +1,8 @@
+import {
+  normalizeProductionType,
+  PRODUCTION_TYPES,
+} from "../constants/productionTypes";
+
 const STORAGE_KEY = "teeCoProducts";
 
 function buildPlacementConfig(placements = [], placementPrices = {}) {
@@ -19,6 +24,9 @@ export const defaultProducts = [
     product_type: "Pullover Hoodie",
     status: "Active",
     image: "",
+    cost_price: 18,
+    markup_percentage: 50,
+    calculated_base_price: 27,
     colors: ["Black", "Navy", "Gray", "White"],
     sizes: ["S", "M", "L", "XL", "2XL", "3XL"],
     placements: ["Left Chest", "Full Front", "Full Back", "Sleeve"],
@@ -35,6 +43,11 @@ export const defaultProducts = [
       { id: "sleeve", label: "Sleeve", price: 6 },
     ],
     decoration_types: ["Embroidery", "Screen Print", "DTF"],
+    production_method_prices: {
+      "Screen Print": 0,
+      DTF: 1.5,
+      Embroidery: 4.5,
+    },
     notes: "General hoodie option. Add specific brands later when known.",
   },
   {
@@ -44,6 +57,9 @@ export const defaultProducts = [
     product_type: "Cap / Hat",
     status: "Active",
     image: "",
+    cost_price: 8,
+    markup_percentage: 75,
+    calculated_base_price: 14,
     colors: ["Black", "Navy", "Gray", "White"],
     sizes: ["OSFA"],
     placements: ["Front", "Side", "Back"],
@@ -58,6 +74,9 @@ export const defaultProducts = [
       { id: "back", label: "Back", price: 5 },
     ],
     decoration_types: ["Embroidery"],
+    production_method_prices: {
+      Embroidery: 3,
+    },
     notes: "Use for caps, snapbacks, and similar headwear.",
   },
   {
@@ -67,6 +86,9 @@ export const defaultProducts = [
     product_type: "T-Shirt",
     status: "Active",
     image: "",
+    cost_price: 5.5,
+    markup_percentage: 80,
+    calculated_base_price: 9.9,
     colors: ["Black", "White", "Gray", "Navy"],
     sizes: ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"],
     placements: ["Left Chest", "Full Front", "Full Back", "Sleeve"],
@@ -83,6 +105,11 @@ export const defaultProducts = [
       { id: "sleeve", label: "Sleeve", price: 5 },
     ],
     decoration_types: ["Screen Print", "DTF", "Embroidery"],
+    production_method_prices: {
+      "Screen Print": 0,
+      DTF: 1.25,
+      Embroidery: 3.5,
+    },
     notes: "Generic shirt category until exact brand catalog is added.",
   },
 ];
@@ -116,6 +143,43 @@ function normalizePlacementPrices(placements, value) {
   return prices;
 }
 
+function calculateBaseSellPrice(cost = 0, markup = 0) {
+  const parsedCost = Number(cost || 0);
+  const parsedMarkup = Number(markup || 0);
+
+  return Number(
+    (parsedCost + parsedCost * (parsedMarkup / 100)).toFixed(2)
+  );
+}
+
+function normalizeProductionMethods(product) {
+  const explicitMethods = [
+    ...(Array.isArray(product?.production_methods)
+      ? product.production_methods
+      : []),
+    ...(Array.isArray(product?.decoration_types)
+      ? product.decoration_types
+      : []),
+    ...(product?.decoration_type ? [product.decoration_type] : []),
+  ]
+    .map((type) => normalizeProductionType(type))
+    .filter(Boolean);
+
+  return Array.from(
+    new Set(explicitMethods.length ? explicitMethods : PRODUCTION_TYPES)
+  );
+}
+
+function normalizeProductionMethodPrices(methods, value) {
+  const prices =
+    value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+  return methods.reduce((accumulator, method) => {
+    accumulator[method] = Number(prices?.[method] || 0);
+    return accumulator;
+  }, {});
+}
+
 function normalizeProduct(product) {
   const placements = normalizeList(
     product.placements ||
@@ -138,13 +202,33 @@ function normalizeProduct(product) {
         price: Number(item.price ?? placementPrices[item.label] ?? 0),
       }))
     : buildPlacementConfig(placements, placementPrices);
+  const costPrice = Number(product.cost_price || 0);
+  const markupPercentage = Number(product.markup_percentage || 0);
+  const calculatedBasePrice =
+    Number(product.calculated_base_price) ||
+    Number(product.base_garment_price) ||
+    calculateBaseSellPrice(costPrice, markupPercentage);
+  const productionMethods = normalizeProductionMethods(product);
+  const productionMethodPrices = normalizeProductionMethodPrices(
+    productionMethods,
+    product.production_method_prices
+  );
 
   return {
     ...product,
     product_type: product.product_type || product.type || product.name || "General",
+    cost_price: costPrice,
+    markup_percentage: markupPercentage,
+    calculated_base_price: calculatedBasePrice,
+    base_garment_price: calculatedBasePrice,
+    unit_price: calculatedBasePrice,
     placements,
+    allowed_placements: placements,
     placement_prices: placementPrices,
     placement_config: placementConfig,
+    production_methods: productionMethods,
+    decoration_types: productionMethods,
+    production_method_prices: productionMethodPrices,
   };
 }
 

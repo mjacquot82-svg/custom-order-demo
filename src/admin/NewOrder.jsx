@@ -10,9 +10,10 @@ import {
   getStoredCustomers,
   linkOrderToCustomer,
 } from "../lib/customersStore";
-import { createStoredOrder } from "../lib/ordersStore";
+import { createStoredOrder, updateStoredOrder } from "../lib/ordersStore";
 import { getStoredProducts } from "../lib/productsStore";
 import { saveCustomerArtwork } from "../lib/customerArtworkStore";
+import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import "./NewOrder.css";
 
 const fallbackSizeKeys = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
@@ -77,11 +78,17 @@ function findCustomerSuggestions(customers, value) {
 }
 
 function getDecorationOptions(product) {
-  const normalizedOptions = Array.isArray(product?.decoration_types)
-    ? product.decoration_types.map((type) => normalizeProductionType(type))
+  const sourceOptions =
+    Array.isArray(product?.production_methods) && product.production_methods.length
+      ? product.production_methods
+      : product?.decoration_types;
+  const normalizedOptions = Array.isArray(sourceOptions)
+    ? sourceOptions.map((type) => normalizeProductionType(type))
     : [];
 
-  return Array.from(new Set([...PRODUCTION_TYPES, ...normalizedOptions]));
+  return normalizedOptions.length
+    ? Array.from(new Set(normalizedOptions))
+    : PRODUCTION_TYPES;
 }
 
 function fileToDataUrl(file) {
@@ -98,6 +105,10 @@ function formatFileSize(bytes) {
   if (value <= 0) return "0 KB";
   if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(value / 1024))} KB`;
+}
+
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
 }
 
 const fieldStyle = {
@@ -173,6 +184,23 @@ export default function NewOrder() {
       return total + (Number.isFinite(qty) ? qty : 0);
     }, 0);
   }, [sizes]);
+  const normalizedDecorationType = normalizeProductionType(form.decoration_type);
+  const liveQuote = useMemo(() => {
+    return generateQuoteSnapshot(
+      {
+        ...form,
+        qty: totalQty,
+        placement: selectedPlacements[0] || "",
+        placements: selectedPlacements.map((placement) => ({
+          placement,
+          decoration_type: normalizedDecorationType,
+        })),
+        decoration_type: normalizedDecorationType,
+        setup_fees: [],
+      },
+      selectedProduct
+    );
+  }, [form, normalizedDecorationType, selectedPlacements, selectedProduct, totalQty]);
 
   function selectCustomerById(customerId) {
     const customer = customers.find((item) => item.id === customerId);
@@ -382,6 +410,8 @@ export default function NewOrder() {
       customer_artwork_id: savedArtwork?.id || "",
       customer_artwork_name: savedArtwork?.name || "",
     });
+    const quote = generateQuoteSnapshot(order, selectedProduct);
+    updateStoredOrder(order.order_number, { quote });
 
     linkOrderToCustomer(customerId, order.order_number);
 
@@ -558,6 +588,14 @@ export default function NewOrder() {
               <span>
                 <strong>Model:</strong> {selectedProduct?.brand_model || "General"}
               </span>
+              <span>
+                <strong>Unit Price:</strong>{" "}
+                {selectedProduct ? money(liveQuote.garment_unit_price) : "—"}
+              </span>
+              <span>
+                <strong>Supported Methods:</strong>{" "}
+                {selectedProduct ? decorationOptions.join(", ") : "—"}
+              </span>
             </div>
 
             <div className="new-order-preview-panel">
@@ -588,6 +626,82 @@ export default function NewOrder() {
           </div>
 
           <div className="new-order-production-panel">
+            <section className="new-order-card new-order-summary-card">
+              <div className="new-order-card-header">
+                <div>
+                  <p className="new-order-section-kicker">Live Quote</p>
+                  <h2>Pricing Summary</h2>
+                </div>
+                <span className="new-order-selection-count">Qty {totalQty}</span>
+              </div>
+
+              <div className="new-order-summary-shell">
+                <div className="new-order-summary-block">
+                  <div className="new-order-summary-row">
+                    <span>Garment unit price</span>
+                    <strong>{selectedProduct ? money(liveQuote.garment_unit_price) : "—"}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Quantity</span>
+                    <strong>{totalQty}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Garment subtotal</span>
+                    <strong>{money(liveQuote.garment_subtotal)}</strong>
+                  </div>
+                </div>
+
+                <div className="new-order-summary-block">
+                  <div className="new-order-summary-row">
+                    <span>Placement charges</span>
+                    <strong>{money(liveQuote.placement_subtotal)}</strong>
+                  </div>
+
+                  {liveQuote.placement_lines.length ? (
+                    <div className="new-order-summary-list">
+                      {liveQuote.placement_lines.map((line) => (
+                        <div
+                          key={`${line.placement}-${line.decoration_type}`}
+                          className="new-order-summary-list-row"
+                        >
+                          <span>{line.placement}</span>
+                          <span>{money(line.line_total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="new-order-muted">No placements selected.</p>
+                  )}
+                </div>
+
+                <div className="new-order-summary-block">
+                  <div className="new-order-summary-row">
+                    <span>Production charges</span>
+                    <strong>{money(liveQuote.production_subtotal)}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>{normalizedDecorationType}</span>
+                    <span>
+                      {totalQty} x {money(liveQuote.production_lines[0]?.unit_price || 0)}
+                    </span>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Digitizing / setup fees</span>
+                    <strong>{money(liveQuote.setup_subtotal)}</strong>
+                  </div>
+                  <div className="new-order-summary-row">
+                    <span>Taxes</span>
+                    <span>{liveQuote.taxes_placeholder}</span>
+                  </div>
+                </div>
+
+                <div className="new-order-summary-total">
+                  <span>Grand Total</span>
+                  <strong>{money(liveQuote.total)}</strong>
+                </div>
+              </div>
+            </section>
+
             <section className="new-order-card">
               <div className="new-order-card-header">
                 <div>

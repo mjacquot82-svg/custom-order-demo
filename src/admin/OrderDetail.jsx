@@ -231,13 +231,28 @@ export default function OrderDetail() {
             {quoteSnapshot ? (
               <div style={{ display: "grid", gap: "8px" }}>
                 <span>
+                  <strong>Garment Unit Price:</strong>
+                  {money(quoteSnapshot.garment_unit_price)}
+                </span>
+
+                <span>
                   <strong>Quantity:</strong>
                   {quoteSnapshot.quantity || order.qty || 0}
                 </span>
 
                 <span>
+                  <strong>Garment Subtotal:</strong>
+                  {money(quoteSnapshot.garment_subtotal)}
+                </span>
+
+                <span>
                   <strong>Placement Subtotal:</strong>
                   {money(quoteSnapshot.placement_subtotal)}
+                </span>
+
+                <span>
+                  <strong>Production Charges:</strong>
+                  {money(quoteSnapshot.production_subtotal)}
                 </span>
 
                 <span>

@@ -9,6 +9,9 @@ import {
 import { getUserInitials } from "../utils/getUserInitials";
 
 const ADMIN_LOGO_SRC = "/tee&co512x512.png";
+const FACEBOOK_URL =
+  "https://www.facebook.com/p/Tee-Co-Ltd-100078145951464/";
+const INSTAGRAM_URL = "https://www.instagram.com/teeandcodesigns/";
 
 function FacebookIcon() {
   return (
@@ -148,6 +151,47 @@ function AttentionBadge({ count }) {
   );
 }
 
+function SocialLinks({ compact = false }) {
+  const linkStyle = compact
+    ? {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "38px",
+        height: "38px",
+        borderRadius: "999px",
+        border: "1px solid #dbe4ee",
+        color: "#171717",
+        background: "#ffffff",
+      }
+    : {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "8px",
+        padding: "10px 12px",
+        borderRadius: "12px",
+        border: "1px solid #dbe4ee",
+        color: "#171717",
+        background: "#ffffff",
+        textDecoration: "none",
+        fontWeight: 700,
+      };
+
+  return (
+    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <a href={FACEBOOK_URL} target="_blank" rel="noreferrer" style={linkStyle}>
+        <FacebookIcon />
+        {compact ? null : <span>Facebook</span>}
+      </a>
+
+      <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" style={linkStyle}>
+        <InstagramIcon />
+        {compact ? null : <span>Instagram</span>}
+      </a>
+    </div>
+  );
+}
+
 function AdminSidebar({ pathname, search, staffUser }) {
   const orders = useStoredOrders();
   const badgeCounts = getSidebarCounts(orders);
@@ -162,6 +206,8 @@ function AdminSidebar({ pathname, search, staffUser }) {
         minWidth: "250px",
         maxWidth: "250px",
         flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
         overflow: "hidden",
         minHeight: "100vh",
         background: "#ffffff",
@@ -287,6 +333,31 @@ function AdminSidebar({ pathname, search, staffUser }) {
           </div>
         </div>
       ))}
+
+      <div
+        style={{
+          marginTop: "auto",
+          paddingTop: "18px",
+          borderTop: "1px solid #e2e8f0",
+          display: "grid",
+          gap: "10px",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: "11px",
+            fontWeight: 900,
+            color: "#78716c",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+          }}
+        >
+          Tee & Co Social
+        </p>
+
+        <SocialLinks />
+      </div>
     </aside>
   );
 }
@@ -382,25 +453,7 @@ function PublicHeader() {
             flexShrink: 0,
           }}
         >
-          <div style={{ display: "flex", gap: "12px" }}>
-            <a
-              href="https://facebook.com"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: "#171717" }}
-            >
-              <FacebookIcon />
-            </a>
-
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: "#171717" }}
-            >
-              <InstagramIcon />
-            </a>
-          </div>
+          <SocialLinks compact />
 
           <Link
             to="/login"
@@ -507,6 +560,8 @@ function AdminWorkspaceHeader({ staffUser }) {
               ({displayRole})
             </p>
           </div>
+
+          <SocialLinks compact />
 
           {staffUser ? (
             <button

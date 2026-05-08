@@ -10,6 +10,19 @@ export function getPlacementUnitPrice(product, placementName, quantity = 0) {
   return Number(priceConfig || 0);
 }
 
+export function getGarmentUnitPrice(product) {
+  return Number(
+    product?.unit_price ??
+      product?.base_garment_price ??
+      product?.calculated_base_price ??
+      0
+  );
+}
+
+export function getProductionUnitPrice(product, productionMethod) {
+  return Number(product?.production_method_prices?.[productionMethod] || 0);
+}
+
 export function normalizeOrderPlacements(order) {
   if (Array.isArray(order?.placements) && order.placements.length) {
     return order.placements;
@@ -32,6 +45,11 @@ export function normalizeOrderPlacements(order) {
 export function generateQuoteSnapshot(order, product) {
   const quantity = Number(order?.qty || 0);
   const placements = normalizeOrderPlacements(order);
+  const garmentUnitPrice = getGarmentUnitPrice(product);
+  const garmentSubtotal = garmentUnitPrice * quantity;
+  const productionMethod = order?.decoration_type || "";
+  const productionUnitPrice = getProductionUnitPrice(product, productionMethod);
+  const productionSubtotal = productionUnitPrice * quantity;
 
   const placement_lines = placements.map((line) => {
     const placementName = line.placement;
@@ -51,8 +69,18 @@ export function generateQuoteSnapshot(order, product) {
 
   const setup_fees = Array.isArray(order?.setup_fees) ? order.setup_fees : [];
   const placementSubtotal = placement_lines.reduce((total, line) => total + Number(line.line_total || 0), 0);
+  const production_lines = productionMethod
+    ? [
+        {
+          production_method: productionMethod,
+          unit_price: productionUnitPrice,
+          quantity,
+          line_total: productionSubtotal,
+        },
+      ]
+    : [];
   const setupSubtotal = setup_fees.reduce((total, fee) => total + Number(fee.amount || 0), 0);
-  const subtotal = placementSubtotal + setupSubtotal;
+  const subtotal = garmentSubtotal + placementSubtotal + productionSubtotal + setupSubtotal;
 
   return {
     order_number: order?.order_number || "",
@@ -60,12 +88,18 @@ export function generateQuoteSnapshot(order, product) {
     garment: order?.garment || product?.name || "",
     product_id: order?.product_id || product?.id || "",
     quantity,
+    garment_unit_price: garmentUnitPrice,
+    garment_subtotal: garmentSubtotal,
     placement_lines,
+    production_method: productionMethod,
+    production_lines,
+    production_subtotal: productionSubtotal,
     setup_fees,
     placement_subtotal: placementSubtotal,
     setup_subtotal: setupSubtotal,
     subtotal,
     tax: null,
+    taxes_placeholder: "Calculated at checkout",
     total: subtotal,
     generated_at: new Date().toISOString(),
   };

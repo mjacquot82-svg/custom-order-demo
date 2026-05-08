@@ -52,6 +52,8 @@ export default function QuoteView() {
       <p><strong>Customer:</strong> {quote.customer_name}</p>
       <p><strong>Garment:</strong> {quote.garment}</p>
       <p><strong>Quantity:</strong> {quote.quantity}</p>
+      <p><strong>Garment Unit Price:</strong> {money(quote.garment_unit_price)}</p>
+      <p><strong>Garment Subtotal:</strong> {money(quote.garment_subtotal)}</p>
 
       <table style={{ width: "100%", marginTop: "20px" }}>
         <thead>
@@ -71,6 +73,21 @@ export default function QuoteView() {
           ))}
         </tbody>
       </table>
+
+      <div style={{ marginTop: "20px", display: "grid", gap: "8px" }}>
+        <p style={{ margin: 0 }}>
+          <strong>Placement Charges:</strong> {money(quote.placement_subtotal)}
+        </p>
+        <p style={{ margin: 0 }}>
+          <strong>Production Charges:</strong> {money(quote.production_subtotal)}
+        </p>
+        <p style={{ margin: 0 }}>
+          <strong>Digitizing / Setup:</strong> {money(quote.setup_subtotal)}
+        </p>
+        <p style={{ margin: 0 }}>
+          <strong>Taxes:</strong> {quote.taxes_placeholder || "Calculated at checkout"}
+        </p>
+      </div>
 
       <h2 style={{ marginTop: "20px" }}>Total: {money(quote.total)}</h2>
 
