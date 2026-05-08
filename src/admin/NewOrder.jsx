@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProductionTypeSelect from "../components/ProductionTypeSelect";
 import {
   normalizeProductionType,
   PRODUCTION_TYPES,
 } from "../constants/productionTypes";
-import { createStoredOrder } from "../lib/ordersStore";
-import { getStoredProducts } from "../lib/productsStore";
 import {
   createStoredCustomer,
   getStoredCustomers,
   linkOrderToCustomer,
 } from "../lib/customersStore";
+import { createStoredOrder } from "../lib/ordersStore";
+import { getStoredProducts } from "../lib/productsStore";
+import { saveCustomerArtwork } from "../lib/customerArtworkStore";
+import "./NewOrder.css";
 
 const fallbackSizeKeys = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 
@@ -82,6 +84,22 @@ function getDecorationOptions(product) {
   return Array.from(new Set([...PRODUCTION_TYPES, ...normalizedOptions]));
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes || 0);
+  if (value <= 0) return "0 KB";
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
+}
+
 const fieldStyle = {
   border: "1px solid #cbd5e1",
   borderRadius: "12px",
@@ -89,6 +107,7 @@ const fieldStyle = {
   fontSize: "15px",
   width: "100%",
   boxSizing: "border-box",
+  background: "#ffffff",
 };
 
 const labelStyle = {
@@ -100,11 +119,15 @@ const labelStyle = {
 
 export default function NewOrder() {
   const navigate = useNavigate();
+  const artworkInputRef = useRef(null);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [customerSearchResults, setCustomerSearchResults] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedPlacements, setSelectedPlacements] = useState([]);
+  const [artworkUpload, setArtworkUpload] = useState(null);
+  const [uploadError, setUploadError] = useState("");
   const [form, setForm] = useState({
     customer_id: "",
     customer_name: "",
@@ -135,7 +158,13 @@ export default function NewOrder() {
 
   const sizeKeys = selectedProduct?.sizes?.length ? selectedProduct.sizes : fallbackSizeKeys;
   const colorOptions = selectedProduct?.colors?.length ? selectedProduct.colors : [];
-  const placementOptions = selectedProduct?.placements?.length ? selectedProduct.placements : [];
+  const placementConfig = selectedProduct?.placement_config?.length
+    ? selectedProduct.placement_config
+    : (selectedProduct?.placements || []).map((placement) => ({
+        id: String(placement).toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        label: placement,
+        price: Number(selectedProduct?.placement_prices?.[placement] || 0),
+      }));
   const decorationOptions = getDecorationOptions(selectedProduct);
 
   const totalQty = useMemo(() => {
@@ -196,6 +225,15 @@ export default function NewOrder() {
     selectCustomerById(customerId);
   }
 
+  function resetArtworkUpload() {
+    setArtworkUpload(null);
+    setUploadError("");
+
+    if (artworkInputRef.current) {
+      artworkInputRef.current.value = "";
+    }
+  }
+
   function selectProduct(event) {
     const productId = event.target.value;
     const product = products.find((item) => item.id === productId);
@@ -212,6 +250,7 @@ export default function NewOrder() {
         placement: "",
         decoration_type: "Screen Print",
       }));
+      setSelectedPlacements([]);
       setSizes(buildSizeState(fallbackSizeKeys));
       return;
     }
@@ -223,14 +262,52 @@ export default function NewOrder() {
       garment_category: product.category,
       brand_model: product.brand_model || "",
       garment_color: product.colors?.[0] || "",
-      placement: product.placements?.[0] || "",
+      placement: "",
       decoration_type: getDecorationOptions(product)[0] || "Screen Print",
     }));
+    setSelectedPlacements([]);
     setSizes(buildSizeState(product.sizes?.length ? product.sizes : fallbackSizeKeys));
+  }
+
+  async function updateArtwork(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const preview = await fileToDataUrl(file);
+      setArtworkUpload({
+        name: file.name,
+        file_name: file.name,
+        file_type: file.type || "application/octet-stream",
+        file_size: file.size || 0,
+        preview,
+      });
+      setUploadError("");
+    } catch (error) {
+      console.error("Unable to read uploaded artwork", error);
+      setUploadError("Artwork could not be loaded. Try a different image file.");
+      resetArtworkUpload();
+    }
   }
 
   function updateSize(size, value) {
     setSizes((current) => ({ ...current, [size]: value }));
+  }
+
+  function togglePlacement(placementLabel) {
+    setSelectedPlacements((current) => {
+      const exists = current.includes(placementLabel);
+      const nextPlacements = exists
+        ? current.filter((item) => item !== placementLabel)
+        : [...current, placementLabel];
+
+      setForm((currentForm) => ({
+        ...currentForm,
+        placement: nextPlacements[0] || "",
+      }));
+
+      return nextPlacements;
+    });
   }
 
   function resolveCustomerForOrder() {
@@ -251,14 +328,45 @@ export default function NewOrder() {
     return customer.id;
   }
 
+  function buildArtworkPayload(customerId) {
+    if (!artworkUpload) return null;
+
+    return saveCustomerArtwork(customerId, {
+      ...artworkUpload,
+      placement_hint: selectedPlacements.join(", "),
+      notes: `Uploaded during order intake for ${form.garment || "custom garment"}.`,
+    });
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
 
     const customerId = resolveCustomerForOrder();
-
     const normalizedSizes = Object.fromEntries(
       Object.entries(sizes).map(([size, value]) => [size, Number(value) || 0])
     );
+    const savedArtwork = buildArtworkPayload(customerId);
+    const artworkFiles = savedArtwork
+      ? [
+          {
+            id: savedArtwork.id,
+            name: savedArtwork.name,
+            file_name: savedArtwork.file_name,
+            type: savedArtwork.file_type,
+            size: savedArtwork.file_size,
+            preview: savedArtwork.preview,
+            placement_hint: savedArtwork.placement_hint,
+            uploaded_at: savedArtwork.created_at,
+            uploaded_by_staff_name: "Order Intake",
+          },
+        ]
+      : [];
+    const placements = selectedPlacements.map((placement) => ({
+      placement,
+      decoration_type: normalizeProductionType(form.decoration_type),
+      artwork_id: savedArtwork?.id || "",
+      artwork_name: savedArtwork?.name || "",
+    }));
 
     const order = createStoredOrder({
       ...form,
@@ -267,7 +375,12 @@ export default function NewOrder() {
       product_notes: selectedProduct?.notes || "",
       qty: totalQty,
       size_breakdown: normalizedSizes,
+      placement: selectedPlacements[0] || "",
+      placements,
       decoration_type: normalizeProductionType(form.decoration_type),
+      artwork_files: artworkFiles,
+      customer_artwork_id: savedArtwork?.id || "",
+      customer_artwork_name: savedArtwork?.name || "",
     });
 
     linkOrderToCustomer(customerId, order.order_number);
@@ -276,70 +389,36 @@ export default function NewOrder() {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: "1100px",
-        margin: "0 auto",
-        padding: "24px",
-        fontFamily:
-          'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: "#ffffff",
-          borderRadius: "20px",
-          padding: "24px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-        }}
-      >
+    <div className="new-order-page">
+      <form onSubmit={handleSubmit} className="new-order-form">
         <div style={{ marginBottom: "22px" }}>
-          <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          <p
+            style={{
+              margin: 0,
+              color: "#78716c",
+              fontSize: "12px",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
             Staff Order Entry
           </p>
           <h1 style={{ margin: "6px 0 8px", fontSize: "30px" }}>New Order</h1>
           <p style={{ margin: 0, color: "#475569" }}>
-            Select an existing customer or enter a new one, then choose a catalog garment for production.
+            Configure the garment first, confirm placements, and attach production artwork before saving.
           </p>
         </div>
 
-        <section style={{ background: "#171717", color: "#ffffff", borderRadius: "18px", padding: "18px", marginBottom: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
-            <div>
-              <h2 style={{ margin: "0 0 8px", fontSize: "22px" }}>Start Intake</h2>
-              <p style={{ margin: 0, color: "rgba(255,255,255,0.82)" }}>
-                Choose how the customer came in so staff can move quickly from counter or phone straight into production intake.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              {["Walk-in", "Phone"].map((source) => {
-                const active = form.source === source;
-
-                return (
-                  <button
-                    key={source}
-                    type="button"
-                    onClick={() => setForm((current) => ({ ...current, source }))}
-                    style={{
-                      border: active ? "1px solid #ffffff" : "1px solid rgba(255,255,255,0.28)",
-                      background: active ? "#ffffff" : "transparent",
-                      color: active ? "#171717" : "#ffffff",
-                      borderRadius: "12px",
-                      padding: "12px 16px",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {source === "Walk-in" ? "Walk-in Counter Order" : "Phone Order"}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "18px", padding: "18px", marginBottom: "20px" }}>
+        <section
+          style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: "18px",
+            padding: "18px",
+            marginBottom: "20px",
+          }}
+        >
           <h2 style={{ margin: "0 0 12px", fontSize: "20px" }}>Customer</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
             <label style={labelStyle}>
@@ -433,79 +512,192 @@ export default function NewOrder() {
           )}
         </section>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 1fr) minmax(220px, 320px)", gap: "18px", alignItems: "start" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
-            <label style={labelStyle}>
-              Garment / Product
-              <select value={selectedProductId} onChange={selectProduct} required style={fieldStyle}>
-                <option value="">Select a catalog product...</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}{product.brand_model ? ` (${product.brand_model})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label style={labelStyle}>
-              Garment Color
-              {colorOptions.length ? (
-                <select name="garment_color" value={form.garment_color} onChange={updateField} style={fieldStyle}>
-                  {colorOptions.map((color) => <option key={color}>{color}</option>)}
+        <section className="new-order-production-shell">
+          <div className="new-order-config-panel">
+            <div className="new-order-field-stack">
+              <label style={labelStyle}>
+                Garment / Product
+                <select value={selectedProductId} onChange={selectProduct} required style={fieldStyle}>
+                  <option value="">Select a catalog product...</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}{product.brand_model ? ` (${product.brand_model})` : ""}
+                    </option>
+                  ))}
                 </select>
-              ) : (
-                <input name="garment_color" value={form.garment_color} onChange={updateField} placeholder="Black" style={fieldStyle} />
-              )}
-            </label>
+              </label>
 
-            <ProductionTypeSelect
-              value={form.decoration_type}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  decoration_type: event.target.value,
-                }))
-              }
-              label="Production Type"
-              options={decorationOptions}
-            />
+              <label style={labelStyle}>
+                Garment Color
+                {colorOptions.length ? (
+                  <select name="garment_color" value={form.garment_color} onChange={updateField} style={fieldStyle}>
+                    {colorOptions.map((color) => <option key={color}>{color}</option>)}
+                  </select>
+                ) : (
+                  <input name="garment_color" value={form.garment_color} onChange={updateField} placeholder="Black" style={fieldStyle} />
+                )}
+              </label>
 
-            <label style={labelStyle}>
-              Logo Placement
-              {placementOptions.length ? (
-                <select name="placement" value={form.placement} onChange={updateField} style={fieldStyle}>
-                  {placementOptions.map((placement) => <option key={placement}>{placement}</option>)}
-                </select>
-              ) : (
-                <input name="placement" value={form.placement} onChange={updateField} placeholder="Left Chest" style={fieldStyle} />
-              )}
-            </label>
-          </div>
-
-          <div style={{ border: "1px solid #e2e8f0", borderRadius: "18px", padding: "14px", background: "#f8fafc" }}>
-            <p style={{ margin: "0 0 10px", fontWeight: 700 }}>Garment Preview</p>
-            <div style={{ height: "210px", borderRadius: "14px", background: "#ffffff", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", color: "#94a3b8", textAlign: "center", padding: "10px" }}>
-              {selectedProduct?.image ? (
-                <img src={selectedProduct.image} alt={selectedProduct.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-              ) : (
-                "Select a product with an image to preview it here"
-              )}
+              <ProductionTypeSelect
+                value={form.decoration_type}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    decoration_type: event.target.value,
+                  }))
+                }
+                label="Production Type"
+                options={decorationOptions}
+              />
             </div>
-            {selectedProduct && (
-              <div style={{ marginTop: "10px", color: "#475569", fontSize: "14px" }}>
-                <strong>{selectedProduct.name}</strong>
-                {selectedProduct.brand_model ? ` • ${selectedProduct.brand_model}` : ""}
-                {selectedProduct.notes && <p style={{ marginBottom: 0 }}>{selectedProduct.notes}</p>}
-              </div>
-            )}
-          </div>
-        </div>
 
-        <div style={{ marginTop: "24px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "18px", padding: "18px" }}>
+            <div className="new-order-meta-strip">
+              <span>
+                <strong>Category:</strong> {selectedProduct?.category || "—"}
+              </span>
+              <span>
+                <strong>Model:</strong> {selectedProduct?.brand_model || "General"}
+              </span>
+            </div>
+
+            <div className="new-order-preview-panel">
+              <div className="new-order-preview-header">
+                <div>
+                  <p className="new-order-section-kicker">Garment Preview</p>
+                  <h2>{selectedProduct?.name || "Select a garment to preview"}</h2>
+                </div>
+                {selectedProduct?.notes ? (
+                  <p className="new-order-preview-note">{selectedProduct.notes}</p>
+                ) : null}
+              </div>
+
+              <div className="new-order-preview-stage">
+                {selectedProduct?.image ? (
+                  <img
+                    src={selectedProduct.image}
+                    alt={selectedProduct.name}
+                    className="new-order-preview-image"
+                  />
+                ) : (
+                  <div className="new-order-preview-empty">
+                    Product preview will appear here.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="new-order-production-panel">
+            <section className="new-order-card">
+              <div className="new-order-card-header">
+                <div>
+                  <p className="new-order-section-kicker">Step 5</p>
+                  <h2>Logo Placements</h2>
+                </div>
+                <span className="new-order-selection-count">
+                  {selectedPlacements.length} selected
+                </span>
+              </div>
+
+              {placementConfig.length ? (
+                <div className="new-order-placement-grid">
+                  {placementConfig.map((placement) => {
+                    const active = selectedPlacements.includes(placement.label);
+
+                    return (
+                      <button
+                        key={placement.id || placement.label}
+                        type="button"
+                        onClick={() => togglePlacement(placement.label)}
+                        className={active ? "new-order-placement-chip active" : "new-order-placement-chip"}
+                      >
+                        <span>{placement.label}</span>
+                        {placement.price > 0 ? (
+                          <small>${Number(placement.price).toFixed(0)}</small>
+                        ) : (
+                          <small>Included</small>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="new-order-muted">
+                  Select a garment to load its allowed production placements.
+                </p>
+              )}
+            </section>
+
+            <section className="new-order-card">
+              <div className="new-order-card-header">
+                <div>
+                  <p className="new-order-section-kicker">Step 6</p>
+                  <h2>Artwork Upload</h2>
+                </div>
+              </div>
+
+              <div className="new-order-upload-shell">
+                <label htmlFor="order-artwork-upload" className="new-order-upload-button">
+                  Upload Customer Artwork
+                </label>
+                <input
+                  id="order-artwork-upload"
+                  ref={artworkInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={updateArtwork}
+                  style={{ display: "none" }}
+                />
+
+                {artworkUpload ? (
+                  <div className="new-order-artwork-preview">
+                    <div className="new-order-artwork-thumb">
+                      <img src={artworkUpload.preview} alt={artworkUpload.name} />
+                    </div>
+                    <div className="new-order-artwork-copy">
+                      <strong>{artworkUpload.name}</strong>
+                      <span>{formatFileSize(artworkUpload.file_size)}</span>
+                      <span>
+                        {selectedPlacements.length
+                          ? `Linked to: ${selectedPlacements.join(", ")}`
+                          : "No placement selected yet"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resetArtworkUpload}
+                      className="new-order-clear-button"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <p className="new-order-muted">
+                    No artwork uploaded. You can still save the order and attach files later.
+                  </p>
+                )}
+
+                {uploadError ? (
+                  <p className="new-order-error">{uploadError}</p>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <div
+          style={{
+            marginTop: "24px",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: "18px",
+            padding: "18px",
+          }}
+        >
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", alignItems: "center", marginBottom: "14px" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: "20px" }}>Size Breakdown</h2>
-              <p style={{ margin: "4px 0 0", color: "#64748b" }}>Size fields now come from the selected catalog product.</p>
+              <p style={{ margin: "4px 0 0", color: "#64748b" }}>Size fields come directly from the selected product.</p>
             </div>
             <strong style={{ fontSize: "18px" }}>Total: {totalQty}</strong>
           </div>
@@ -536,7 +728,19 @@ export default function NewOrder() {
           <button type="button" onClick={() => navigate("/admin/orders")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "13px 18px", cursor: "pointer", fontWeight: 600 }}>
             Cancel
           </button>
-          <button type="submit" disabled={!form.customer_name || !form.garment || totalQty <= 0} style={{ background: totalQty > 0 && form.customer_name && form.garment ? "#171717" : "#a8a29e", color: "#ffffff", border: "none", borderRadius: "12px", padding: "13px 18px", cursor: totalQty > 0 && form.customer_name && form.garment ? "pointer" : "not-allowed", fontWeight: 700 }}>
+          <button
+            type="submit"
+            disabled={!form.customer_name || !form.garment || totalQty <= 0}
+            style={{
+              background: totalQty > 0 && form.customer_name && form.garment ? "#171717" : "#a8a29e",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "12px",
+              padding: "13px 18px",
+              cursor: totalQty > 0 && form.customer_name && form.garment ? "pointer" : "not-allowed",
+              fontWeight: 700,
+            }}
+          >
             Save Order
           </button>
         </div>

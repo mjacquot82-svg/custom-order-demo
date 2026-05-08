@@ -1,5 +1,16 @@
 import { normalizeProductionType } from "../constants/productionTypes";
 
+function formatPlacements(order) {
+  if (Array.isArray(order.placements) && order.placements.length) {
+    return order.placements
+      .map((item) => item?.placement)
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return order.placement || "—";
+}
+
 export default function PrintableProductionTicket({ order = {} }) {
   const productionType = normalizeProductionType(
     order.decoration_type ||
@@ -32,8 +43,8 @@ export default function PrintableProductionTicket({ order = {} }) {
         </p>
 
         <p>
-          <strong>Placement:</strong>
-          {order.placement || "—"}
+          <strong>Placements:</strong>
+          {formatPlacements(order)}
         </p>
 
         <p>

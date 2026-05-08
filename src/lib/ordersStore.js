@@ -14,12 +14,39 @@ function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeArtworkFiles(files) {
+  return Array.isArray(files) ? files.filter(Boolean) : [];
+}
+
+function normalizePlacements(order = {}) {
+  if (Array.isArray(order.placements) && order.placements.length) {
+    return order.placements.filter((placement) => placement?.placement);
+  }
+
+  if (order.placement) {
+    return [
+      {
+        placement: order.placement,
+        decoration_type: order.decoration_type || order.production_type || "",
+        artwork_id: order.customer_artwork_id || "",
+        artwork_name: order.customer_artwork_name || "",
+      },
+    ];
+  }
+
+  return [];
+}
+
 function normalizeStoredOrder(order = {}) {
   const assignedToStaffId = order.assigned_to_staff_id || "";
   const assignedToStaffName = order.assigned_to_staff_name || "";
   const hasAssignedStaff = Boolean(assignedToStaffId);
   const status = order.status || "Awaiting Artwork";
   const normalizedStatus = normalizeStatus(status);
+  const artworkFiles = normalizeArtworkFiles(order.artwork_files);
+  const placements = normalizePlacements(order);
+  const primaryPlacement = placements[0] || null;
+  const primaryArtwork = artworkFiles[0] || null;
   const productionReadyStatuses = [
     "approved",
     "ready for production",
@@ -31,9 +58,19 @@ function normalizeStoredOrder(order = {}) {
   return {
     ...order,
     status,
+    placements,
+    artwork_files: artworkFiles,
+    placement: order.placement || primaryPlacement?.placement || "",
     decoration_type: normalizeProductionType(
       order.decoration_type || order.production_type || ""
     ),
+    customer_artwork_id:
+      order.customer_artwork_id || primaryArtwork?.id || primaryPlacement?.artwork_id || "",
+    customer_artwork_name:
+      order.customer_artwork_name ||
+      primaryArtwork?.name ||
+      primaryPlacement?.artwork_name ||
+      "",
     assigned_to_staff_id: assignedToStaffId,
     assigned_to_staff_name: assignedToStaffName,
     assigned_to_staff_role: order.assigned_to_staff_role || "",

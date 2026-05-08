@@ -4,6 +4,17 @@ function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function formatPlacements(order) {
+  if (Array.isArray(order.placements) && order.placements.length) {
+    return order.placements
+      .map((item) => item?.placement)
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return order.placement || "—";
+}
+
 export default function ProductionInstructionsPanel({ order = {} }) {
   const productionType = normalizeProductionType(
     order.decoration_type ||
@@ -27,7 +38,7 @@ export default function ProductionInstructionsPanel({ order = {} }) {
 
         <p><strong>Garment:</strong> {order.garment || order.item || "Custom garment"}</p>
 
-        <p><strong>Placement:</strong> {order.placement || "—"}</p>
+        <p><strong>Placements:</strong> {formatPlacements(order)}</p>
 
         <p><strong>Production Type:</strong> {productionType}</p>
 
