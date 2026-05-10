@@ -25,6 +25,19 @@ function normalizePlacementLabel(value) {
   return String(value || "").trim();
 }
 
+function isProductRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeNumericPrice(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) return null;
+
+  return Number(parsedValue.toFixed(2));
+}
+
 export function buildPlacementConfig(source = [], placementPrices = {}) {
   const rawPlacements = Array.isArray(source) ? source : [];
   const seenLabels = new Set();
@@ -46,7 +59,7 @@ export function buildPlacementConfig(source = [], placementPrices = {}) {
         (typeof entry === "object" && entry !== null ? entry.id : "") ||
         toPlacementId(label),
       label,
-      price: Number(configuredPrice || 0),
+      price: normalizeNumericPrice(configuredPrice),
     });
 
     return placements;
@@ -54,24 +67,34 @@ export function buildPlacementConfig(source = [], placementPrices = {}) {
 }
 
 export function getProductPlacementConfig(product = {}) {
-  if (Array.isArray(product?.placement_config) && product.placement_config.length) {
-    return buildPlacementConfig(product.placement_config, product?.placement_prices || {});
+  const safeProduct = isProductRecord(product) ? product : {};
+
+  if (
+    Array.isArray(safeProduct.placement_config) &&
+    safeProduct.placement_config.length
+  ) {
+    return buildPlacementConfig(
+      safeProduct.placement_config,
+      safeProduct.placement_prices || {}
+    );
   }
 
   const placementLabels = normalizeList(
-    product.placements ||
-      product.allowed_placements ||
-      product.placement_options?.map((item) => item.label)
+    safeProduct.placements ||
+      safeProduct.allowed_placements ||
+      safeProduct.placement_options?.map((item) => item?.label)
   );
 
-  return buildPlacementConfig(placementLabels, product?.placement_prices || {});
+  return buildPlacementConfig(placementLabels, safeProduct.placement_prices || {});
 }
 
 function buildPlacementPricesFromConfig(placementConfig, placementPrices = {}) {
   return placementConfig.reduce((prices, placement) => {
     const configuredPrice = placementPrices?.[placement.label];
     prices[placement.label] =
-      configuredPrice === undefined ? Number(placement.price || 0) : configuredPrice;
+      configuredPrice === undefined
+        ? normalizeNumericPrice(placement.price)
+        : normalizeNumericPrice(configuredPrice);
     return prices;
   }, {});
 }
@@ -175,7 +198,12 @@ export const defaultProducts = [
 ];
 
 function normalizeList(value) {
-  if (Array.isArray(value)) return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+  }
+
   return String(value || "")
     .split(",")
     .map((item) => item.trim())
@@ -183,7 +211,12 @@ function normalizeList(value) {
 }
 
 function normalizePlacementPrices(placements, value) {
-  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return placements.reduce((prices, placement) => {
+      prices[placement] = normalizeNumericPrice(value?.[placement]);
+      return prices;
+    }, {});
+  }
 
   const prices = {};
   const lines = String(value || "")
@@ -193,11 +226,11 @@ function normalizePlacementPrices(placements, value) {
 
   lines.forEach((line) => {
     const [placement, price] = line.split(":").map((item) => item.trim());
-    if (placement) prices[placement] = Number(price) || 0;
+    if (placement) prices[placement] = normalizeNumericPrice(price);
   });
 
   placements.forEach((placement) => {
-    if (!(placement in prices)) prices[placement] = 0;
+    if (!(placement in prices)) prices[placement] = null;
   });
 
   return prices;
@@ -284,12 +317,14 @@ function normalizeProductionMethodPrices(methods, value) {
     value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
   return methods.reduce((accumulator, method) => {
-    accumulator[method] = Number(prices?.[method] || 0);
+    accumulator[method] = normalizeNumericPrice(prices?.[method]);
     return accumulator;
   }, {});
 }
 
 function normalizeProduct(product) {
+  if (!isProductRecord(product)) return null;
+
   const placementConfig = getProductPlacementConfig(product);
   const placements = placementConfig.map((item) => item.label);
   const placementPrices = buildPlacementPricesFromConfig(
@@ -323,13 +358,29 @@ function normalizeProduct(product) {
   };
 }
 
+function normalizeStoredProductsCollection(products) {
+  const sourceProducts = Array.isArray(products) ? products : defaultProducts;
+  return sourceProducts.map(normalizeProduct).filter(Boolean);
+}
+
 export function getStoredProducts() {
   if (typeof window === "undefined") return defaultProducts.map(normalizeProduct);
 
   try {
     const rawProducts = window.localStorage.getItem(STORAGE_KEY);
-    const products = rawProducts ? JSON.parse(rawProducts) : defaultProducts;
-    return products.map(normalizeProduct);
+    const parsedProducts = rawProducts ? JSON.parse(rawProducts) : defaultProducts;
+    const normalizedProducts = normalizeStoredProductsCollection(parsedProducts);
+
+    if (rawProducts && Array.isArray(parsedProducts)) {
+      const rawSnapshot = JSON.stringify(parsedProducts);
+      const normalizedSnapshot = JSON.stringify(normalizedProducts);
+
+      if (rawSnapshot !== normalizedSnapshot) {
+        window.localStorage.setItem(STORAGE_KEY, normalizedSnapshot);
+      }
+    }
+
+    return normalizedProducts;
   } catch (error) {
     console.error("Unable to read Tee & Co products", error);
     return defaultProducts.map(normalizeProduct);
@@ -338,7 +389,10 @@ export function getStoredProducts() {
 
 export function saveStoredProducts(products) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products.map(normalizeProduct)));
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify((Array.isArray(products) ? products : []).map(normalizeProduct).filter(Boolean))
+  );
   emitProductsUpdated();
 }
 
@@ -406,11 +460,14 @@ export function createStoredProduct(productInput) {
 
 export function updateStoredProduct(productId, updates) {
   const products = getStoredProducts();
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(updates, key);
   const nextProducts = products.map((product) => {
     if (product.id !== productId) return product;
 
-    const placements = updates.placements ? normalizeList(updates.placements) : product.placements;
-    const placementPrices = updates.placement_prices
+    const placements = hasOwn("placements")
+      ? normalizeList(updates.placements)
+      : product.placements;
+    const placementPrices = hasOwn("placement_prices")
       ? normalizePlacementPrices(placements, updates.placement_prices)
       : product.placement_prices || normalizePlacementPrices(placements, {});
     const placementConfig = buildPlacementConfig(
@@ -423,12 +480,12 @@ export function updateStoredProduct(productId, updates) {
     return normalizeProduct({
       ...product,
       ...updates,
-      colors: updates.colors ? normalizeList(updates.colors) : product.colors,
-      sizes: updates.sizes ? normalizeList(updates.sizes) : product.sizes,
+      colors: hasOwn("colors") ? normalizeList(updates.colors) : product.colors,
+      sizes: hasOwn("sizes") ? normalizeList(updates.sizes) : product.sizes,
       placements,
       placement_prices: placementPrices,
       placement_config: placementConfig,
-      decoration_types: updates.decoration_types
+      decoration_types: hasOwn("decoration_types")
         ? normalizeList(updates.decoration_types)
         : product.decoration_types,
     });

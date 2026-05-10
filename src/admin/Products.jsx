@@ -45,8 +45,31 @@ const emptyProduct = {
   notes: "",
 };
 
-function money(value) {
-  return `$${Number(value || 0).toFixed(2)}`;
+function formatMoney(value, fallback = "Not set") {
+  if (value === null || value === undefined || value === "") return fallback;
+
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) return fallback;
+
+  return `$${parsedValue.toFixed(2)}`;
+}
+
+function parseOptionalPrice(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) return null;
+
+  return Number(parsedValue.toFixed(2));
+}
+
+function formatPercent(value, fallback = "Not set") {
+  if (value === null || value === undefined || value === "") return fallback;
+
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) return fallback;
+
+  return `${parsedValue.toFixed(0)}%`;
 }
 
 function normalizeListInput(value) {
@@ -58,45 +81,61 @@ function normalizeListInput(value) {
 
 function buildPlacementPriceMap(placements, existing = {}) {
   return placements.reduce((accumulator, placement) => {
-    accumulator[placement] = String(existing?.[placement] ?? "0");
+    accumulator[placement] =
+      existing?.[placement] === null || existing?.[placement] === undefined
+        ? ""
+        : String(existing[placement]);
     return accumulator;
   }, {});
 }
 
 function buildMethodPriceMap(methods, existing = {}) {
   return methods.reduce((accumulator, method) => {
-    accumulator[method] = String(existing?.[method] ?? "0");
+    accumulator[method] =
+      existing?.[method] === null || existing?.[method] === undefined
+        ? ""
+        : String(existing[method]);
     return accumulator;
   }, {});
 }
 
 function buildFormFromProduct(product) {
-  const placements = getProductPlacementConfig(product).map((placement) => placement.label);
-  const productionMethods = product?.production_methods?.length
-    ? product.production_methods
-    : product?.decoration_types?.length
-    ? product.decoration_types
+  const safeProduct = product && typeof product === "object" ? product : {};
+  const placements = getProductPlacementConfig(safeProduct).map(
+    (placement) => placement.label
+  );
+  const productionMethods = safeProduct?.production_methods?.length
+    ? safeProduct.production_methods
+    : safeProduct?.decoration_types?.length
+    ? safeProduct.decoration_types
     : ["Screen Print"];
 
   return {
     ...emptyProduct,
-    ...product,
-    product_type: product?.product_type || product?.name || "",
-    cost_price: String(product?.cost_price ?? "0"),
-    markup_percentage: String(product?.markup_percentage ?? "0"),
-    colors: Array.isArray(product?.colors) ? product.colors.join(", ") : "",
-    sizes: Array.isArray(product?.sizes) ? product.sizes.join(", ") : "",
+    ...safeProduct,
+    product_type: safeProduct?.product_type || safeProduct?.name || "",
+    cost_price:
+      safeProduct?.cost_price === null || safeProduct?.cost_price === undefined
+        ? ""
+        : String(safeProduct.cost_price),
+    markup_percentage:
+      safeProduct?.markup_percentage === null ||
+      safeProduct?.markup_percentage === undefined
+        ? ""
+        : String(safeProduct.markup_percentage),
+    colors: Array.isArray(safeProduct?.colors) ? safeProduct.colors.join(", ") : "",
+    sizes: Array.isArray(safeProduct?.sizes) ? safeProduct.sizes.join(", ") : "",
     placementsText: placements.join(", "),
     placementPriceMap: buildPlacementPriceMap(
       placements,
-      product?.placement_prices || {}
+      safeProduct?.placement_prices || {}
     ),
     production_methods: productionMethods,
     production_method_prices: buildMethodPriceMap(
       productionMethods,
-      product?.production_method_prices || {}
+      safeProduct?.production_method_prices || {}
     ),
-    notes: product?.notes || "",
+    notes: safeProduct?.notes || "",
   };
 }
 
@@ -222,14 +261,16 @@ export default function Products() {
 
     const placements = placementOptions;
     const placementPrices = placements.reduce((accumulator, placement) => {
-      accumulator[placement] = Number(form.placementPriceMap?.[placement] || 0);
+      accumulator[placement] = parseOptionalPrice(form.placementPriceMap?.[placement]);
       return accumulator;
     }, {});
     const productionMethods = form.production_methods.length
       ? form.production_methods
       : ["Screen Print"];
     const productionMethodPrices = productionMethods.reduce((accumulator, method) => {
-      accumulator[method] = Number(form.production_method_prices?.[method] || 0);
+      accumulator[method] = parseOptionalPrice(
+        form.production_method_prices?.[method]
+      );
       return accumulator;
     }, {});
     const productPayload = {
@@ -696,7 +737,7 @@ export default function Products() {
                   </div>
 
                   <strong style={{ fontSize: "20px", color: "#0f172a" }}>
-                    {money(product.base_garment_price)}
+                    {formatMoney(product?.base_garment_price)}
                   </strong>
                 </div>
 
@@ -713,7 +754,7 @@ export default function Products() {
                       Production Methods
                     </strong>
                     <span style={{ color: "#475569" }}>
-                      {product.production_methods?.join(", ") || "None"}
+                      {product?.production_methods?.join(", ") || "None"}
                     </span>
                   </div>
 
@@ -722,8 +763,13 @@ export default function Products() {
                       Placement Pricing
                     </strong>
                     <span style={{ color: "#475569" }}>
-                      {(product.placement_config || [])
-                        .map((placement) => `${placement.label} ${money(placement.price)}`)
+                      {(product?.placement_config || [])
+                        .map((placement) =>
+                          placement?.label
+                            ? `${placement.label} ${formatMoney(placement?.price)}`
+                            : null
+                        )
+                        .filter(Boolean)
                         .join(" • ") || "No placements"}
                     </span>
                   </div>
@@ -738,9 +784,9 @@ export default function Products() {
                     color: "#64748b",
                   }}
                 >
-                  <span>Cost: {money(product.cost_price)}</span>
-                  <span>Markup: {Number(product.markup_percentage || 0).toFixed(0)}%</span>
-                  <span>Status: {product.status}</span>
+                  <span>Cost: {formatMoney(product?.cost_price)}</span>
+                  <span>Markup: {formatPercent(product?.markup_percentage)}</span>
+                  <span>Status: {product?.status || "Unknown"}</span>
                 </div>
               </div>
 
