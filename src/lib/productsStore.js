@@ -7,6 +7,9 @@ import { useSyncExternalStore } from "react";
 const STORAGE_KEY = "teeCoProducts";
 const EMPTY_PRODUCTS = [];
 const productListeners = new Set();
+let cachedProductsRaw = null;
+let cachedProductsSnapshot = EMPTY_PRODUCTS;
+let cachedDefaultProductsSnapshot = null;
 
 function emitProductsUpdated() {
   productListeners.forEach((listener) => {
@@ -363,36 +366,60 @@ function normalizeStoredProductsCollection(products) {
   return sourceProducts.map(normalizeProduct).filter(Boolean);
 }
 
+function getDefaultProductsSnapshot() {
+  if (cachedDefaultProductsSnapshot) {
+    return cachedDefaultProductsSnapshot;
+  }
+
+  cachedDefaultProductsSnapshot = normalizeStoredProductsCollection(defaultProducts);
+  return cachedDefaultProductsSnapshot;
+}
+
+function cacheProductsSnapshot(products) {
+  const normalizedProducts = normalizeStoredProductsCollection(products);
+  const normalizedSnapshot = JSON.stringify(normalizedProducts);
+
+  cachedProductsRaw = normalizedSnapshot;
+  cachedProductsSnapshot = normalizedProducts;
+
+  return {
+    normalizedProducts,
+    normalizedSnapshot,
+  };
+}
+
 export function getStoredProducts() {
-  if (typeof window === "undefined") return defaultProducts.map(normalizeProduct);
+  if (typeof window === "undefined") return getDefaultProductsSnapshot();
 
   try {
     const rawProducts = window.localStorage.getItem(STORAGE_KEY);
-    const parsedProducts = rawProducts ? JSON.parse(rawProducts) : defaultProducts;
-    const normalizedProducts = normalizeStoredProductsCollection(parsedProducts);
+    const normalizedRawProducts = rawProducts || "";
 
-    if (rawProducts && Array.isArray(parsedProducts)) {
-      const rawSnapshot = JSON.stringify(parsedProducts);
-      const normalizedSnapshot = JSON.stringify(normalizedProducts);
+    if (normalizedRawProducts === cachedProductsRaw) {
+      return cachedProductsSnapshot;
+    }
 
-      if (rawSnapshot !== normalizedSnapshot) {
-        window.localStorage.setItem(STORAGE_KEY, normalizedSnapshot);
-      }
+    const parsedProducts = rawProducts ? JSON.parse(rawProducts) : getDefaultProductsSnapshot();
+    const { normalizedProducts, normalizedSnapshot } = cacheProductsSnapshot(parsedProducts);
+
+    if (rawProducts && normalizedRawProducts !== normalizedSnapshot) {
+      window.localStorage.setItem(STORAGE_KEY, normalizedSnapshot);
     }
 
     return normalizedProducts;
   } catch (error) {
     console.error("Unable to read Tee & Co products", error);
-    return defaultProducts.map(normalizeProduct);
+    cachedProductsRaw = null;
+    cachedProductsSnapshot = getDefaultProductsSnapshot();
+    return cachedProductsSnapshot;
   }
 }
 
 export function saveStoredProducts(products) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify((Array.isArray(products) ? products : []).map(normalizeProduct).filter(Boolean))
-  );
+
+  const { normalizedSnapshot } = cacheProductsSnapshot(products);
+  window.localStorage.setItem(STORAGE_KEY, normalizedSnapshot);
   emitProductsUpdated();
 }
 
