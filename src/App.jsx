@@ -29,8 +29,8 @@ import AppSplash from "./components/AppSplash";
 
 export default function App() {
   return (
-    <AppSplash>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AppSplash>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Home />} />
@@ -74,7 +74,7 @@ export default function App() {
             />
           </Route>
         </Routes>
-      </BrowserRouter>
-    </AppSplash>
+      </AppSplash>
+    </BrowserRouter>
   );
 }

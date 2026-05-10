@@ -446,7 +446,7 @@ function PublicHeader() {
                 fontSize: "14px",
               }}
             >
-              Custom Apparel & Production
+              Made local, worn proud
             </span>
           </div>
         </Link>

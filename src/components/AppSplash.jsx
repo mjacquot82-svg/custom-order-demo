@@ -1,14 +1,23 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 const SPLASH_LOGO_SRC = "/tee&co512x512.png";
 
 export default function AppSplash({ children }) {
-  const [showSplash, setShowSplash] = useState(true);
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+  const [showSplash, setShowSplash] = useState(isAdminRoute);
 
   useEffect(() => {
+    if (!isAdminRoute) {
+      setShowSplash(false);
+      return undefined;
+    }
+
+    setShowSplash(true);
     const timer = window.setTimeout(() => setShowSplash(false), 900);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [isAdminRoute]);
 
   return (
     <>
