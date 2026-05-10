@@ -1,7 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import PlacementOptionList from "../components/PlacementOptionList";
+import {
+  buildPlacementPricingOptions,
+  getDefaultDecorationType,
+  resolveCustomerOrderProduct,
+} from "../lib/orderConfiguration";
+import { generateQuoteSnapshot } from "../lib/quoteEngine";
+import { getStoredProducts } from "../lib/productsStore";
 
 const fallbackImage = "/garments/gildan-softstyle-tee.jpg";
+
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
 
 export default function OrderPreview() {
   const navigate = useNavigate();
@@ -9,27 +21,52 @@ export default function OrderPreview() {
   const fileInputRef = useRef(null);
 
   const passedState = location.state || {};
+  const [products] = useState(() => getStoredProducts());
+  const selectedProduct = useMemo(
+    () => resolveCustomerOrderProduct(products, passedState),
+    [passedState, products]
+  );
+  const quantity = Number(passedState.quantity || 1);
+  const placementOptions = useMemo(
+    () => buildPlacementPricingOptions(selectedProduct, quantity),
+    [quantity, selectedProduct]
+  );
+  const allowedPlacements = useMemo(
+    () => placementOptions.map((placement) => placement.label),
+    [placementOptions]
+  );
+  const defaultDecorationType = useMemo(
+    () => getDefaultDecorationType(selectedProduct),
+    [selectedProduct]
+  );
 
-  const garmentName = passedState.garmentName || "Selected Garment";
-  const brand = passedState.brand || "Tee & Co";
-  const category = passedState.category || "Apparel";
+  const garmentName = passedState.garmentName || selectedProduct?.name || "Selected Garment";
+  const brand = passedState.brand || selectedProduct?.brand_model || "Tee & Co";
+  const category = passedState.category || selectedProduct?.category || "Apparel";
   const description =
     passedState.description ||
+    selectedProduct?.notes ||
     "Review your garment details, artwork, and print placement before submitting.";
-  const imageSrc = passedState.imageSrc || fallbackImage;
+  const imageSrc = passedState.imageSrc || selectedProduct?.image || fallbackImage;
   const selectedColor = passedState.selectedColor || "Black";
   const selectedSize = passedState.selectedSize || "M";
-  const quantity = passedState.quantity || 1;
-  const placementsAllowed = Array.isArray(passedState.placementsAllowed)
-    ? passedState.placementsAllowed
-    : [];
 
-  const [selectedPlacements, setSelectedPlacements] = useState(
-    placementsAllowed.length ? [placementsAllowed[0]] : []
-  );
+  const [selectedPlacements, setSelectedPlacements] = useState([]);
   const [notes, setNotes] = useState("");
   const [artwork, setArtwork] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
+
+  useEffect(() => {
+    if (!allowedPlacements.length) {
+      setSelectedPlacements([]);
+      return;
+    }
+
+    setSelectedPlacements((current) => {
+      const filtered = current.filter((placement) => allowedPlacements.includes(placement));
+      return filtered.length ? filtered : [allowedPlacements[0]];
+    });
+  }, [allowedPlacements]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -40,8 +77,33 @@ export default function OrderPreview() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const liveQuote = useMemo(() => {
+    return generateQuoteSnapshot(
+      {
+        garment: garmentName,
+        product_id: selectedProduct?.id || passedState.productId || "",
+        qty: quantity,
+        placement: selectedPlacements[0] || "",
+        placements: selectedPlacements.map((placement) => ({
+          placement,
+          decoration_type: defaultDecorationType,
+        })),
+        decoration_type: defaultDecorationType,
+        setup_fees: [],
+      },
+      selectedProduct
+    );
+  }, [
+    defaultDecorationType,
+    garmentName,
+    passedState.productId,
+    quantity,
+    selectedPlacements,
+    selectedProduct,
+  ]);
+
   function togglePlacement(placement) {
-    if (!placementsAllowed.includes(placement)) return;
+    if (!allowedPlacements.includes(placement)) return;
 
     setSelectedPlacements((current) => {
       const exists = current.includes(placement);
@@ -49,12 +111,12 @@ export default function OrderPreview() {
         ? current.filter((item) => item !== placement)
         : [...current, placement];
 
-      return placementsAllowed.filter((item) => nextPlacements.includes(item));
+      return allowedPlacements.filter((item) => nextPlacements.includes(item));
     });
   }
 
-  function handleUpload(e) {
-    const file = e.target.files?.[0];
+  function handleUpload(event) {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     const previewUrl = URL.createObjectURL(file);
@@ -69,6 +131,8 @@ export default function OrderPreview() {
   function handleSubmit() {
     navigate("/order-submitted", {
       state: {
+        garmentId: passedState.garmentId || "",
+        productId: selectedProduct?.id || passedState.productId || "",
         garmentName,
         brand,
         category,
@@ -81,6 +145,8 @@ export default function OrderPreview() {
         placement: selectedPlacements[0] || "",
         notes,
         artworkName: artwork?.name || "",
+        decorationType: defaultDecorationType,
+        quote: liveQuote,
       },
     });
   }
@@ -117,9 +183,7 @@ export default function OrderPreview() {
           Home
         </Link>
         <span>/</span>
-        <span style={{ color: "#171717", fontWeight: 700 }}>
-          Order Preview
-        </span>
+        <span style={{ color: "#171717", fontWeight: 700 }}>Order Preview</span>
       </div>
 
       <div
@@ -201,15 +265,34 @@ export default function OrderPreview() {
               Quantity: {quantity}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
+              Method: {defaultDecorationType}
+            </p>
+            <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
               Placements: {selectedPlacements.join(", ") || "None selected"}
             </p>
             {artwork?.name ? (
-              <p
-                style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}
-              >
+              <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
                 Artwork: {artwork.name}
               </p>
             ) : null}
+          </div>
+
+          <div
+            style={{
+              width: "100%",
+              marginTop: "12px",
+              padding: "12px",
+              borderRadius: "14px",
+              background: "#171717",
+              color: "#ffffff",
+            }}
+          >
+            <p style={{ margin: "0 0 4px 0", fontSize: "12px", opacity: 0.72 }}>
+              Estimated Total
+            </p>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: "24px" }}>
+              {money(liveQuote.total)}
+            </p>
           </div>
 
           {artwork?.previewUrl && artwork.file?.type?.startsWith("image/") && (
@@ -318,96 +401,67 @@ export default function OrderPreview() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile
-                  ? "1fr"
-                  : "repeat(2, minmax(0, 1fr))",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
                 gap: "10px 16px",
               }}
             >
               <div>
-                <p
-                  style={{
-                    margin: "0 0 2px 0",
-                    fontSize: "12px",
-                    color: "#78716c",
-                  }}
-                >
+                <p style={{ margin: "0 0 2px 0", fontSize: "12px", color: "#78716c" }}>
                   Color
                 </p>
                 <p style={{ margin: 0, fontWeight: 600 }}>{selectedColor}</p>
               </div>
 
               <div>
-                <p
-                  style={{
-                    margin: "0 0 2px 0",
-                    fontSize: "12px",
-                    color: "#78716c",
-                  }}
-                >
+                <p style={{ margin: "0 0 2px 0", fontSize: "12px", color: "#78716c" }}>
                   Size
                 </p>
                 <p style={{ margin: 0, fontWeight: 600 }}>{selectedSize}</p>
               </div>
 
               <div>
-                <p
-                  style={{
-                    margin: "0 0 2px 0",
-                    fontSize: "12px",
-                    color: "#78716c",
-                  }}
-                >
+                <p style={{ margin: "0 0 2px 0", fontSize: "12px", color: "#78716c" }}>
                   Quantity
                 </p>
                 <p style={{ margin: 0, fontWeight: 600 }}>{quantity}</p>
+              </div>
+
+              <div>
+                <p style={{ margin: "0 0 2px 0", fontSize: "12px", color: "#78716c" }}>
+                  Production Method
+                </p>
+                <p style={{ margin: 0, fontWeight: 600 }}>{defaultDecorationType}</p>
               </div>
             </div>
           </div>
 
           <div style={{ marginTop: "18px" }}>
-            <p
-              style={{
-                fontWeight: "700",
-                margin: "0 0 8px 0",
-                fontSize: "15px",
-              }}
-            >
+            <p style={{ fontWeight: "700", margin: "0 0 8px 0", fontSize: "15px" }}>
               Print Placement
             </p>
-
-            <div
+            <p
               style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
+                margin: "0 0 12px 0",
+                fontSize: "13px",
+                color: "#78716c",
+                lineHeight: 1.5,
               }}
             >
-              {placementsAllowed.map((placement) => {
-                const active = selectedPlacements.includes(placement);
+              Placement options and pricing are pulled from the same product catalog and quote rules used by staff.
+            </p>
 
-                return (
-                  <button
-                    key={placement}
-                    type="button"
-                    onClick={() => togglePlacement(placement)}
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: "999px",
-                      border: active
-                        ? "2px solid #171717"
-                        : "1px solid #d6d3d1",
-                      background: active ? "#171717" : "#ffffff",
-                      color: active ? "#ffffff" : "#171717",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {placement}
-                  </button>
-                );
-              })}
-            </div>
+            {placementOptions.length ? (
+              <PlacementOptionList
+                options={placementOptions}
+                selectedPlacements={selectedPlacements}
+                onToggle={togglePlacement}
+                variant="pill"
+              />
+            ) : (
+              <p style={{ margin: 0, color: "#78716c", fontSize: "14px" }}>
+                No configured placements are available for this garment.
+              </p>
+            )}
           </div>
 
           <div
@@ -419,28 +473,53 @@ export default function OrderPreview() {
               border: "1px solid #e7e5e4",
             }}
           >
-            <p
-              style={{
-                margin: "0 0 6px 0",
-                fontWeight: 700,
-                fontSize: "14px",
-              }}
-            >
-              Selected Placements
+            <p style={{ margin: "0 0 8px 0", fontWeight: 700, fontSize: "14px" }}>
+              Pricing Breakdown
             </p>
-            <p style={{ margin: 0, color: "#57534e", fontSize: "14px" }}>
-              {selectedPlacements.join(", ") || "Choose one or more valid placements for this garment."}
-            </p>
+
+            <div style={{ display: "grid", gap: "8px", color: "#57534e", fontSize: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                <span>Garment subtotal</span>
+                <strong style={{ color: "#171717" }}>{money(liveQuote.garment_subtotal)}</strong>
+              </div>
+
+              {liveQuote.placement_lines.map((line) => (
+                <div
+                  key={`${line.placement}-${line.decoration_type}`}
+                  style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}
+                >
+                  <span>
+                    {line.placement} ({money(line.unit_price)} each)
+                  </span>
+                  <strong style={{ color: "#171717" }}>{money(line.line_total)}</strong>
+                </div>
+              ))}
+
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                <span>Placement charges</span>
+                <strong style={{ color: "#171717" }}>{money(liveQuote.placement_subtotal)}</strong>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                <span>
+                  {defaultDecorationType} production ({money(liveQuote.production_lines[0]?.unit_price || 0)} each)
+                </span>
+                <strong style={{ color: "#171717" }}>
+                  {money(liveQuote.production_method_subtotal || 0)}
+                </strong>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                <span>Grand total</span>
+                <strong style={{ color: "#171717", fontSize: "16px" }}>
+                  {money(liveQuote.total)}
+                </strong>
+              </div>
+            </div>
           </div>
 
           <div style={{ marginTop: "18px" }}>
-            <p
-              style={{
-                fontWeight: "700",
-                margin: "0 0 8px 0",
-                fontSize: "15px",
-              }}
-            >
+            <p style={{ fontWeight: "700", margin: "0 0 8px 0", fontSize: "15px" }}>
               Artwork Upload
             </p>
 
@@ -479,13 +558,7 @@ export default function OrderPreview() {
                   border: "1px solid #e7e5e4",
                 }}
               >
-                <p
-                  style={{
-                    margin: "0 0 6px 0",
-                    fontSize: "13px",
-                    color: "#57534e",
-                  }}
-                >
+                <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#57534e" }}>
                   Uploaded file
                 </p>
                 <p
@@ -514,19 +587,13 @@ export default function OrderPreview() {
           </div>
 
           <div style={{ marginTop: "18px" }}>
-            <p
-              style={{
-                fontWeight: "700",
-                margin: "0 0 8px 0",
-                fontSize: "15px",
-              }}
-            >
+            <p style={{ fontWeight: "700", margin: "0 0 8px 0", fontSize: "15px" }}>
               Notes for Tee &amp; Co
             </p>
 
             <textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(event) => setNotes(event.target.value)}
               placeholder="Optional notes about placement, sizing, timing, or design preferences..."
               style={{
                 width: "100%",

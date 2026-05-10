@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 export default function OrderSubmitted() {
   const location = useLocation();
   const state = location.state || {};
+  const quote = state.quote || null;
 
   const garmentName = state.garmentName || "Selected Garment";
   const brand = state.brand || "Tee & Co";
@@ -17,6 +18,10 @@ export default function OrderSubmitted() {
     : [];
   const artworkName = state.artworkName || "No artwork uploaded";
   const notes = state.notes || "";
+
+  function money(value) {
+    return `$${Number(value || 0).toFixed(2)}`;
+  }
 
   return (
     <div
@@ -243,6 +248,40 @@ export default function OrderSubmitted() {
                   {artworkName}
                 </p>
               </div>
+
+              {quote ? (
+                <>
+                  <div>
+                    <p
+                      style={{
+                        margin: "0 0 2px 0",
+                        fontSize: "12px",
+                        color: "#78716c",
+                      }}
+                    >
+                      Placement Charges
+                    </p>
+                    <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
+                      {money(quote.placement_subtotal)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p
+                      style={{
+                        margin: "0 0 2px 0",
+                        fontSize: "12px",
+                        color: "#78716c",
+                      }}
+                    >
+                      Estimated Total
+                    </p>
+                    <p style={{ margin: 0, fontWeight: 700, color: "#171717" }}>
+                      {money(quote.total)}
+                    </p>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
 

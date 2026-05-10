@@ -1,19 +1,21 @@
 import { Link, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { garments } from "../data/garments";
+import { findProductForGarment } from "../lib/orderConfiguration";
+import { getStoredProducts } from "../lib/productsStore";
 
-const garmentPricing = {
-  TSHIRT_GILDAN_64000: { single: "$14.50" },
-  TSHIRT_BELLA_3001: { single: "$18.00" },
-  HOODIE_GILDAN_18500: { single: "$32.00" },
-  HOODIE_IND_4000: { single: "$38.00" },
-  HAT_RICHARDSON_112: { single: "$24.00" },
-  HAT_FLEXFIT_6277: { single: "$26.00" },
-};
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
 
 export default function GarmentView() {
   const { garmentId } = useParams();
   const garment = garments.find((g) => g.garment_id === garmentId);
+  const catalogProducts = useMemo(() => getStoredProducts(), []);
+  const selectedProduct = useMemo(
+    () => findProductForGarment(catalogProducts, garment),
+    [catalogProducts, garment]
+  );
 
   const [selectedColor, setSelectedColor] = useState(
     garment?.available_colors?.[0] || ""
@@ -53,10 +55,7 @@ export default function GarmentView() {
   }
 
   const imageSrc = garment.image || "/garments/gildan-softstyle-tee.jpg";
-
-  const pricing = garmentPricing[garment.garment_id] || {
-    single: "$19.00",
-  };
+  const startingPrice = selectedProduct?.unit_price ?? 19;
 
   const decreaseQuantity = () => {
     setQuantity((prev) => Math.max(1, prev - 1));
@@ -254,10 +253,10 @@ export default function GarmentView() {
                 margin: 0,
                 fontSize: isMobile ? "16px" : "18px",
                 fontWeight: 800,
-                color: "#171717",
-              }}
-            >
-              From {pricing.single} each
+              color: "#171717",
+            }}
+          >
+              From {money(startingPrice)} each
             </p>
           </div>
 
@@ -376,9 +375,9 @@ export default function GarmentView() {
                 flexWrap: "wrap",
               }}
             >
-              {(garment.placements_allowed || []).map((placement) => (
+              {(selectedProduct?.placement_config || []).map((placement) => (
                 <span
-                  key={placement}
+                  key={placement.id || placement.label}
                   style={{
                     fontSize: "12px",
                     padding: "7px 10px",
@@ -388,7 +387,7 @@ export default function GarmentView() {
                     color: "#44403c",
                   }}
                 >
-                  {placement}
+                  {placement.label}
                 </span>
               ))}
             </div>
@@ -476,6 +475,7 @@ export default function GarmentView() {
               to="/order-preview"
               state={{
                 garmentId: garment.garment_id,
+                productId: selectedProduct?.id || garment.product_id || "",
                 garmentName: garment.display_name,
                 brand: garment.brand,
                 category: garment.category,
@@ -484,7 +484,6 @@ export default function GarmentView() {
                 selectedColor,
                 selectedSize,
                 quantity,
-                placementsAllowed: garment.placements_allowed || [],
               }}
               style={{
                 background: "#171717",

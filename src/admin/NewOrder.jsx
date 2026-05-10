@@ -1,17 +1,21 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import PlacementOptionList from "../components/PlacementOptionList";
 import ProductionTypeSelect from "../components/ProductionTypeSelect";
 import {
   normalizeProductionType,
-  PRODUCTION_TYPES,
 } from "../constants/productionTypes";
+import {
+  buildPlacementPricingOptions,
+  getProductDecorationOptions,
+} from "../lib/orderConfiguration";
 import {
   createStoredCustomer,
   getStoredCustomers,
   linkOrderToCustomer,
 } from "../lib/customersStore";
 import { createStoredOrder, updateStoredOrder } from "../lib/ordersStore";
-import { getProductPlacementConfig, getStoredProducts } from "../lib/productsStore";
+import { getStoredProducts } from "../lib/productsStore";
 import { saveCustomerArtwork } from "../lib/customerArtworkStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import "./NewOrder.css";
@@ -75,20 +79,6 @@ function findCustomerSuggestions(customers, value) {
       );
     })
     .slice(0, 5);
-}
-
-function getDecorationOptions(product) {
-  const sourceOptions =
-    Array.isArray(product?.production_methods) && product.production_methods.length
-      ? product.production_methods
-      : product?.decoration_types;
-  const normalizedOptions = Array.isArray(sourceOptions)
-    ? sourceOptions.map((type) => normalizeProductionType(type))
-    : [];
-
-  return normalizedOptions.length
-    ? Array.from(new Set(normalizedOptions))
-    : PRODUCTION_TYPES;
 }
 
 function fileToDataUrl(file) {
@@ -165,14 +155,17 @@ export default function NewOrder() {
 
   const sizeKeys = selectedProduct?.sizes?.length ? selectedProduct.sizes : fallbackSizeKeys;
   const colorOptions = selectedProduct?.colors?.length ? selectedProduct.colors : [];
-  const placementConfig = useMemo(
-    () => getProductPlacementConfig(selectedProduct),
+  const decorationOptions = useMemo(
+    () => getProductDecorationOptions(selectedProduct),
     [selectedProduct]
   );
-  const decorationOptions = getDecorationOptions(selectedProduct);
+  const placementOptions = useMemo(
+    () => buildPlacementPricingOptions(selectedProduct, totalQty),
+    [selectedProduct, totalQty]
+  );
   const placementLabels = useMemo(
-    () => placementConfig.map((placement) => placement.label),
-    [placementConfig]
+    () => placementOptions.map((placement) => placement.label),
+    [placementOptions]
   );
 
   const totalQty = useMemo(() => {
@@ -286,7 +279,7 @@ export default function NewOrder() {
       garment_category: product.category,
       brand_model: product.brand_model || "",
       garment_color: product.colors?.[0] || "",
-      decoration_type: getDecorationOptions(product)[0] || "Screen Print",
+      decoration_type: getProductDecorationOptions(product)[0] || "Screen Print",
     }));
     setSelectedPlacements([]);
     setSizes(buildSizeState(product.sizes?.length ? product.sizes : fallbackSizeKeys));
@@ -714,28 +707,13 @@ export default function NewOrder() {
                 </span>
               </div>
 
-              {placementConfig.length ? (
-                <div className="new-order-placement-grid">
-                  {placementConfig.map((placement) => {
-                    const active = selectedPlacements.includes(placement.label);
-
-                    return (
-                      <button
-                        key={placement.id || placement.label}
-                        type="button"
-                        onClick={() => togglePlacement(placement.label)}
-                        className={active ? "new-order-placement-chip active" : "new-order-placement-chip"}
-                      >
-                        <span>{placement.label}</span>
-                        {placement.price > 0 ? (
-                          <small>${Number(placement.price).toFixed(0)}</small>
-                        ) : (
-                          <small>Included</small>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+              {placementOptions.length ? (
+                <PlacementOptionList
+                  options={placementOptions}
+                  selectedPlacements={selectedPlacements}
+                  onToggle={togglePlacement}
+                  variant="card"
+                />
               ) : (
                 <p className="new-order-muted">
                   Select a garment to load its allowed production placements.
