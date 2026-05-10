@@ -11,6 +11,11 @@ function label(value) {
   return value || "—";
 }
 
+function formatPrice(value, isAvailable = true) {
+  if (!isAvailable) return "Price unavailable";
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
 export default function WorkOrder() {
   const { orderNumber } = useParams();
   const order = findStoredOrder(orderNumber);
@@ -253,7 +258,7 @@ export default function WorkOrder() {
             }}
           >
             <h2 style={{ marginTop: 0 }}>Quote Snapshot</h2>
-            <p><strong>Total:</strong> ${Number(quote.total || 0).toFixed(2)}</p>
+            <p><strong>Total:</strong> {formatPrice(quote.total, quote.garment_pricing_available)}</p>
             <p><strong>Generated:</strong> {quote.generated_at ? new Date(quote.generated_at).toLocaleString() : "—"}</p>
           </section>
         )}

@@ -102,6 +102,11 @@ function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function formatPrice(value, isAvailable = true) {
+  if (!isAvailable) return "Price unavailable";
+  return money(value);
+}
+
 const fieldStyle = {
   border: "1px solid #cbd5e1",
   borderRadius: "12px",
@@ -156,6 +161,12 @@ export default function NewOrder() {
 
   const sizeKeys = selectedProduct?.sizes?.length ? selectedProduct.sizes : fallbackSizeKeys;
   const colorOptions = selectedProduct?.colors?.length ? selectedProduct.colors : [];
+  const totalQty = useMemo(() => {
+    return Object.values(sizes).reduce((total, value) => {
+      const qty = Number(value);
+      return total + (Number.isFinite(qty) ? qty : 0);
+    }, 0);
+  }, [sizes]);
   const decorationOptions = useMemo(
     () => getProductDecorationOptions(selectedProduct),
     [selectedProduct]
@@ -168,13 +179,6 @@ export default function NewOrder() {
     () => placementOptions.map((placement) => placement.label),
     [placementOptions]
   );
-
-  const totalQty = useMemo(() => {
-    return Object.values(sizes).reduce((total, value) => {
-      const qty = Number(value);
-      return total + (Number.isFinite(qty) ? qty : 0);
-    }, 0);
-  }, [sizes]);
   const normalizedDecorationType = normalizeProductionType(form.decoration_type);
   const liveQuote = useMemo(() => {
     return generateQuoteSnapshot(
@@ -576,7 +580,7 @@ export default function NewOrder() {
               </span>
               <span>
                 <strong>Unit Price:</strong>{" "}
-                {selectedProduct ? money(liveQuote.garment_unit_price) : "—"}
+                {selectedProduct ? formatPrice(liveQuote.garment_unit_price, liveQuote.garment_pricing_available) : "—"}
               </span>
               <span>
                 <strong>Supported Methods:</strong>{" "}

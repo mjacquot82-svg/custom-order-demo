@@ -2,6 +2,11 @@ function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function formatPrice(value, isAvailable = true) {
+  if (!isAvailable) return "Price unavailable";
+  return money(value);
+}
+
 function sectionStyle(compact) {
   return {
     padding: compact ? "12px" : "14px",
@@ -45,7 +50,7 @@ export default function PricingSummary({
       <div style={sectionStyle(compact)}>
         <div style={rowStyle()}>
           <span>Garment base price</span>
-          <strong>{money(quote.garment_unit_price)}</strong>
+          <strong>{formatPrice(quote.garment_unit_price, quote.garment_pricing_available)}</strong>
         </div>
         <div style={rowStyle()}>
           <span>Quantity</span>
@@ -53,7 +58,7 @@ export default function PricingSummary({
         </div>
         <div style={rowStyle(true)}>
           <span>Garment subtotal</span>
-          <strong>{money(quote.garment_subtotal)}</strong>
+          <strong>{formatPrice(quote.garment_subtotal, quote.garment_pricing_available)}</strong>
         </div>
       </div>
 
@@ -126,7 +131,7 @@ export default function PricingSummary({
       >
         <span>Grand Total</span>
         <strong style={{ fontSize: compact ? "20px" : "24px" }}>
-          {money(quote.total)}
+          {formatPrice(quote.total, quote.garment_pricing_available)}
         </strong>
       </div>
     </div>

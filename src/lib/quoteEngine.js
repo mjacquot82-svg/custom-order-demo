@@ -1,4 +1,4 @@
-import { getProductPlacementConfig } from "./productsStore";
+import { getProductPlacementConfig, resolveProductBasePrice } from "./productsStore";
 
 export function getPlacementUnitPrice(product, placementName, quantity = 0) {
   const configEntry = getProductPlacementConfig(product).find(
@@ -16,12 +16,7 @@ export function getPlacementUnitPrice(product, placementName, quantity = 0) {
 }
 
 export function getGarmentUnitPrice(product) {
-  return Number(
-    product?.unit_price ??
-      product?.base_garment_price ??
-      product?.calculated_base_price ??
-      0
-  );
+  return resolveProductBasePrice(product);
 }
 
 export function getProductionUnitPrice(product, productionMethod) {
@@ -51,7 +46,9 @@ export function generateQuoteSnapshot(order, product) {
   const quantity = Number(order?.qty || 0);
   const placements = normalizeOrderPlacements(order);
   const garmentUnitPrice = getGarmentUnitPrice(product);
-  const garmentSubtotal = garmentUnitPrice * quantity;
+  const garmentPricingAvailable =
+    Number.isFinite(garmentUnitPrice) && Number(garmentUnitPrice) > 0;
+  const garmentSubtotal = garmentPricingAvailable ? garmentUnitPrice * quantity : null;
   const productionMethod = order?.decoration_type || "";
   const productionUnitPrice = getProductionUnitPrice(product, productionMethod);
   const productionSubtotal = productionUnitPrice * quantity;
@@ -86,7 +83,9 @@ export function generateQuoteSnapshot(order, product) {
       ]
     : [];
   const setupSubtotal = setup_fees.reduce((total, fee) => total + Number(fee.amount || 0), 0);
-  const subtotal = garmentSubtotal + placementSubtotal + productionSubtotal + setupSubtotal;
+  const subtotal = garmentPricingAvailable
+    ? garmentSubtotal + placementSubtotal + productionSubtotal + setupSubtotal
+    : null;
 
   return {
     order_number: order?.order_number || "",
@@ -96,6 +95,7 @@ export function generateQuoteSnapshot(order, product) {
     quantity,
     garment_unit_price: garmentUnitPrice,
     garment_subtotal: garmentSubtotal,
+    garment_pricing_available: garmentPricingAvailable,
     placement_lines,
     production_method: productionMethod,
     production_lines,

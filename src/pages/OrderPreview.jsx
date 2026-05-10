@@ -16,12 +16,17 @@ function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function formatPrice(value, isAvailable = true) {
+  if (!isAvailable) return "Price unavailable";
+  return money(value);
+}
+
 export default function OrderPreview() {
   const navigate = useNavigate();
   const location = useLocation();
   const fileInputRef = useRef(null);
 
-  const passedState = location.state || {};
+  const passedState = useMemo(() => location.state || {}, [location.state]);
   const [products] = useState(() => getStoredProducts());
   const selectedProduct = useMemo(
     () => resolveCustomerOrderProduct(products, passedState),
@@ -52,22 +57,20 @@ export default function OrderPreview() {
   const selectedColor = passedState.selectedColor || "Black";
   const selectedSize = passedState.selectedSize || "M";
 
-  const [selectedPlacements, setSelectedPlacements] = useState([]);
+  const [requestedPlacements, setRequestedPlacements] = useState([]);
   const [notes, setNotes] = useState("");
   const [artwork, setArtwork] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
 
-  useEffect(() => {
-    if (!allowedPlacements.length) {
-      setSelectedPlacements([]);
-      return;
-    }
+  const selectedPlacements = useMemo(() => {
+    if (!allowedPlacements.length) return [];
 
-    setSelectedPlacements((current) => {
-      const filtered = current.filter((placement) => allowedPlacements.includes(placement));
-      return filtered.length ? filtered : [allowedPlacements[0]];
-    });
-  }, [allowedPlacements]);
+    const filtered = requestedPlacements.filter((placement) =>
+      allowedPlacements.includes(placement)
+    );
+
+    return filtered.length ? filtered : [allowedPlacements[0]];
+  }, [allowedPlacements, requestedPlacements]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -106,7 +109,7 @@ export default function OrderPreview() {
   function togglePlacement(placement) {
     if (!allowedPlacements.includes(placement)) return;
 
-    setSelectedPlacements((current) => {
+    setRequestedPlacements((current) => {
       const exists = current.includes(placement);
       const nextPlacements = exists
         ? current.filter((item) => item !== placement)
@@ -266,7 +269,7 @@ export default function OrderPreview() {
               Quantity: {quantity}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
-              Garment base price: {selectedProduct ? money(liveQuote.garment_unit_price) : "—"}
+              Garment base price: {selectedProduct ? formatPrice(liveQuote.garment_unit_price, liveQuote.garment_pricing_available) : "—"}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
               Method: {defaultDecorationType}
@@ -295,7 +298,7 @@ export default function OrderPreview() {
               Estimated Total
             </p>
             <p style={{ margin: 0, fontWeight: 800, fontSize: "24px" }}>
-              {money(liveQuote.total)}
+              {formatPrice(liveQuote.total, liveQuote.garment_pricing_available)}
             </p>
           </div>
 
@@ -435,7 +438,7 @@ export default function OrderPreview() {
                   Garment Base Price
                 </p>
                 <p style={{ margin: 0, fontWeight: 600 }}>
-                  {selectedProduct ? money(liveQuote.garment_unit_price) : "—"}
+                  {selectedProduct ? formatPrice(liveQuote.garment_unit_price, liveQuote.garment_pricing_available) : "—"}
                 </p>
               </div>
 

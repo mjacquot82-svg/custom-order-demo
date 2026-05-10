@@ -77,7 +77,7 @@ export const defaultProducts = [
     image: "",
     cost_price: 18,
     markup_percentage: 50,
-    calculated_base_price: 27,
+    calculated_base_price: 28,
     colors: ["Black", "Navy", "Gray", "White"],
     sizes: ["S", "M", "L", "XL", "2XL", "3XL"],
     placements: ["Left Chest", "Full Front", "Full Back", "Sleeve"],
@@ -139,7 +139,7 @@ export const defaultProducts = [
     image: "",
     cost_price: 5.5,
     markup_percentage: 80,
-    calculated_base_price: 9.9,
+    calculated_base_price: 18,
     colors: ["Black", "White", "Gray", "Navy"],
     sizes: ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"],
     placements: ["Left Chest", "Full Front", "Full Back", "Sleeve"],
@@ -203,6 +203,55 @@ function calculateBaseSellPrice(cost = 0, markup = 0) {
   );
 }
 
+function parsePriceCandidate(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsedValue = Number(value);
+  if (!Number.isFinite(parsedValue)) return null;
+
+  return parsedValue;
+}
+
+function findFirstPositivePrice(...values) {
+  for (const value of values) {
+    const parsedValue = parsePriceCandidate(value);
+    if (parsedValue !== null && parsedValue > 0) {
+      return Number(parsedValue.toFixed(2));
+    }
+  }
+
+  return null;
+}
+
+export function resolveProductBasePrice(product = {}) {
+  const explicitBasePrice = findFirstPositivePrice(
+    product?.unit_price,
+    product?.base_garment_price,
+    product?.calculated_base_price,
+    product?.startingPrice,
+    product?.starting_price,
+    product?.basePrice,
+    product?.base_price,
+    product?.garmentPrice,
+    product?.garment_price,
+    product?.price,
+    product?.retail_price
+  );
+
+  if (explicitBasePrice !== null) {
+    return explicitBasePrice;
+  }
+
+  const costPrice = parsePriceCandidate(product?.cost_price);
+  const markupPercentage = parsePriceCandidate(product?.markup_percentage) ?? 0;
+
+  if (costPrice !== null && costPrice > 0) {
+    return calculateBaseSellPrice(costPrice, markupPercentage);
+  }
+
+  return null;
+}
+
 function normalizeProductionMethods(product) {
   const explicitMethods = [
     ...(Array.isArray(product?.production_methods)
@@ -240,10 +289,7 @@ function normalizeProduct(product) {
   );
   const costPrice = Number(product.cost_price || 0);
   const markupPercentage = Number(product.markup_percentage || 0);
-  const calculatedBasePrice =
-    Number(product.calculated_base_price) ||
-    Number(product.base_garment_price) ||
-    calculateBaseSellPrice(costPrice, markupPercentage);
+  const resolvedBasePrice = resolveProductBasePrice(product);
   const productionMethods = normalizeProductionMethods(product);
   const productionMethodPrices = normalizeProductionMethodPrices(
     productionMethods,
@@ -255,9 +301,9 @@ function normalizeProduct(product) {
     product_type: product.product_type || product.type || product.name || "General",
     cost_price: costPrice,
     markup_percentage: markupPercentage,
-    calculated_base_price: calculatedBasePrice,
-    base_garment_price: calculatedBasePrice,
-    unit_price: calculatedBasePrice,
+    calculated_base_price: resolvedBasePrice,
+    base_garment_price: resolvedBasePrice,
+    unit_price: resolvedBasePrice,
     placements,
     allowed_placements: placements,
     placement_prices: placementPrices,

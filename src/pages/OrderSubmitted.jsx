@@ -24,6 +24,11 @@ export default function OrderSubmitted() {
     return `$${Number(value || 0).toFixed(2)}`;
   }
 
+  function formatPrice(value, isAvailable = true) {
+    if (!isAvailable) return "Price unavailable";
+    return money(value);
+  }
+
   return (
     <div
       style={{
@@ -263,7 +268,7 @@ export default function OrderSubmitted() {
                       Garment Base Price
                     </p>
                     <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
-                      {money(quote.garment_unit_price)}
+                      {formatPrice(quote.garment_unit_price, quote.garment_pricing_available)}
                     </p>
                   </div>
 
@@ -278,7 +283,7 @@ export default function OrderSubmitted() {
                       Garment Subtotal
                     </p>
                     <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
-                      {money(quote.garment_subtotal)}
+                      {formatPrice(quote.garment_subtotal, quote.garment_pricing_available)}
                     </p>
                   </div>
                 </>

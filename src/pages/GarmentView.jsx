@@ -2,10 +2,16 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { garments } from "../data/garments";
 import { findProductForGarment } from "../lib/orderConfiguration";
-import { getStoredProducts } from "../lib/productsStore";
+import { getStoredProducts, resolveProductBasePrice } from "../lib/productsStore";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function formatBasePrice(value) {
+  return Number.isFinite(value) && Number(value) > 0
+    ? `From ${money(value)} each`
+    : "Price unavailable";
 }
 
 export default function GarmentView() {
@@ -55,7 +61,7 @@ export default function GarmentView() {
   }
 
   const imageSrc = garment.image || "/garments/gildan-softstyle-tee.jpg";
-  const startingPrice = selectedProduct?.unit_price ?? 19;
+  const startingPrice = resolveProductBasePrice(selectedProduct);
 
   const decreaseQuantity = () => {
     setQuantity((prev) => Math.max(1, prev - 1));
@@ -253,10 +259,10 @@ export default function GarmentView() {
                 margin: 0,
                 fontSize: isMobile ? "16px" : "18px",
                 fontWeight: 800,
-              color: "#171717",
-            }}
-          >
-              From {money(startingPrice)} each
+                color: "#171717",
+              }}
+            >
+              {formatBasePrice(startingPrice)}
             </p>
           </div>
 

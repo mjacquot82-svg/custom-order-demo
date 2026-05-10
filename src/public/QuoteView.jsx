@@ -6,6 +6,11 @@ function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function formatPrice(value, isAvailable = true) {
+  if (!isAvailable) return "Price unavailable";
+  return money(value);
+}
+
 export default function QuoteView() {
   const { orderNumber } = useParams();
 
@@ -53,8 +58,8 @@ export default function QuoteView() {
       <p><strong>Customer:</strong> {quote.customer_name}</p>
       <p><strong>Garment:</strong> {quote.garment}</p>
       <p><strong>Quantity:</strong> {quote.quantity}</p>
-      <p><strong>Garment Unit Price:</strong> {money(quote.garment_unit_price)}</p>
-      <p><strong>Garment Subtotal:</strong> {money(quote.garment_subtotal)}</p>
+      <p><strong>Garment Unit Price:</strong> {formatPrice(quote.garment_unit_price, quote.garment_pricing_available)}</p>
+      <p><strong>Garment Subtotal:</strong> {formatPrice(quote.garment_subtotal, quote.garment_pricing_available)}</p>
 
       <table style={{ width: "100%", marginTop: "20px" }}>
         <thead>
