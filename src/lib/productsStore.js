@@ -5,15 +5,66 @@ import {
 
 const STORAGE_KEY = "teeCoProducts";
 
-function buildPlacementConfig(placements = [], placementPrices = {}) {
-  return placements.map((placement) => ({
-    id: String(placement || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-"),
-    label: placement,
-    price: Number(placementPrices?.[placement] || 0),
-  }));
+function toPlacementId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+}
+
+function normalizePlacementLabel(value) {
+  return String(value || "").trim();
+}
+
+export function buildPlacementConfig(source = [], placementPrices = {}) {
+  const rawPlacements = Array.isArray(source) ? source : [];
+  const seenLabels = new Set();
+
+  return rawPlacements.reduce((placements, entry) => {
+    const label = normalizePlacementLabel(
+      typeof entry === "string" ? entry : entry?.label
+    );
+
+    if (!label || seenLabels.has(label)) return placements;
+    seenLabels.add(label);
+
+    const configuredPrice =
+      placementPrices?.[label] ??
+      (typeof entry === "object" && entry !== null ? entry.price : undefined);
+
+    placements.push({
+      id:
+        (typeof entry === "object" && entry !== null ? entry.id : "") ||
+        toPlacementId(label),
+      label,
+      price: Number(configuredPrice || 0),
+    });
+
+    return placements;
+  }, []);
+}
+
+export function getProductPlacementConfig(product = {}) {
+  if (Array.isArray(product?.placement_config) && product.placement_config.length) {
+    return buildPlacementConfig(product.placement_config, product?.placement_prices || {});
+  }
+
+  const placementLabels = normalizeList(
+    product.placements ||
+      product.allowed_placements ||
+      product.placement_options?.map((item) => item.label)
+  );
+
+  return buildPlacementConfig(placementLabels, product?.placement_prices || {});
+}
+
+function buildPlacementPricesFromConfig(placementConfig, placementPrices = {}) {
+  return placementConfig.reduce((prices, placement) => {
+    const configuredPrice = placementPrices?.[placement.label];
+    prices[placement.label] =
+      configuredPrice === undefined ? Number(placement.price || 0) : configuredPrice;
+    return prices;
+  }, {});
 }
 
 export const defaultProducts = [
@@ -181,27 +232,12 @@ function normalizeProductionMethodPrices(methods, value) {
 }
 
 function normalizeProduct(product) {
-  const placements = normalizeList(
-    product.placements ||
-      product.placement_options?.map((item) => item.label) ||
-      product.placement_config?.map((item) => item.label)
+  const placementConfig = getProductPlacementConfig(product);
+  const placements = placementConfig.map((item) => item.label);
+  const placementPrices = buildPlacementPricesFromConfig(
+    placementConfig,
+    normalizePlacementPrices(placements, product.placement_prices)
   );
-  const placementPrices = normalizePlacementPrices(
-    placements,
-    product.placement_prices
-  );
-  const placementConfig = Array.isArray(product.placement_config) && product.placement_config.length
-    ? product.placement_config.map((item) => ({
-        id:
-          item.id ||
-          String(item.label || "")
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-"),
-        label: item.label || "",
-        price: Number(item.price ?? placementPrices[item.label] ?? 0),
-      }))
-    : buildPlacementConfig(placements, placementPrices);
   const costPrice = Number(product.cost_price || 0);
   const markupPercentage = Number(product.markup_percentage || 0);
   const calculatedBasePrice =
@@ -254,6 +290,12 @@ export function createStoredProduct(productInput) {
   const products = getStoredProducts();
   const placements = normalizeList(productInput.placements);
   const placementPrices = normalizePlacementPrices(placements, productInput.placement_prices);
+  const placementConfig = buildPlacementConfig(
+    Array.isArray(productInput.placement_config) && productInput.placement_config.length
+      ? productInput.placement_config
+      : placements,
+    placementPrices
+  );
   const product = normalizeProduct({
     ...productInput,
     id: `product-${Date.now()}`,
@@ -262,9 +304,7 @@ export function createStoredProduct(productInput) {
     sizes: normalizeList(productInput.sizes),
     placements,
     placement_prices: placementPrices,
-    placement_config: Array.isArray(productInput.placement_config) && productInput.placement_config.length
-      ? productInput.placement_config
-      : buildPlacementConfig(placements, placementPrices),
+    placement_config: placementConfig,
     decoration_types: normalizeList(productInput.decoration_types),
   });
 
@@ -282,6 +322,12 @@ export function updateStoredProduct(productId, updates) {
     const placementPrices = updates.placement_prices
       ? normalizePlacementPrices(placements, updates.placement_prices)
       : product.placement_prices || normalizePlacementPrices(placements, {});
+    const placementConfig = buildPlacementConfig(
+      Array.isArray(updates.placement_config) && updates.placement_config.length
+        ? updates.placement_config
+        : placements,
+      placementPrices
+    );
 
     return normalizeProduct({
       ...product,
@@ -290,10 +336,7 @@ export function updateStoredProduct(productId, updates) {
       sizes: updates.sizes ? normalizeList(updates.sizes) : product.sizes,
       placements,
       placement_prices: placementPrices,
-      placement_config:
-        Array.isArray(updates.placement_config) && updates.placement_config.length
-          ? updates.placement_config
-          : buildPlacementConfig(placements, placementPrices),
+      placement_config: placementConfig,
       decoration_types: updates.decoration_types
         ? normalizeList(updates.decoration_types)
         : product.decoration_types,

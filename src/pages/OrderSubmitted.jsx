@@ -10,8 +10,11 @@ export default function OrderSubmitted() {
   const selectedColor = state.selectedColor || "Black";
   const selectedSize = state.selectedSize || "M";
   const quantity = state.quantity || 1;
-  const orderType = state.orderType || "Single Item";
-  const placement = state.placement || "Full Front";
+  const placements = Array.isArray(state.placements)
+    ? state.placements
+    : state.placement
+    ? [state.placement]
+    : [];
   const artworkName = state.artworkName || "No artwork uploaded";
   const notes = state.notes || "";
 
@@ -182,21 +185,6 @@ export default function OrderSubmitted() {
                     color: "#78716c",
                   }}
                 >
-                  Order Type
-                </p>
-                <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
-                  {orderType}
-                </p>
-              </div>
-
-              <div>
-                <p
-                  style={{
-                    margin: "0 0 2px 0",
-                    fontSize: "12px",
-                    color: "#78716c",
-                  }}
-                >
                   Size
                 </p>
                 <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
@@ -227,10 +215,10 @@ export default function OrderSubmitted() {
                     color: "#78716c",
                   }}
                 >
-                  Placement
+                  Placements
                 </p>
                 <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
-                  {placement}
+                  {placements.join(", ") || "None selected"}
                 </p>
               </div>
 

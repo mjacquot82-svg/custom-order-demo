@@ -1,28 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-
-const PLACEMENTS = [
-  {
-    value: "Full Front",
-    description: "Centered large print on front of garment.",
-  },
-  {
-    value: "Left Chest",
-    description: "Small logo or artwork on upper left chest.",
-  },
-  {
-    value: "Full Back",
-    description: "Centered large print on back of garment.",
-  },
-  {
-    value: "Sleeve",
-    description: "Print placed on sleeve area.",
-  },
-  {
-    value: "Other",
-    description: "A custom location to be confirmed by the office team.",
-  },
-];
 
 const fallbackImage = "/garments/gildan-softstyle-tee.jpg";
 
@@ -43,9 +20,13 @@ export default function OrderPreview() {
   const selectedColor = passedState.selectedColor || "Black";
   const selectedSize = passedState.selectedSize || "M";
   const quantity = passedState.quantity || 1;
-  const orderType = passedState.orderType || "Single Item";
+  const placementsAllowed = Array.isArray(passedState.placementsAllowed)
+    ? passedState.placementsAllowed
+    : [];
 
-  const [placement, setPlacement] = useState("Full Front");
+  const [selectedPlacements, setSelectedPlacements] = useState(
+    placementsAllowed.length ? [placementsAllowed[0]] : []
+  );
   const [notes, setNotes] = useState("");
   const [artwork, setArtwork] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
@@ -59,10 +40,18 @@ export default function OrderPreview() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const selectedPlacement = useMemo(
-    () => PLACEMENTS.find((item) => item.value === placement),
-    [placement]
-  );
+  function togglePlacement(placement) {
+    if (!placementsAllowed.includes(placement)) return;
+
+    setSelectedPlacements((current) => {
+      const exists = current.includes(placement);
+      const nextPlacements = exists
+        ? current.filter((item) => item !== placement)
+        : [...current, placement];
+
+      return placementsAllowed.filter((item) => nextPlacements.includes(item));
+    });
+  }
 
   function handleUpload(e) {
     const file = e.target.files?.[0];
@@ -88,8 +77,8 @@ export default function OrderPreview() {
         selectedColor,
         selectedSize,
         quantity,
-        orderType,
-        placement,
+        placements: selectedPlacements,
+        placement: selectedPlacements[0] || "",
         notes,
         artworkName: artwork?.name || "",
       },
@@ -206,16 +195,13 @@ export default function OrderPreview() {
               Color: {selectedColor}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
-              Order Type: {orderType}
-            </p>
-            <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
               Size: {selectedSize}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
               Quantity: {quantity}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
-              Placement: {placement}
+              Placements: {selectedPlacements.join(", ") || "None selected"}
             </p>
             {artwork?.name ? (
               <p
@@ -359,19 +345,6 @@ export default function OrderPreview() {
                     color: "#78716c",
                   }}
                 >
-                  Order Type
-                </p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{orderType}</p>
-              </div>
-
-              <div>
-                <p
-                  style={{
-                    margin: "0 0 2px 0",
-                    fontSize: "12px",
-                    color: "#78716c",
-                  }}
-                >
                   Size
                 </p>
                 <p style={{ margin: 0, fontWeight: 600 }}>{selectedSize}</p>
@@ -405,43 +378,32 @@ export default function OrderPreview() {
 
             <div
               style={{
-                display: "grid",
+                display: "flex",
                 gap: "8px",
+                flexWrap: "wrap",
               }}
             >
-              {PLACEMENTS.map((option) => {
-                const active = placement === option.value;
+              {placementsAllowed.map((placement) => {
+                const active = selectedPlacements.includes(placement);
 
                 return (
                   <button
-                    key={option.value}
+                    key={placement}
                     type="button"
-                    onClick={() => setPlacement(option.value)}
+                    onClick={() => togglePlacement(placement)}
                     style={{
-                      textAlign: "left",
-                      padding: "12px 14px",
-                      borderRadius: "14px",
+                      padding: "10px 14px",
+                      borderRadius: "999px",
                       border: active
                         ? "2px solid #171717"
                         : "1px solid #d6d3d1",
                       background: active ? "#171717" : "#ffffff",
                       color: active ? "#ffffff" : "#171717",
                       cursor: "pointer",
+                      fontWeight: 700,
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: "14px" }}>
-                      {option.value}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        marginTop: "4px",
-                        color: active ? "#f5f5f4" : "#78716c",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {option.description}
-                    </div>
+                    {placement}
                   </button>
                 );
               })}
@@ -464,10 +426,10 @@ export default function OrderPreview() {
                 fontSize: "14px",
               }}
             >
-              Selected Placement
+              Selected Placements
             </p>
             <p style={{ margin: 0, color: "#57534e", fontSize: "14px" }}>
-              {selectedPlacement?.description}
+              {selectedPlacements.join(", ") || "Choose one or more valid placements for this garment."}
             </p>
           </div>
 

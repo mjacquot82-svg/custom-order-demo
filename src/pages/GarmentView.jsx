@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import { garments } from "../data/garments";
 
 const garmentPricing = {
-  TSHIRT_GILDAN_64000: { single: "$14.50", bulkText: "Bulk pricing available" },
-  TSHIRT_BELLA_3001: { single: "$18.00", bulkText: "Bulk pricing available" },
-  HOODIE_GILDAN_18500: { single: "$32.00", bulkText: "Bulk pricing available" },
-  HOODIE_IND_4000: { single: "$38.00", bulkText: "Bulk pricing available" },
-  HAT_RICHARDSON_112: { single: "$24.00", bulkText: "Bulk pricing available" },
-  HAT_FLEXFIT_6277: { single: "$26.00", bulkText: "Bulk pricing available" },
+  TSHIRT_GILDAN_64000: { single: "$14.50" },
+  TSHIRT_BELLA_3001: { single: "$18.00" },
+  HOODIE_GILDAN_18500: { single: "$32.00" },
+  HOODIE_IND_4000: { single: "$38.00" },
+  HAT_RICHARDSON_112: { single: "$24.00" },
+  HAT_FLEXFIT_6277: { single: "$26.00" },
 };
 
 export default function GarmentView() {
@@ -18,7 +18,6 @@ export default function GarmentView() {
   const [selectedColor, setSelectedColor] = useState(
     garment?.available_colors?.[0] || ""
   );
-  const [orderType, setOrderType] = useState("Single Item");
   const [selectedSize, setSelectedSize] = useState(
     garment?.available_sizes?.[0] || ""
   );
@@ -57,7 +56,6 @@ export default function GarmentView() {
 
   const pricing = garmentPricing[garment.garment_id] || {
     single: "$19.00",
-    bulkText: "Bulk pricing available",
   };
 
   const decreaseQuantity = () => {
@@ -190,18 +188,11 @@ export default function GarmentView() {
               Color: {selectedColor}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
-              Order Type: {orderType}
-            </p>
-            <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
               Size: {selectedSize}
             </p>
-            {orderType === "Single Item" && (
-              <p
-                style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}
-              >
-                Quantity: {quantity}
-              </p>
-            )}
+            <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
+              Quantity: {quantity}
+            </p>
           </div>
         </div>
 
@@ -268,15 +259,6 @@ export default function GarmentView() {
             >
               From {pricing.single} each
             </p>
-            <p
-              style={{
-                margin: "4px 0 0 0",
-                fontSize: "13px",
-                color: "#78716c",
-              }}
-            >
-              {pricing.bulkText}
-            </p>
           </div>
 
           <div style={{ marginTop: "18px" }}>
@@ -329,49 +311,7 @@ export default function GarmentView() {
                 fontSize: "15px",
               }}
             >
-              Order Type
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap: "wrap",
-              }}
-            >
-              {["Single Item", "Bulk Order"].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setOrderType(type)}
-                  style={{
-                    padding: "10px 16px",
-                    borderRadius: "12px",
-                    border:
-                      orderType === type
-                        ? "2px solid #171717"
-                        : "1px solid #d6d3d1",
-                    background: orderType === type ? "#171717" : "#ffffff",
-                    color: orderType === type ? "#ffffff" : "#171717",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    fontSize: "14px",
-                  }}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginTop: "18px" }}>
-            <p
-              style={{
-                fontWeight: "700",
-                margin: "0 0 8px 0",
-                fontSize: "15px",
-              }}
-            >
-              {orderType === "Single Item" ? "Choose Size" : "Available Sizes"}
+              Choose Size
             </p>
 
             <div
@@ -405,17 +345,6 @@ export default function GarmentView() {
               ))}
             </div>
 
-            {orderType === "Bulk Order" && (
-              <p
-                style={{
-                  marginTop: "10px",
-                  color: "#78716c",
-                  fontSize: "13px",
-                }}
-              >
-                Bulk size quantity entry can be the next step in the demo flow.
-              </p>
-            )}
           </div>
 
           <div style={{ marginTop: "18px" }}>
@@ -432,12 +361,12 @@ export default function GarmentView() {
             <p
               style={{
                 margin: "0 0 8px 0",
-                fontSize: "13px",
-                color: "#78716c",
-                lineHeight: 1.4,
-              }}
-            >
-              You’ll choose your final artwork placement on the next step.
+              fontSize: "13px",
+              color: "#78716c",
+              lineHeight: 1.4,
+            }}
+          >
+              These placements follow the garment's catalog configuration.
             </p>
 
             <div
@@ -465,77 +394,75 @@ export default function GarmentView() {
             </div>
           </div>
 
-          {orderType === "Single Item" && (
-            <div style={{ marginTop: "18px" }}>
-              <p
+          <div style={{ marginTop: "18px" }}>
+            <p
+              style={{
+                fontWeight: "700",
+                margin: "0 0 8px 0",
+                fontSize: "15px",
+              }}
+            >
+              Choose Quantity
+            </p>
+
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "8px",
+                borderRadius: "14px",
+                border: "1px solid #e7e5e4",
+                background: "#fafaf9",
+              }}
+            >
+              <button
+                onClick={decreaseQuantity}
                 style={{
-                  fontWeight: "700",
-                  margin: "0 0 8px 0",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  border: "1px solid #d6d3d1",
+                  background: "#ffffff",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "18px",
+                  color: "#171717",
+                }}
+              >
+                -
+              </button>
+
+              <span
+                style={{
+                  minWidth: "28px",
+                  textAlign: "center",
+                  fontWeight: 700,
                   fontSize: "15px",
+                  color: "#171717",
                 }}
               >
-                Choose Quantity
-              </p>
+                {quantity}
+              </span>
 
-              <div
+              <button
+                onClick={increaseQuantity}
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "8px",
-                  borderRadius: "14px",
-                  border: "1px solid #e7e5e4",
-                  background: "#fafaf9",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  border: "1px solid #d6d3d1",
+                  background: "#ffffff",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "18px",
+                  color: "#171717",
                 }}
               >
-                <button
-                  onClick={decreaseQuantity}
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "10px",
-                    border: "1px solid #d6d3d1",
-                    background: "#ffffff",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                    fontSize: "18px",
-                    color: "#171717",
-                  }}
-                >
-                  -
-                </button>
-
-                <span
-                  style={{
-                    minWidth: "28px",
-                    textAlign: "center",
-                    fontWeight: 700,
-                    fontSize: "15px",
-                    color: "#171717",
-                  }}
-                >
-                  {quantity}
-                </span>
-
-                <button
-                  onClick={increaseQuantity}
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "10px",
-                    border: "1px solid #d6d3d1",
-                    background: "#ffffff",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                    fontSize: "18px",
-                    color: "#171717",
-                  }}
-                >
-                  +
-                </button>
-              </div>
+                +
+              </button>
             </div>
-          )}
+          </div>
 
           <div
             style={{
@@ -557,7 +484,7 @@ export default function GarmentView() {
                 selectedColor,
                 selectedSize,
                 quantity,
-                orderType,
+                placementsAllowed: garment.placements_allowed || [],
               }}
               style={{
                 background: "#171717",

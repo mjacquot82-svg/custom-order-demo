@@ -2,12 +2,12 @@ import { Link, useParams } from "react-router-dom";
 import { categories, garments } from "../data/garments";
 
 const garmentPricing = {
-  TSHIRT_GILDAN_64000: { single: "$14.50", bulk: "Bulk pricing available" },
-  TSHIRT_BELLA_3001: { single: "$18.00", bulk: "Bulk pricing available" },
-  HOODIE_GILDAN_18500: { single: "$32.00", bulk: "Bulk pricing available" },
-  HOODIE_IND_4000: { single: "$38.00", bulk: "Bulk pricing available" },
-  HAT_RICHARDSON_112: { single: "$24.00", bulk: "Bulk pricing available" },
-  HAT_FLEXFIT_6277: { single: "$26.00", bulk: "Bulk pricing available" },
+  TSHIRT_GILDAN_64000: { single: "$14.50" },
+  TSHIRT_BELLA_3001: { single: "$18.00" },
+  HOODIE_GILDAN_18500: { single: "$32.00" },
+  HOODIE_IND_4000: { single: "$38.00" },
+  HAT_RICHARDSON_112: { single: "$24.00" },
+  HAT_FLEXFIT_6277: { single: "$26.00" },
 };
 
 export default function CategoryView() {
@@ -95,7 +95,6 @@ export default function CategoryView() {
         {categoryGarments.map((item) => {
           const pricing = garmentPricing[item.garment_id] || {
             single: "$19.00",
-            bulk: "Bulk pricing available",
           };
 
           return (
@@ -172,16 +171,6 @@ export default function CategoryView() {
                   }}
                 >
                   From {pricing.single}
-                </p>
-
-                <p
-                  style={{
-                    margin: "2px 0 0 0",
-                    fontSize: "11px",
-                    color: "#78716c",
-                  }}
-                >
-                  {pricing.bulk}
                 </p>
               </div>
             </Link>

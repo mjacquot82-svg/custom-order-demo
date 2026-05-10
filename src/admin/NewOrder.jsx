@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProductionTypeSelect from "../components/ProductionTypeSelect";
 import {
@@ -11,7 +11,7 @@ import {
   linkOrderToCustomer,
 } from "../lib/customersStore";
 import { createStoredOrder, updateStoredOrder } from "../lib/ordersStore";
-import { getStoredProducts } from "../lib/productsStore";
+import { getProductPlacementConfig, getStoredProducts } from "../lib/productsStore";
 import { saveCustomerArtwork } from "../lib/customerArtworkStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import "./NewOrder.css";
@@ -131,8 +131,10 @@ const labelStyle = {
 export default function NewOrder() {
   const navigate = useNavigate();
   const artworkInputRef = useRef(null);
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const [products] = useState(() =>
+    getStoredProducts().filter((product) => product.status !== "Inactive")
+  );
+  const [customers, setCustomers] = useState(() => getStoredCustomers());
   const [customerSearchResults, setCustomerSearchResults] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -150,7 +152,6 @@ export default function NewOrder() {
     garment_category: "",
     brand_model: "",
     garment_color: "",
-    placement: "",
     decoration_type: "Screen Print",
     due_date: "",
     notes: "",
@@ -158,25 +159,21 @@ export default function NewOrder() {
   });
   const [sizes, setSizes] = useState(buildSizeState(fallbackSizeKeys));
 
-  useEffect(() => {
-    setProducts(getStoredProducts().filter((product) => product.status !== "Inactive"));
-    setCustomers(getStoredCustomers());
-  }, []);
-
   const selectedProduct = useMemo(() => {
     return products.find((product) => product.id === selectedProductId);
   }, [products, selectedProductId]);
 
   const sizeKeys = selectedProduct?.sizes?.length ? selectedProduct.sizes : fallbackSizeKeys;
   const colorOptions = selectedProduct?.colors?.length ? selectedProduct.colors : [];
-  const placementConfig = selectedProduct?.placement_config?.length
-    ? selectedProduct.placement_config
-    : (selectedProduct?.placements || []).map((placement) => ({
-        id: String(placement).toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        label: placement,
-        price: Number(selectedProduct?.placement_prices?.[placement] || 0),
-      }));
+  const placementConfig = useMemo(
+    () => getProductPlacementConfig(selectedProduct),
+    [selectedProduct]
+  );
   const decorationOptions = getDecorationOptions(selectedProduct);
+  const placementLabels = useMemo(
+    () => placementConfig.map((placement) => placement.label),
+    [placementConfig]
+  );
 
   const totalQty = useMemo(() => {
     return Object.values(sizes).reduce((total, value) => {
@@ -275,7 +272,6 @@ export default function NewOrder() {
         garment_category: "",
         brand_model: "",
         garment_color: "",
-        placement: "",
         decoration_type: "Screen Print",
       }));
       setSelectedPlacements([]);
@@ -290,7 +286,6 @@ export default function NewOrder() {
       garment_category: product.category,
       brand_model: product.brand_model || "",
       garment_color: product.colors?.[0] || "",
-      placement: "",
       decoration_type: getDecorationOptions(product)[0] || "Screen Print",
     }));
     setSelectedPlacements([]);
@@ -323,18 +318,15 @@ export default function NewOrder() {
   }
 
   function togglePlacement(placementLabel) {
+    if (!placementLabels.includes(placementLabel)) return;
+
     setSelectedPlacements((current) => {
       const exists = current.includes(placementLabel);
       const nextPlacements = exists
         ? current.filter((item) => item !== placementLabel)
         : [...current, placementLabel];
 
-      setForm((currentForm) => ({
-        ...currentForm,
-        placement: nextPlacements[0] || "",
-      }));
-
-      return nextPlacements;
+      return placementLabels.filter((placement) => nextPlacements.includes(placement));
     });
   }
 

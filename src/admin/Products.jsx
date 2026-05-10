@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import ProductPricingFields from "../components/ProductPricingFields";
 import { PRODUCTION_TYPES } from "../constants/productionTypes";
 import {
+  buildPlacementConfig,
   createStoredProduct,
   deleteStoredProduct,
+  getProductPlacementConfig,
   getStoredProducts,
   updateStoredProduct,
 } from "../lib/productsStore";
@@ -69,7 +71,7 @@ function buildMethodPriceMap(methods, existing = {}) {
 }
 
 function buildFormFromProduct(product) {
-  const placements = product?.placements || [];
+  const placements = getProductPlacementConfig(product).map((placement) => placement.label);
   const productionMethods = product?.production_methods?.length
     ? product.production_methods
     : product?.decoration_types?.length
@@ -109,15 +111,11 @@ function fileToDataUrl(file) {
 
 export default function Products() {
   const pageRef = useRef(null);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(() => getStoredProducts());
   const [form, setForm] = useState(emptyProduct);
   const [editingProductId, setEditingProductId] = useState(null);
   const [selectedFileName, setSelectedFileName] = useState("");
   const imageInputRef = useRef(null);
-
-  useEffect(() => {
-    setProducts(getStoredProducts());
-  }, []);
 
   const placementOptions = normalizeListInput(form.placementsText);
 
@@ -244,11 +242,7 @@ export default function Products() {
       sizes: normalizeListInput(form.sizes),
       placements,
       placement_prices: placementPrices,
-      placement_config: placements.map((placement) => ({
-        id: String(placement).toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        label: placement,
-        price: Number(placementPrices[placement] || 0),
-      })),
+      placement_config: buildPlacementConfig(placements, placementPrices),
       production_methods: productionMethods,
       decoration_types: productionMethods,
       production_method_prices: productionMethodPrices,

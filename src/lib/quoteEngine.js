@@ -1,7 +1,9 @@
+import { getProductPlacementConfig } from "./productsStore";
+
 export function getPlacementUnitPrice(product, placementName, quantity = 0) {
-  const configEntry = Array.isArray(product?.placement_config)
-    ? product.placement_config.find((placement) => placement?.label === placementName)
-    : null;
+  const configEntry = getProductPlacementConfig(product).find(
+    (placement) => placement?.label === placementName
+  );
   const priceConfig = product?.placement_prices?.[placementName] ?? configEntry?.price;
 
   if (Array.isArray(priceConfig)) {
