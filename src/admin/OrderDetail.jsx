@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
-import { getStoredProducts } from "../lib/productsStore";
+import { useStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import { printElement } from "../lib/printElement";
@@ -36,6 +36,7 @@ const inputStyle = {
 export default function OrderDetail() {
   const { orderNumber } = useParams();
   const storedOrders = useStoredOrders();
+  const storedProducts = useStoredProducts();
   const printableTicketRef = useRef(null);
   const order = useMemo(
     () => storedOrders.find((entry) => entry.order_number === orderNumber) || null,
@@ -52,12 +53,12 @@ export default function OrderDetail() {
   const selectedProduct = useMemo(() => {
     if (!order) return null;
 
-    return getStoredProducts().find(
+    return storedProducts.find(
       (product) =>
         product.id === order.product_id ||
         product.name === order.garment
     );
-  }, [order]);
+  }, [order, storedProducts]);
 
   const quoteSnapshot = useMemo(() => {
     if (!order) return null;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getStoredProducts } from "../lib/productsStore";
+import { useStoredProducts } from "../lib/productsStore";
 import { createStoredQuickSale } from "../lib/salesStore";
 import { getStoredCustomers } from "../lib/customersStore";
 
@@ -85,9 +85,7 @@ export default function QuickSale() {
   const completedSaleNumber = searchParams.get("completed");
   const productSelectRef = useRef(null);
 
-  const [products] = useState(() =>
-    getStoredProducts().filter((product) => product.status !== "Inactive")
-  );
+  const products = useStoredProducts().filter((product) => product.status !== "Inactive");
   const [customers] = useState(() => getStoredCustomers());
   const [customerMatches, setCustomerMatches] = useState([]);
   const [linkedCustomerId, setLinkedCustomerId] = useState("");

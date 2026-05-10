@@ -8,7 +8,7 @@ import {
   resolveCustomerOrderProduct,
 } from "../lib/orderConfiguration";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
-import { getStoredProducts } from "../lib/productsStore";
+import { useStoredProducts } from "../lib/productsStore";
 
 const fallbackImage = "/garments/gildan-softstyle-tee.jpg";
 
@@ -27,7 +27,7 @@ export default function OrderPreview() {
   const fileInputRef = useRef(null);
 
   const passedState = useMemo(() => location.state || {}, [location.state]);
-  const [products] = useState(() => getStoredProducts());
+  const products = useStoredProducts();
   const selectedProduct = useMemo(
     () => resolveCustomerOrderProduct(products, passedState),
     [passedState, products]

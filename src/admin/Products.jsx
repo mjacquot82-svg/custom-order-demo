@@ -6,7 +6,7 @@ import {
   createStoredProduct,
   deleteStoredProduct,
   getProductPlacementConfig,
-  getStoredProducts,
+  useStoredProducts,
   updateStoredProduct,
 } from "../lib/productsStore";
 
@@ -111,17 +111,15 @@ function fileToDataUrl(file) {
 
 export default function Products() {
   const pageRef = useRef(null);
-  const [products, setProducts] = useState(() => getStoredProducts());
+  const editorRef = useRef(null);
+  const nameInputRef = useRef(null);
+  const products = useStoredProducts();
   const [form, setForm] = useState(emptyProduct);
   const [editingProductId, setEditingProductId] = useState(null);
   const [selectedFileName, setSelectedFileName] = useState("");
   const imageInputRef = useRef(null);
 
   const placementOptions = normalizeListInput(form.placementsText);
-
-  function refreshProducts() {
-    setProducts(getStoredProducts());
-  }
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -212,6 +210,11 @@ export default function Products() {
     setEditingProductId(product.id);
     setSelectedFileName("");
     setForm(buildFormFromProduct(product));
+    editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.requestAnimationFrame(() => {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    });
   }
 
   function handleSubmit(event) {
@@ -255,7 +258,6 @@ export default function Products() {
       createStoredProduct(productPayload);
     }
 
-    refreshProducts();
     resetForm();
 
     pageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -263,7 +265,6 @@ export default function Products() {
 
   function handleDelete(productId) {
     deleteStoredProduct(productId);
-    refreshProducts();
 
     if (editingProductId === productId) {
       resetForm();
@@ -281,6 +282,7 @@ export default function Products() {
         }}
       >
         <form
+          ref={editorRef}
           onSubmit={handleSubmit}
           style={{
             background: "#ffffff",
@@ -324,6 +326,7 @@ export default function Products() {
             <label style={labelStyle}>
               Product Name
               <input
+                ref={nameInputRef}
                 name="name"
                 value={form.name}
                 onChange={updateField}

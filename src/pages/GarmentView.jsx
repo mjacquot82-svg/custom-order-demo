@@ -2,7 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { garments } from "../data/garments";
 import { findProductForGarment } from "../lib/orderConfiguration";
-import { getStoredProducts, resolveProductBasePrice } from "../lib/productsStore";
+import { resolveProductBasePrice, useStoredProducts } from "../lib/productsStore";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -17,7 +17,7 @@ function formatBasePrice(value) {
 export default function GarmentView() {
   const { garmentId } = useParams();
   const garment = garments.find((g) => g.garment_id === garmentId);
-  const catalogProducts = useMemo(() => getStoredProducts(), []);
+  const catalogProducts = useStoredProducts();
   const selectedProduct = useMemo(
     () => findProductForGarment(catalogProducts, garment),
     [catalogProducts, garment]

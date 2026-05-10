@@ -16,7 +16,7 @@ import {
   linkOrderToCustomer,
 } from "../lib/customersStore";
 import { createStoredOrder, updateStoredOrder } from "../lib/ordersStore";
-import { getStoredProducts } from "../lib/productsStore";
+import { useStoredProducts } from "../lib/productsStore";
 import { saveCustomerArtwork } from "../lib/customerArtworkStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import "./NewOrder.css";
@@ -127,9 +127,7 @@ const labelStyle = {
 export default function NewOrder() {
   const navigate = useNavigate();
   const artworkInputRef = useRef(null);
-  const [products] = useState(() =>
-    getStoredProducts().filter((product) => product.status !== "Inactive")
-  );
+  const products = useStoredProducts().filter((product) => product.status !== "Inactive");
   const [customers, setCustomers] = useState(() => getStoredCustomers());
   const [customerSearchResults, setCustomerSearchResults] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");

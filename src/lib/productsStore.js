@@ -2,8 +2,17 @@ import {
   normalizeProductionType,
   PRODUCTION_TYPES,
 } from "../constants/productionTypes";
+import { useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "teeCoProducts";
+const EMPTY_PRODUCTS = [];
+const productListeners = new Set();
+
+function emitProductsUpdated() {
+  productListeners.forEach((listener) => {
+    listener();
+  });
+}
 
 function toPlacementId(value) {
   return String(value || "")
@@ -330,6 +339,42 @@ export function getStoredProducts() {
 export function saveStoredProducts(products) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products.map(normalizeProduct)));
+  emitProductsUpdated();
+}
+
+export function subscribeToStoredProducts(listener) {
+  if (typeof listener !== "function") {
+    return () => {};
+  }
+
+  productListeners.add(listener);
+
+  if (typeof window === "undefined") {
+    return () => {
+      productListeners.delete(listener);
+    };
+  }
+
+  const handleStorage = (event) => {
+    if (!event.key || event.key === STORAGE_KEY) {
+      listener();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    productListeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+export function useStoredProducts() {
+  return useSyncExternalStore(
+    subscribeToStoredProducts,
+    getStoredProducts,
+    () => EMPTY_PRODUCTS
+  );
 }
 
 export function createStoredProduct(productInput) {
