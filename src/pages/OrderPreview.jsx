@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import PlacementOptionList from "../components/PlacementOptionList";
+import PricingSummary from "../components/PricingSummary";
 import {
   buildPlacementPricingOptions,
   getDefaultDecorationType,
@@ -265,6 +266,9 @@ export default function OrderPreview() {
               Quantity: {quantity}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
+              Garment base price: {selectedProduct ? money(liveQuote.garment_unit_price) : "—"}
+            </p>
+            <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
               Method: {defaultDecorationType}
             </p>
             <p style={{ margin: "3px 0", color: "#57534e", fontSize: "14px" }}>
@@ -428,6 +432,15 @@ export default function OrderPreview() {
 
               <div>
                 <p style={{ margin: "0 0 2px 0", fontSize: "12px", color: "#78716c" }}>
+                  Garment Base Price
+                </p>
+                <p style={{ margin: 0, fontWeight: 600 }}>
+                  {selectedProduct ? money(liveQuote.garment_unit_price) : "—"}
+                </p>
+              </div>
+
+              <div>
+                <p style={{ margin: "0 0 2px 0", fontSize: "12px", color: "#78716c" }}>
                   Production Method
                 </p>
                 <p style={{ margin: 0, fontWeight: 600 }}>{defaultDecorationType}</p>
@@ -476,46 +489,7 @@ export default function OrderPreview() {
             <p style={{ margin: "0 0 8px 0", fontWeight: 700, fontSize: "14px" }}>
               Pricing Breakdown
             </p>
-
-            <div style={{ display: "grid", gap: "8px", color: "#57534e", fontSize: "14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                <span>Garment subtotal</span>
-                <strong style={{ color: "#171717" }}>{money(liveQuote.garment_subtotal)}</strong>
-              </div>
-
-              {liveQuote.placement_lines.map((line) => (
-                <div
-                  key={`${line.placement}-${line.decoration_type}`}
-                  style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}
-                >
-                  <span>
-                    {line.placement} ({money(line.unit_price)} each)
-                  </span>
-                  <strong style={{ color: "#171717" }}>{money(line.line_total)}</strong>
-                </div>
-              ))}
-
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                <span>Placement charges</span>
-                <strong style={{ color: "#171717" }}>{money(liveQuote.placement_subtotal)}</strong>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                <span>
-                  {defaultDecorationType} production ({money(liveQuote.production_lines[0]?.unit_price || 0)} each)
-                </span>
-                <strong style={{ color: "#171717" }}>
-                  {money(liveQuote.production_method_subtotal || 0)}
-                </strong>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                <span>Grand total</span>
-                <strong style={{ color: "#171717", fontSize: "16px" }}>
-                  {money(liveQuote.total)}
-                </strong>
-              </div>
-            </div>
+            <PricingSummary quote={liveQuote} quantity={quantity} compact />
           </div>
 
           <div style={{ marginTop: "18px" }}>

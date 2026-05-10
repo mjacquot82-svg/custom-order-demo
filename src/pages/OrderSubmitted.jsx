@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import PricingSummary from "../components/PricingSummary";
 
 export default function OrderSubmitted() {
   const location = useLocation();
@@ -259,10 +260,10 @@ export default function OrderSubmitted() {
                         color: "#78716c",
                       }}
                     >
-                      Placement Charges
+                      Garment Base Price
                     </p>
                     <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
-                      {money(quote.placement_subtotal)}
+                      {money(quote.garment_unit_price)}
                     </p>
                   </div>
 
@@ -274,10 +275,10 @@ export default function OrderSubmitted() {
                         color: "#78716c",
                       }}
                     >
-                      Estimated Total
+                      Garment Subtotal
                     </p>
-                    <p style={{ margin: 0, fontWeight: 700, color: "#171717" }}>
-                      {money(quote.total)}
+                    <p style={{ margin: 0, fontWeight: 600, color: "#171717" }}>
+                      {money(quote.garment_subtotal)}
                     </p>
                   </div>
                 </>
@@ -351,6 +352,30 @@ export default function OrderSubmitted() {
             </div>
           </div>
         </div>
+
+        {quote ? (
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "18px",
+              border: "1px solid #e7e5e4",
+              marginBottom: "20px",
+            }}
+          >
+            <p
+              style={{
+                margin: "0 0 12px 0",
+                fontWeight: "700",
+                fontSize: "15px",
+                color: "#171717",
+              }}
+            >
+              Pricing Summary
+            </p>
+            <PricingSummary quote={quote} quantity={quantity} compact />
+          </div>
+        ) : null}
 
         <div
           style={{

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PlacementOptionList from "../components/PlacementOptionList";
+import PricingSummary from "../components/PricingSummary";
 import ProductionTypeSelect from "../components/ProductionTypeSelect";
 import {
   normalizeProductionType,
@@ -752,73 +753,7 @@ export default function NewOrder() {
               </div>
 
               <div className="new-order-summary-shell">
-                <div className="new-order-summary-block">
-                  <div className="new-order-summary-row">
-                    <span>Garment unit price</span>
-                    <strong>{selectedProduct ? money(liveQuote.garment_unit_price) : "—"}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Quantity</span>
-                    <strong>{totalQty}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Garment subtotal</span>
-                    <strong>{money(liveQuote.garment_subtotal)}</strong>
-                  </div>
-                </div>
-
-                <div className="new-order-summary-block">
-                  <div className="new-order-summary-row">
-                    <span>Placement charges</span>
-                    <strong>{money(liveQuote.placement_subtotal)}</strong>
-                  </div>
-
-                  {liveQuote.placement_lines.length ? (
-                    <div className="new-order-summary-list">
-                      {liveQuote.placement_lines.map((line) => (
-                        <div
-                          key={`${line.placement}-${line.decoration_type}`}
-                          className="new-order-summary-list-row"
-                        >
-                          <span>{line.placement}</span>
-                          <span>{money(line.line_total)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="new-order-muted">No placements selected.</p>
-                  )}
-                </div>
-
-                <div className="new-order-summary-block">
-                  <div className="new-order-summary-row">
-                    <span>Production pricing</span>
-                    <strong>{money(liveQuote.production_subtotal)}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>{normalizedDecorationType}</span>
-                    <span>
-                      {totalQty} x {money(liveQuote.production_lines[0]?.unit_price || 0)}
-                    </span>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Method-only production</span>
-                    <span>{money(liveQuote.production_method_subtotal || 0)}</span>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Digitizing / setup fees</span>
-                    <strong>{money(liveQuote.setup_subtotal)}</strong>
-                  </div>
-                  <div className="new-order-summary-row">
-                    <span>Taxes</span>
-                    <span>{liveQuote.taxes_placeholder}</span>
-                  </div>
-                </div>
-
-                <div className="new-order-summary-total">
-                  <span>Grand Total</span>
-                  <strong>{money(liveQuote.total)}</strong>
-                </div>
+                <PricingSummary quote={liveQuote} quantity={totalQty} />
               </div>
             </section>
           </div>

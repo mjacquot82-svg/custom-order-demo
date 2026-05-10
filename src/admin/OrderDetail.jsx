@@ -5,6 +5,7 @@ import { getStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import { printElement } from "../lib/printElement";
+import PricingSummary from "../components/PricingSummary";
 import StatusBadge from "../components/StatusBadge";
 import ProductionProgressTracker from "../order-detail/ProductionProgressTracker";
 import AssignmentPanel from "../order-detail/AssignmentPanel";
@@ -31,10 +32,6 @@ const inputStyle = {
   padding: "11px",
   boxSizing: "border-box",
 };
-
-function money(value) {
-  return `$${Number(value || 0).toFixed(2)}`;
-}
 
 export default function OrderDetail() {
   const { orderNumber } = useParams();
@@ -250,47 +247,11 @@ export default function OrderDetail() {
             <h2 style={{ marginTop: 0 }}>Quote Snapshot</h2>
 
             {quoteSnapshot ? (
-              <div style={{ display: "grid", gap: "8px" }}>
-                <span>
-                  <strong>Garment Unit Price:</strong>
-                  {money(quoteSnapshot.garment_unit_price)}
-                </span>
-
-                <span>
-                  <strong>Quantity:</strong>
-                  {quoteSnapshot.quantity || order.qty || 0}
-                </span>
-
-                <span>
-                  <strong>Garment Subtotal:</strong>
-                  {money(quoteSnapshot.garment_subtotal)}
-                </span>
-
-                <span>
-                  <strong>Placement Subtotal:</strong>
-                  {money(quoteSnapshot.placement_subtotal)}
-                </span>
-
-                <span>
-                  <strong>Production Pricing:</strong>
-                  {money(quoteSnapshot.production_subtotal)}
-                </span>
-
-                <span>
-                  <strong>Method-Only Production:</strong>
-                  {money(quoteSnapshot.production_method_subtotal || 0)}
-                </span>
-
-                <span>
-                  <strong>Setup Fees:</strong>
-                  {money(quoteSnapshot.setup_subtotal)}
-                </span>
-
-                <span style={{ fontSize: "20px" }}>
-                  <strong>Total:</strong>
-                  {money(quoteSnapshot.total)}
-                </span>
-              </div>
+              <PricingSummary
+                quote={quoteSnapshot}
+                quantity={quoteSnapshot.quantity || order.qty || 0}
+                compact
+              />
             ) : (
               <p style={{ color: "#94a3b8" }}>
                 Quote snapshot unavailable.

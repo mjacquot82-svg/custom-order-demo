@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import PricingSummary from "../components/PricingSummary";
 import { findStoredOrder, updateStoredOrder } from "../lib/ordersStore";
 
 function money(value) {
@@ -74,25 +75,9 @@ export default function QuoteView() {
         </tbody>
       </table>
 
-      <div style={{ marginTop: "20px", display: "grid", gap: "8px" }}>
-        <p style={{ margin: 0 }}>
-          <strong>Placement Charges:</strong> {money(quote.placement_subtotal)}
-        </p>
-        <p style={{ margin: 0 }}>
-          <strong>Production Pricing:</strong> {money(quote.production_subtotal)}
-        </p>
-        <p style={{ margin: 0 }}>
-          <strong>Method-Only Production:</strong> {money(quote.production_method_subtotal || 0)}
-        </p>
-        <p style={{ margin: 0 }}>
-          <strong>Digitizing / Setup:</strong> {money(quote.setup_subtotal)}
-        </p>
-        <p style={{ margin: 0 }}>
-          <strong>Taxes:</strong> {quote.taxes_placeholder || "Calculated at checkout"}
-        </p>
+      <div style={{ marginTop: "20px" }}>
+        <PricingSummary quote={quote} quantity={quote.quantity} compact />
       </div>
-
-      <h2 style={{ marginTop: "20px" }}>Total: {money(quote.total)}</h2>
 
       <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
         <button
