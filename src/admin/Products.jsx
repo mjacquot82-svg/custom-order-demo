@@ -27,6 +27,25 @@ const labelStyle = {
   color: "#292524",
 };
 
+function PencilIcon({ color = "#0f172a", size = 18 }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="m16.5 3.5 4 4L7 21l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
 const emptyProduct = {
   name: "",
   category: "T-Shirt",
@@ -159,6 +178,15 @@ export default function Products() {
   const imageInputRef = useRef(null);
 
   const placementOptions = normalizeListInput(form.placementsText);
+  const editingProduct = editingProductId
+    ? products.find((product) => product.id === editingProductId) || null
+    : null;
+  const editorTitle = editingProduct
+    ? `Editing: ${editingProduct.name || form.name || "Product"}`
+    : "Create Product";
+  const editorDescription = editingProduct
+    ? "Update garment settings, pricing, and workflow options for this catalog item."
+    : "Configure garment price, allowed placements, and supported production methods.";
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -326,21 +354,27 @@ export default function Products() {
           ref={editorRef}
           onSubmit={handleSubmit}
           style={{
-            background: "#ffffff",
+            background: editingProduct
+              ? "linear-gradient(180deg, #f8fbff 0%, #ffffff 22%)"
+              : "#ffffff",
             borderRadius: "22px",
             padding: "22px",
-            border: "1px solid #e2e8f0",
+            border: editingProduct ? "1px solid #93c5fd" : "1px solid #e2e8f0",
+            boxShadow: editingProduct
+              ? "0 20px 44px rgba(14, 116, 144, 0.12)"
+              : "none",
             display: "grid",
             gap: "18px",
             position: "sticky",
             top: "18px",
+            scrollMarginTop: "18px",
           }}
         >
-          <div>
+          <div style={{ display: "grid", gap: "12px" }}>
             <p
               style={{
                 margin: 0,
-                color: "#78716c",
+                color: editingProduct ? "#0369a1" : "#78716c",
                 fontSize: "12px",
                 fontWeight: 900,
                 letterSpacing: "0.08em",
@@ -349,13 +383,68 @@ export default function Products() {
             >
               Owner Catalog Control
             </p>
-            <h1 style={{ margin: "6px 0 8px" }}>
-              {editingProductId ? "Edit Product" : "Add Product"}
-            </h1>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: editingProduct ? "14px 16px" : 0,
+                borderRadius: "18px",
+                background: editingProduct ? "#e0f2fe" : "transparent",
+                border: editingProduct ? "1px solid #bae6fd" : "none",
+              }}
+            >
+              {editingProduct ? (
+                <div
+                  style={{
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "12px",
+                    display: "grid",
+                    placeItems: "center",
+                    background: "#ffffff",
+                    border: "1px solid #bae6fd",
+                    flexShrink: 0,
+                  }}
+                >
+                  <PencilIcon color="#0369a1" size={18} />
+                </div>
+              ) : null}
+              <h1 style={{ margin: 0 }}>{editorTitle}</h1>
+            </div>
             <p style={{ margin: 0, color: "#64748b" }}>
-              Configure garment price, allowed placements, and supported production methods.
+              {editorDescription}
             </p>
           </div>
+
+          {editingProduct ? (
+            <div
+              style={{
+                display: "grid",
+                gap: "4px",
+                padding: "14px 16px",
+                borderRadius: "18px",
+                border: "1px solid #bfdbfe",
+                background: "#eff6ff",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "#1d4ed8",
+                  fontWeight: 800,
+                }}
+              >
+                <PencilIcon color="#1d4ed8" size={16} />
+                <span>Editing Existing Product</span>
+              </div>
+              <p style={{ margin: 0, color: "#475569", fontSize: "13px" }}>
+                Changes will update catalog pricing and order workflows.
+              </p>
+            </div>
+          ) : null}
 
           <div
             style={{
@@ -660,35 +749,63 @@ export default function Products() {
                 type="button"
                 onClick={resetForm}
                 style={{
-                  background: "#ffffff",
-                  color: "#171717",
-                  border: "1px solid #cbd5e1",
+                  background: editingProduct ? "#eff6ff" : "#ffffff",
+                  color: editingProduct ? "#1d4ed8" : "#171717",
+                  border: editingProduct ? "1px solid #bfdbfe" : "1px solid #cbd5e1",
                   borderRadius: "12px",
                   padding: "13px 18px",
                   fontWeight: 800,
                   cursor: "pointer",
                 }}
               >
-                Cancel Edit
+                Cancel Editing
               </button>
             ) : null}
           </div>
         </form>
 
         <section style={{ display: "grid", gap: "14px" }}>
-          {products.map((product) => (
-            <article
-              key={product.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "120px minmax(0, 1fr) auto",
-                gap: "16px",
-                border: "1px solid #e2e8f0",
-                borderRadius: "20px",
-                padding: "16px",
-                background: "#ffffff",
-              }}
-            >
+          {products.map((product) => {
+            const isActive = product.id === editingProductId;
+
+            return (
+              <article
+                key={product.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "120px minmax(0, 1fr) auto",
+                  gap: "16px",
+                  border: isActive ? "1px solid #38bdf8" : "1px solid #e2e8f0",
+                  borderRadius: "20px",
+                  padding: "16px",
+                  background: isActive
+                    ? "linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%)"
+                    : "#ffffff",
+                  boxShadow: isActive
+                    ? "0 16px 36px rgba(14, 165, 233, 0.16)"
+                    : "none",
+                  position: "relative",
+                }}
+              >
+                {isActive ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "14px",
+                      right: "14px",
+                      padding: "6px 10px",
+                      borderRadius: "999px",
+                      background: "#0f172a",
+                      color: "#ffffff",
+                      fontSize: "11px",
+                      fontWeight: 800,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Editing Now
+                  </div>
+                ) : null}
               <div>
                 {product.image ? (
                   <img
@@ -699,6 +816,7 @@ export default function Products() {
                       height: "120px",
                       objectFit: "cover",
                       borderRadius: "14px",
+                      border: isActive ? "2px solid #7dd3fc" : "none",
                     }}
                   />
                 ) : (
@@ -719,7 +837,7 @@ export default function Products() {
                 )}
               </div>
 
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, paddingRight: isActive ? "84px" : 0 }}>
                 <div
                   style={{
                     display: "flex",
@@ -802,16 +920,16 @@ export default function Products() {
                   type="button"
                   onClick={() => handleEdit(product)}
                   style={{
-                    border: "1px solid #cbd5e1",
-                    background: "#ffffff",
-                    color: "#171717",
+                    border: isActive ? "1px solid #0ea5e9" : "1px solid #cbd5e1",
+                    background: isActive ? "#0f172a" : "#ffffff",
+                    color: isActive ? "#ffffff" : "#171717",
                     borderRadius: "10px",
                     padding: "9px 12px",
                     fontWeight: 800,
                     cursor: "pointer",
                   }}
                 >
-                  Edit
+                  {isActive ? "Editing" : "Edit"}
                 </button>
 
                 <button
@@ -831,7 +949,8 @@ export default function Products() {
                 </button>
               </div>
             </article>
-          ))}
+            );
+          })}
         </section>
       </div>
     </div>
