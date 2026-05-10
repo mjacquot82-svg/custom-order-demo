@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const SPLASH_LOGO_SRC = "/icon-512-clear.png";
+const SPLASH_LOGO_SRC = "/tee&co512x512.png";
 
 export default function AppSplash({ children }) {
   const [showSplash, setShowSplash] = useState(true);

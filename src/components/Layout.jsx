@@ -8,7 +8,7 @@ import {
 } from "../lib/staffUsersStore";
 import { getUserInitials } from "../utils/getUserInitials";
 
-const ADMIN_LOGO_SRC = "/icon-512-clear.png";
+const ADMIN_LOGO_SRC = "/tee&co512x512.png";
 const FACEBOOK_URL =
   "https://www.facebook.com/p/Tee-Co-Ltd-100078145951464/";
 const INSTAGRAM_URL = "https://www.instagram.com/teeandcodesigns/";
@@ -403,6 +403,10 @@ function PublicHeader() {
             style={{
               width: "56px",
               height: "56px",
+              minWidth: "56px",
+              minHeight: "56px",
+              maxWidth: "56px",
+              maxHeight: "56px",
               overflow: "hidden",
               borderRadius: "999px",
               flexShrink: 0,
