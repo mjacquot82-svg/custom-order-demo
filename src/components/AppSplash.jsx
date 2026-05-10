@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import logo from "../assets/icon-512.png";
+
+const SPLASH_LOGO_SRC = "/icon-512-clear.png";
 
 export default function AppSplash({ children }) {
   const [showSplash, setShowSplash] = useState(true);
@@ -14,7 +15,16 @@ export default function AppSplash({ children }) {
       {showSplash && (
         <div className="app-splash" role="status" aria-label="Loading Tee & Co Central Operations">
           <div className="app-splash-card">
-            <img src={logo} alt="Tee & Co" className="app-splash-logo" />
+            <img
+              src={SPLASH_LOGO_SRC}
+              alt="Tee & Co"
+              className="app-splash-logo"
+              width="88"
+              height="88"
+              loading="eager"
+              decoding="sync"
+              fetchPriority="high"
+            />
             <div>
               <p className="app-splash-kicker">Tee & Co</p>
               <h1 className="app-splash-title">Central Operations</h1>

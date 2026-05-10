@@ -20,6 +20,67 @@ img {
   height: auto;
 }
 
+.app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.app-splash-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  width: min(100%, 420px);
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+}
+
+.app-splash-logo {
+  width: 88px;
+  height: 88px;
+  min-width: 88px;
+  min-height: 88px;
+  max-width: 88px;
+  max-height: 88px;
+  object-fit: contain;
+}
+
+.app-splash-kicker,
+.app-splash-title,
+.app-splash-copy {
+  margin: 0;
+}
+
+.app-splash-kicker {
+  color: #78716c;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-splash-title {
+  margin-top: 4px;
+  color: #0f172a;
+  font-size: 26px;
+  line-height: 1.05;
+}
+
+.app-splash-copy {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 14px;
+}
+
 .tee-co-logo {
   display: block;
   width: 100% !important;
@@ -163,6 +224,25 @@ aside img:not(.tee-co-logo) {
 }
 
 @media (max-width: 767px) {
+  .app-splash-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .app-splash-logo {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    min-height: 72px;
+    max-width: 72px;
+    max-height: 72px;
+  }
+
+  .app-splash-title {
+    font-size: 22px;
+  }
+
   .home-page {
     padding: 12px 14px 22px !important;
   }

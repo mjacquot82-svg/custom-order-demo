@@ -311,6 +311,14 @@ export default function Orders() {
   const searchTerm = searchParams.get("q") || "";
   const customStart = searchParams.get("start") || "";
   const customEnd = searchParams.get("end") || "";
+  const hasActiveFilters = (
+    activeWorkflowFilter !== "all" ||
+    activeScope !== "active" ||
+    activeDateFilter !== "all" ||
+    Boolean(searchTerm) ||
+    Boolean(customStart) ||
+    Boolean(customEnd)
+  );
 
   const orders = sortOrdersByOperationalStatus(useStoredOrders().map(normalizeOrder));
 
@@ -361,6 +369,10 @@ export default function Orders() {
     }
 
     updateStoredOrder(order.order_number, updates);
+  }
+
+  function handleResetFilters() {
+    setSearchParams(new URLSearchParams());
   }
 
   return (
@@ -489,20 +501,48 @@ export default function Orders() {
             </div>
           ) : null}
 
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => updateFilters({ q: event.target.value })}
-            placeholder="Search order, customer, garment, worker, or artwork filename"
+          <div
             style={{
-              width: "100%",
-              border: "1px solid #cbd5e1",
-              borderRadius: "14px",
-              padding: "12px 14px",
-              boxSizing: "border-box",
-              fontSize: "15px",
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+              alignItems: "center",
             }}
-          />
+          >
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => updateFilters({ q: event.target.value })}
+              placeholder="Search order, customer, garment, worker, or artwork filename"
+              style={{
+                flex: "1 1 320px",
+                minWidth: 0,
+                border: "1px solid #cbd5e1",
+                borderRadius: "14px",
+                padding: "12px 14px",
+                boxSizing: "border-box",
+                fontSize: "15px",
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              disabled={!hasActiveFilters}
+              style={{
+                border: "1px solid #d6d3d1",
+                background: hasActiveFilters ? "#ffffff" : "#f5f5f4",
+                color: hasActiveFilters ? "#171717" : "#a8a29e",
+                borderRadius: "14px",
+                padding: "12px 14px",
+                fontWeight: 700,
+                cursor: hasActiveFilters ? "pointer" : "not-allowed",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Reset Filters
+            </button>
+          </div>
         </div>
 
         {(activeScope === "active" || activeScope === "all") ? (
