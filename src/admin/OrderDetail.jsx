@@ -1,9 +1,10 @@
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { getStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
+import { printElement } from "../lib/printElement";
 import StatusBadge from "../components/StatusBadge";
 import ProductionProgressTracker from "../order-detail/ProductionProgressTracker";
 import AssignmentPanel from "../order-detail/AssignmentPanel";
@@ -38,6 +39,7 @@ function money(value) {
 export default function OrderDetail() {
   const { orderNumber } = useParams();
   const storedOrders = useStoredOrders();
+  const printableTicketRef = useRef(null);
   const order = useMemo(
     () => storedOrders.find((entry) => entry.order_number === orderNumber) || null,
     [orderNumber, storedOrders]
@@ -135,6 +137,12 @@ export default function OrderDetail() {
     saveOrderUpdates(nextUpdates);
   }
 
+  function handlePrintTicket() {
+    printElement(printableTicketRef.current, {
+      title: `Production Ticket ${order.order_number || orderNumber}`,
+    });
+  }
+
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div
@@ -203,7 +211,7 @@ export default function OrderDetail() {
 
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrintTicket}
             style={{
               background: "#171717",
               color: "#ffffff",
@@ -302,7 +310,7 @@ export default function OrderDetail() {
             artwork={order.artwork_files || []}
           />
 
-          <PrintableProductionTicket order={order} />
+          <PrintableProductionTicket ref={printableTicketRef} order={order} />
         </aside>
       </div>
     </div>

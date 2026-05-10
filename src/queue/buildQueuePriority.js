@@ -42,7 +42,7 @@ export function buildQueuePriority(order = {}) {
       : dueSoon
       ? "Due Soon"
       : unassigned
-      ? "Needs Assignment"
+      ? "Unassigned"
       : completed
       ? "Completed"
       : "Normal",

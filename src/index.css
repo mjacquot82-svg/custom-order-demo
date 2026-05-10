@@ -20,6 +20,16 @@ img {
   height: auto;
 }
 
+.tee-co-logo {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 header img:not(.tee-co-logo),
 aside img:not(.tee-co-logo) {
   width: auto !important;

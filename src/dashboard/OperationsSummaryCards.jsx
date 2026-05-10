@@ -25,7 +25,7 @@ export default function OperationsSummaryCards({ metrics }) {
       background: "#eff6ff",
     },
     {
-      label: "Needs Assignment",
+      label: "Unassigned",
       value: metrics.needsAssignment,
       color: "#7c2d12",
       background: "#fff7ed",

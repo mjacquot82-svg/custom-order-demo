@@ -8,7 +8,7 @@ import {
 } from "../lib/staffUsersStore";
 import { getUserInitials } from "../utils/getUserInitials";
 
-const ADMIN_LOGO_SRC = "/tee&co512x512.png";
+const ADMIN_LOGO_SRC = "/icon-512-clear.png";
 const FACEBOOK_URL =
   "https://www.facebook.com/p/Tee-Co-Ltd-100078145951464/";
 const INSTAGRAM_URL = "https://www.instagram.com/teeandcodesigns/";
@@ -252,9 +252,10 @@ function AdminSidebar({ pathname, search, staffUser }) {
             height="54"
             loading="eager"
             decoding="sync"
+            fetchPriority="high"
             style={{
-              width: "54px",
-              height: "54px",
+              width: "100%",
+              height: "100%",
               objectFit: "contain",
               display: "block",
             }}
@@ -415,9 +416,10 @@ function PublicHeader() {
               height="56"
               loading="eager"
               decoding="sync"
+              fetchPriority="high"
               style={{
-                width: "56px",
-                height: "56px",
+                width: "100%",
+                height: "100%",
                 objectFit: "contain",
                 display: "block",
               }}

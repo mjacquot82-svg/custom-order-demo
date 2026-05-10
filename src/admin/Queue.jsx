@@ -142,7 +142,7 @@ export default function Queue() {
 
       {unassignedSection.hasItems && (
         <section style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "18px", padding: "16px", marginBottom: "18px" }}>
-          <h2 style={{ marginTop: 0 }}>Needs Assignment ({unassignedSection.count})</h2>
+          <h2 style={{ marginTop: 0 }}>Unassigned ({unassignedSection.count})</h2>
           <div style={{ display: "grid", gap: "10px" }}>{unassignedSection.orders.map((order) => <OrderCard key={order.order_number} order={order} />)}</div>
         </section>
       )}
