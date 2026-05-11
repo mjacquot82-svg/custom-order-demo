@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { normalizeProductionType } from "../constants/productionTypes";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import StatusBadge from "../components/StatusBadge";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import {
   canAdvanceOperationalStatus,
   getNextOperationalStatus,
@@ -168,6 +169,20 @@ function matchesSearch(order, searchTerm) {
   return getOrderSearchText(order).includes(normalizeLookup(searchTerm));
 }
 
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function getPaymentSummary(order) {
+  const balanceDue = Number(order.balance_due || 0);
+
+  if (balanceDue > 0) {
+    return `Owes ${money(balanceDue)}`;
+  }
+
+  return order.payment_status === "Paid in Full" ? "Paid" : "No balance due";
+}
+
 function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus }) {
   return (
     <div
@@ -187,6 +202,7 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Production Type</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Assigned Worker</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Due / Created</th>
+            <th style={{ padding: "12px 8px", textAlign: "left" }}>Payment</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Status</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Action</th>
           </tr>
@@ -236,6 +252,23 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
               </td>
 
               <td style={{ padding: "14px 8px" }}>
+                <div style={{ display: "grid", gap: "6px" }}>
+                  <PaymentStatusBadge status={order.payment_status} />
+                  <span
+                    style={{
+                      color: order.balance_due > 0 ? "#991b1b" : "#64748b",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {getPaymentSummary(order)}
+                  </span>
+                </div>
+              </td>
+
+              <td style={{ padding: "14px 8px" }}>
                 <StatusBadge status={order.status} />
               </td>
 
@@ -266,7 +299,7 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
           {orders.length === 0 ? (
             <tr>
               <td
-                colSpan="8"
+                colSpan="9"
                 style={{
                   padding: "24px 8px",
                   textAlign: "center",

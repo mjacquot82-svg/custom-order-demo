@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PAYMENT_METHOD_OPTIONS } from "../orders/orderFinancials";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -19,26 +20,20 @@ function formatTimestamp(value) {
   });
 }
 
-function badgeStyle(background, color) {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    borderRadius: "999px",
-    padding: "6px 10px",
-    background,
-    color,
-    fontSize: "12px",
-    fontWeight: 800,
-  };
-}
-
-function getPaymentStatusStyle(status) {
-  if (status === "Paid in Full") return badgeStyle("#dcfce7", "#166534");
-  if (status === "Partial" || status === "Deposit Paid") return badgeStyle("#fef3c7", "#92400e");
-  return badgeStyle("#e2e8f0", "#334155");
-}
-
 function getPickupStatusStyle(status) {
+  function badgeStyle(background, color) {
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      borderRadius: "999px",
+      padding: "6px 10px",
+      background,
+      color,
+      fontSize: "12px",
+      fontWeight: 800,
+    };
+  }
+
   if (status === "Picked Up") return badgeStyle("#dcfce7", "#166534");
   if (status === "Ready for Pickup") return badgeStyle("#dbeafe", "#1d4ed8");
   return badgeStyle("#e2e8f0", "#334155");
@@ -229,7 +224,7 @@ export default function FinancialSummaryPanel({
       >
         <div style={{ display: "grid", gap: "6px" }}>
           <span style={rowLabelStyle}>Payment Status</span>
-          <span style={getPaymentStatusStyle(order.payment_status)}>{order.payment_status}</span>
+          <PaymentStatusBadge status={order.payment_status} />
         </div>
 
         <div style={{ display: "grid", gap: "6px" }}>
