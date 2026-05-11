@@ -1,6 +1,20 @@
 import { normalizeProductionType } from "../../constants/productionTypes";
 import { formatShortDate } from "../../lib/dateFormatting";
 
+function normalizeText(value, fallback = "—") {
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    return trimmedValue || fallback;
+  }
+
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  const normalizedValue = String(value).trim();
+  return normalizedValue || fallback;
+}
+
 function buildOrderItems(order = {}) {
   if (Array.isArray(order.items) && order.items.length) {
     return order.items.map((item, index) => ({
@@ -56,15 +70,15 @@ function buildInstructionSections(order = {}) {
   const notes = [
     {
       label: "Production Notes",
-      value: order.production_notes || "",
+      value: normalizeText(order.production_notes, ""),
     },
     {
       label: "Internal Notes",
-      value: order.internal_note || order.notes || "",
+      value: normalizeText(order.internal_note || order.notes, ""),
     },
   ];
 
-  return notes.filter((entry) => entry.value.trim());
+  return notes.filter((entry) => entry.value);
 }
 
 const sectionLabelStyle = {
@@ -111,7 +125,7 @@ export default function ProductionPrintSheet({ order = {} }) {
       >
         <p style={{ ...sectionLabelStyle, marginBottom: "6px" }}>Production Sheet</p>
         <h1 style={{ margin: 0, fontSize: "28px", lineHeight: 1.1 }}>
-          Order {order.order_number || "Unnumbered Order"}
+          Order {normalizeText(order.order_number, "Unnumbered Order")}
         </h1>
 
         <div
@@ -124,7 +138,7 @@ export default function ProductionPrintSheet({ order = {} }) {
         >
           <div>
             <p style={sectionLabelStyle}>Customer Name</p>
-            <p style={sectionValueStyle}>{order.customer_name || "Walk-in Customer"}</p>
+            <p style={sectionValueStyle}>{normalizeText(order.customer_name, "Walk-in Customer")}</p>
           </div>
 
           <div>
@@ -167,7 +181,7 @@ export default function ProductionPrintSheet({ order = {} }) {
                 >
                   <div>
                     <p style={sectionLabelStyle}>Item</p>
-                    <p style={sectionValueStyle}>{item.garment || "Custom garment"}</p>
+                    <p style={sectionValueStyle}>{normalizeText(item.garment, "Custom garment")}</p>
                   </div>
 
                   <div>
@@ -186,9 +200,9 @@ export default function ProductionPrintSheet({ order = {} }) {
                 </div>
 
                 <div style={{ marginBottom: sizeBreakdown.length ? "10px" : 0 }}>
-                  <p style={sectionLabelStyle}>Placements</p>
-                  <p style={sectionValueStyle}>{item.placements || "—"}</p>
-                </div>
+                    <p style={sectionLabelStyle}>Placements</p>
+                    <p style={sectionValueStyle}>{normalizeText(item.placements)}</p>
+                  </div>
 
                 <div>
                   <p style={sectionLabelStyle}>Sizes / Quantities</p>

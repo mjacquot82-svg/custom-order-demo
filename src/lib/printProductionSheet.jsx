@@ -1,10 +1,14 @@
-import { createRoot } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import ProductionPrintSheet from "../components/print/ProductionPrintSheet";
 
 const PRINT_DOCUMENT_STYLES = `
   @page {
     margin: 10mm;
     size: auto;
+  }
+
+  :root {
+    color-scheme: light;
   }
 
   html, body {
@@ -23,7 +27,9 @@ const PRINT_DOCUMENT_STYLES = `
   #production-print-root {
     box-sizing: border-box;
     width: 100%;
-    padding: 18px;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px;
   }
 
   *, *::before, *::after {
@@ -35,33 +41,47 @@ const PRINT_DOCUMENT_STYLES = `
     page-break-inside: avoid;
   }
 
+  @media screen {
+    body {
+      background: #f5f5f5;
+    }
+
+    #production-print-root {
+      margin: 24px auto;
+      background: #ffffff;
+    }
+  }
+
   @media print {
     html, body {
       background: #ffffff !important;
     }
 
     #production-print-root {
+      max-width: none;
+      margin: 0;
       padding: 0;
     }
   }
 `;
 
-function waitForRender(printWindow, container) {
+function escapeHtml(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function waitForWindowLoad(printWindow) {
   return new Promise((resolve) => {
-    let attempts = 0;
+    if (printWindow.document.readyState === "complete") {
+      resolve();
+      return;
+    }
 
-    const checkReady = () => {
-      attempts += 1;
-
-      if (container.textContent?.trim() || attempts >= 10) {
-        resolve();
-        return;
-      }
-
-      printWindow.requestAnimationFrame(checkReady);
-    };
-
-    printWindow.requestAnimationFrame(checkReady);
+    printWindow.addEventListener("load", () => resolve(), { once: true });
   });
 }
 
@@ -76,11 +96,17 @@ function waitForLayout(printWindow) {
 export function printProductionSheet(order, options = {}) {
   if (typeof window === "undefined" || !order) return false;
 
-  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
+  const printWindow = window.open("", "_blank", "width=960,height=720");
   if (!printWindow) return false;
 
   const title = options.title || `Production Sheet ${order.order_number || ""}`.trim();
+  const markup = renderToStaticMarkup(<ProductionPrintSheet order={order} />);
   const printDocument = printWindow.document;
+
+  if (!markup.trim()) {
+    printWindow.close();
+    return false;
+  }
 
   printDocument.open();
   printDocument.write(`<!doctype html>
@@ -88,28 +114,21 @@ export function printProductionSheet(order, options = {}) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${title}</title>
+    <title>${escapeHtml(title)}</title>
     <style>${PRINT_DOCUMENT_STYLES}</style>
   </head>
   <body>
-    <div id="production-print-root"></div>
+    <div id="production-print-root">${markup}</div>
   </body>
 </html>`);
   printDocument.close();
 
-  const container = printDocument.getElementById("production-print-root");
-  if (!container) {
-    printWindow.close();
-    return false;
-  }
-
-  const root = createRoot(container);
   let cleanedUp = false;
 
   const cleanup = () => {
     if (cleanedUp) return;
     cleanedUp = true;
-    root.unmount();
+
     window.setTimeout(() => {
       if (!printWindow.closed) {
         printWindow.close();
@@ -121,10 +140,8 @@ export function printProductionSheet(order, options = {}) {
   printWindow.addEventListener("beforeunload", cleanup, { once: true });
   window.setTimeout(cleanup, 60_000);
 
-  root.render(<ProductionPrintSheet order={order} />);
-
   const runPrint = async () => {
-    await waitForRender(printWindow, container);
+    await waitForWindowLoad(printWindow);
 
     if (printDocument.fonts?.ready) {
       await printDocument.fonts.ready.catch(() => undefined);
@@ -132,7 +149,8 @@ export function printProductionSheet(order, options = {}) {
 
     await waitForLayout(printWindow);
 
-    if (!container.textContent?.trim()) {
+    const container = printDocument.getElementById("production-print-root");
+    if (!container?.textContent?.trim()) {
       cleanup();
       return;
     }
