@@ -1,10 +1,10 @@
 import { useParams, Link } from "react-router-dom";
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { recordStoredOrderPayment, updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { useStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
-import { printElement } from "../lib/printElement";
+import { printProductionSheet } from "../lib/printProductionSheet";
 import PricingSummary from "../components/PricingSummary";
 import StatusBadge from "../components/StatusBadge";
 import ProductionProgressTracker from "../order-detail/ProductionProgressTracker";
@@ -12,7 +12,6 @@ import AssignmentPanel from "../order-detail/AssignmentPanel";
 import ActivityTimeline from "../order-detail/ActivityTimeline";
 import ProductionInstructionsPanel from "../order-detail/ProductionInstructionsPanel";
 import ArtworkPreviewPanel from "../order-detail/ArtworkPreviewPanel";
-import PrintableProductionTicket from "../order-detail/PrintableProductionTicket";
 import FinancialSummaryPanel from "../order-detail/FinancialSummaryPanel";
 import { buildOrderUrgency } from "../order-detail/buildOrderUrgency";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
@@ -57,7 +56,6 @@ export default function OrderDetail() {
   const { orderNumber } = useParams();
   const storedOrders = useStoredOrders();
   const storedProducts = useStoredProducts();
-  const printableTicketRef = useRef(null);
   const order = useMemo(
     () => storedOrders.find((entry) => entry.order_number === orderNumber) || null,
     [orderNumber, storedOrders]
@@ -158,7 +156,7 @@ export default function OrderDetail() {
   }
 
   function handlePrintTicket() {
-    printElement(printableTicketRef.current, {
+    printProductionSheet(printOrder, {
       title: `Production Sheet ${order.order_number || orderNumber}`,
     });
   }
@@ -503,22 +501,6 @@ export default function OrderDetail() {
         <ActivityTimeline
           events={order.activity_log || []}
         />
-      </div>
-
-      <div
-        aria-hidden="true"
-        data-print-hidden="true"
-        style={{
-          position: "absolute",
-          width: "1024px",
-          maxWidth: "100%",
-          left: "-200vw",
-          top: 0,
-          pointerEvents: "none",
-          opacity: 0,
-        }}
-      >
-        <PrintableProductionTicket ref={printableTicketRef} order={printOrder} />
       </div>
     </div>
   );
