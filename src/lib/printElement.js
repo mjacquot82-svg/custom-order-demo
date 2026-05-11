@@ -1,5 +1,7 @@
 export function printElement(element, options = {}) {
   if (typeof window === "undefined" || !element) return;
+  if (!element.isConnected) return;
+  if (!element.textContent?.trim()) return;
 
   const title = options.title || document.title || "Print";
   const printFrame = document.createElement("iframe");
@@ -85,7 +87,10 @@ export function printElement(element, options = {}) {
 
   const printStyles = frameDocument.createElement("style");
   printStyles.textContent = `
-    @page { margin: 10mm; }
+    @page {
+      margin: 10mm;
+      size: auto;
+    }
     html, body {
       margin: 0;
       padding: 0;
@@ -99,6 +104,24 @@ export function printElement(element, options = {}) {
     }
     .print-root {
       padding: 0;
+    }
+    .print-root,
+    .print-root * {
+      box-sizing: border-box;
+      color: #171717 !important;
+      background: #ffffff !important;
+    }
+    .print-avoid-break {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    [data-print-hidden="true"] {
+      display: none !important;
+    }
+    @media print {
+      html, body {
+        background: #ffffff !important;
+      }
     }
   `;
   frameDocument.head.appendChild(printStyles);

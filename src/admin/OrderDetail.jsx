@@ -29,8 +29,28 @@ const cardStyle = {
   boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
 };
 
+const sectionLabelStyle = {
+  margin: 0,
+  color: "#64748b",
+  fontSize: "12px",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+};
+
+const sectionValueStyle = {
+  margin: "4px 0 0",
+  color: "#171717",
+  fontWeight: 700,
+  lineHeight: 1.45,
+};
+
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function buildSizeBreakdownEntries(sizeBreakdown = {}) {
+  return Object.entries(sizeBreakdown).filter(([, quantity]) => Number(quantity) > 0);
 }
 
 export default function OrderDetail() {
@@ -139,7 +159,7 @@ export default function OrderDetail() {
 
   function handlePrintTicket() {
     printElement(printableTicketRef.current, {
-      title: `Production Ticket ${order.order_number || orderNumber}`,
+      title: `Production Sheet ${order.order_number || orderNumber}`,
     });
   }
 
@@ -193,6 +213,8 @@ export default function OrderDetail() {
 
   const placedAt = formatDateTimeParts(order.created_at);
   const updatedAt = formatDateTimeParts(order.updated_at);
+  const sizeBreakdownEntries = buildSizeBreakdownEntries(order.size_breakdown);
+  const printOrder = normalizedOrder || order;
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
@@ -303,7 +325,7 @@ export default function OrderDetail() {
               fontWeight: 700,
             }}
           >
-            Print Ticket
+            Print Production Sheet
           </button>
         </div>
       </div>
@@ -321,11 +343,138 @@ export default function OrderDetail() {
         }}
       >
         <div style={{ display: "grid", gap: "18px" }}>
+          <section style={cardStyle}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "14px",
+                flexWrap: "wrap",
+                marginBottom: "18px",
+              }}
+            >
+              <div>
+                <h2 style={{ margin: "0 0 4px" }}>Customer & Order Items</h2>
+                <p style={{ margin: 0, color: "#64748b" }}>
+                  Core intake details for production and fulfillment.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  borderRadius: "999px",
+                  padding: "8px 12px",
+                  background: "#f1f5f9",
+                  color: "#0f172a",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                }}
+              >
+                Qty {order.qty || 0}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "16px",
+                marginBottom: "18px",
+              }}
+            >
+              <div>
+                <p style={sectionLabelStyle}>Customer</p>
+                <p style={sectionValueStyle}>{order.customer_name || "Walk-in Customer"}</p>
+              </div>
+
+              <div>
+                <p style={sectionLabelStyle}>Garment</p>
+                <p style={sectionValueStyle}>{order.garment || order.item || "Custom garment"}</p>
+              </div>
+
+              <div>
+                <p style={sectionLabelStyle}>Placements</p>
+                <p style={sectionValueStyle}>
+                  {Array.isArray(order.placements) && order.placements.length
+                    ? order.placements
+                        .map((placement) => placement?.placement)
+                        .filter(Boolean)
+                        .join(", ")
+                    : order.placement || "—"}
+                </p>
+              </div>
+
+              <div>
+                <p style={sectionLabelStyle}>Assigned</p>
+                <p style={sectionValueStyle}>{order.assigned_to_staff_name || "Unassigned"}</p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderTop: "1px solid #e2e8f0",
+                paddingTop: "18px",
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: "0 0 4px", fontSize: "16px" }}>Size Breakdown</h3>
+                <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
+                  Recorded quantities for the production team.
+                </p>
+              </div>
+
+              {sizeBreakdownEntries.length ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))",
+                    gap: "10px",
+                  }}
+                >
+                  {sizeBreakdownEntries.map(([size, quantity]) => (
+                    <div
+                      key={size}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "14px",
+                        padding: "12px",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <p style={sectionLabelStyle}>{size}</p>
+                      <p style={{ ...sectionValueStyle, fontSize: "18px" }}>{quantity}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ margin: 0, color: "#94a3b8" }}>
+                  No size breakdown recorded for this order yet.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <ProductionInstructionsPanel order={order} />
+
           <AssignmentPanel
             order={order}
             staffUsers={staffUsers}
             onAssign={handleAssign}
             onAdvanceStatus={handleAdvanceStatus}
+          />
+        </div>
+
+        <aside style={{ display: "grid", gap: "18px" }}>
+          <FinancialSummaryPanel
+            order={normalizedOrder}
+            onRecordPayment={handleRecordPayment}
+            onMarkPickedUp={handleMarkPickedUp}
+            onSendDepositRequest={handleSendDepositRequest}
           />
 
           <section style={cardStyle}>
@@ -344,27 +493,32 @@ export default function OrderDetail() {
             )}
           </section>
 
-          <FinancialSummaryPanel
-            order={normalizedOrder}
-            onRecordPayment={handleRecordPayment}
-            onMarkPickedUp={handleMarkPickedUp}
-            onSendDepositRequest={handleSendDepositRequest}
-          />
-
-          <ActivityTimeline
-            events={order.activity_log || []}
-          />
-        </div>
-
-        <aside style={{ display: "grid", gap: "18px" }}>
-          <ProductionInstructionsPanel order={order} />
-
           <ArtworkPreviewPanel
             artwork={order.artwork_files || []}
           />
-
-          <PrintableProductionTicket ref={printableTicketRef} order={order} />
         </aside>
+      </div>
+
+      <div style={{ marginTop: "18px" }}>
+        <ActivityTimeline
+          events={order.activity_log || []}
+        />
+      </div>
+
+      <div
+        aria-hidden="true"
+        data-print-hidden="true"
+        style={{
+          position: "absolute",
+          width: "1024px",
+          maxWidth: "100%",
+          left: "-200vw",
+          top: 0,
+          pointerEvents: "none",
+          opacity: 0,
+        }}
+      >
+        <PrintableProductionTicket ref={printableTicketRef} order={printOrder} />
       </div>
     </div>
   );

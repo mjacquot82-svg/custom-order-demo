@@ -1,150 +1,242 @@
 import { forwardRef } from "react";
 import { normalizeProductionType } from "../constants/productionTypes";
+import { formatShortDate } from "../lib/dateFormatting";
 
-function formatPlacements(order) {
-  if (Array.isArray(order.placements) && order.placements.length) {
-    return order.placements
-      .map((item) => item?.placement)
-      .filter(Boolean)
-      .join(", ");
+function buildOrderItems(order = {}) {
+  if (Array.isArray(order.items) && order.items.length) {
+    return order.items;
   }
 
-  return order.placement || "—";
+  return [
+    {
+      id: order.id || order.order_number || "item-1",
+      garment: order.garment || order.item || "Custom garment",
+      quantity: Number(order.qty || 0),
+      placements: Array.isArray(order.placements) && order.placements.length
+        ? order.placements
+            .map((item) => item?.placement)
+            .filter(Boolean)
+            .join(", ")
+        : order.placement || "",
+      productionType: normalizeProductionType(
+        order.decoration_type ||
+          order.production_type ||
+          "Screen Printing"
+      ),
+      sizeBreakdown: order.size_breakdown || {},
+    },
+  ];
 }
 
-function formatArtworkFilename(order) {
-  const filenames = (order.artwork_files || [])
-    .map((file) => file?.file_name || file?.name || "")
-    .filter(Boolean);
-
-  if (filenames.length) {
-    return filenames.join(", ");
-  }
-
-  return order.customer_artwork_name || "—";
+function buildSizeBreakdownList(sizeBreakdown = {}) {
+  return Object.entries(sizeBreakdown).filter(([, quantity]) => Number(quantity) > 0);
 }
 
-const rowLabelStyle = {
-  color: "#57534e",
+const sectionLabelStyle = {
+  color: "#44403c",
   fontSize: "11px",
   fontWeight: 800,
   letterSpacing: "0.06em",
   textTransform: "uppercase",
 };
 
-const rowValueStyle = {
+const sectionValueStyle = {
   color: "#171717",
   fontSize: "14px",
   fontWeight: 700,
   lineHeight: 1.3,
 };
 
-const noteValueStyle = {
-  ...rowValueStyle,
-  whiteSpace: "pre-wrap",
-  fontWeight: 600,
-};
-
 const PrintableProductionTicket = forwardRef(function PrintableProductionTicket(
   { order = {} },
   ref
 ) {
-  const productionType = normalizeProductionType(
-    order.decoration_type ||
-      order.production_type ||
-      "Screen Printing"
-  );
+  const createdDate = order.created_at ? formatShortDate(order.created_at) : "—";
+  const dueDate = order.due_date ? formatShortDate(order.due_date) : "—";
+  const orderItems = buildOrderItems(order);
 
   return (
     <section
       ref={ref}
+      aria-label="Printable production sheet"
+      className="production-sheet-print-root"
       style={{
         background: "#ffffff",
-        border: "2px dashed #cbd5e1",
-        borderRadius: "20px",
-        padding: "18px",
         color: "#171717",
+        padding: "24px",
+        width: "100%",
+        boxSizing: "border-box",
+        fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}
     >
-      <div style={{ display: "grid", gap: "4px", marginBottom: "14px" }}>
+      <div
+        className="print-avoid-break"
+        style={{
+          display: "grid",
+          gap: "6px",
+          paddingBottom: "18px",
+          marginBottom: "18px",
+          borderBottom: "2px solid #171717",
+        }}
+      >
         <span
           style={{
-            color: "#78716c",
+            color: "#44403c",
             fontSize: "11px",
             fontWeight: 800,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
           }}
         >
-          Printable Production Ticket
+          Production Sheet
         </span>
-        <h2 style={{ margin: 0, fontSize: "22px", lineHeight: 1.1 }}>
-          {order.order_number || "Unnumbered Order"}
-        </h2>
+
+        <h1 style={{ margin: 0, fontSize: "28px", lineHeight: 1.1 }}>
+          Order {order.order_number || "Unnumbered Order"}
+        </h1>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: "12px",
+            marginTop: "8px",
+          }}
+        >
+          <div style={{ display: "grid", gap: "2px" }}>
+            <span style={sectionLabelStyle}>Customer</span>
+            <span style={sectionValueStyle}>{order.customer_name || "Walk-in Customer"}</span>
+          </div>
+
+          <div style={{ display: "grid", gap: "2px" }}>
+            <span style={sectionLabelStyle}>Created Date</span>
+            <span style={sectionValueStyle}>{createdDate}</span>
+          </div>
+
+          <div style={{ display: "grid", gap: "2px" }}>
+            <span style={sectionLabelStyle}>Due Date</span>
+            <span style={sectionValueStyle}>{dueDate}</span>
+          </div>
+        </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gap: "8px",
-        }}
-      >
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Customer</span>
-          <span style={rowValueStyle}>{order.customer_name || "Walk-in Customer"}</span>
-        </div>
-
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Assigned Worker</span>
-          <span style={rowValueStyle}>{order.assigned_to_staff_name || "Unassigned"}</span>
-        </div>
-
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Garment</span>
-          <span style={rowValueStyle}>{order.garment || order.item || "Custom garment"}</span>
-        </div>
-
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Placements</span>
-          <span style={rowValueStyle}>{formatPlacements(order)}</span>
-        </div>
-
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Production Type</span>
-          <span style={rowValueStyle}>{productionType}</span>
-        </div>
-
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Artwork Filename</span>
-          <span style={rowValueStyle}>{formatArtworkFilename(order)}</span>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
-          <div style={{ display: "grid", gap: "2px" }}>
-            <span style={rowLabelStyle}>Quantity</span>
-            <span style={rowValueStyle}>{order.qty || 0}</span>
+      <div style={{ display: "grid", gap: "18px" }}>
+        <section className="print-avoid-break" style={{ display: "grid", gap: "10px" }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "18px" }}>Order Items</h2>
           </div>
 
-          <div style={{ display: "grid", gap: "2px" }}>
-            <span style={rowLabelStyle}>Due Date</span>
-            <span style={rowValueStyle}>{order.due_date || "—"}</span>
+          <div style={{ display: "grid", gap: "12px" }}>
+            {orderItems.map((item, index) => {
+              const sizeBreakdown = buildSizeBreakdownList(item.sizeBreakdown);
+
+              return (
+                <article
+                  key={item.id || `${item.garment}-${index}`}
+                  className="print-avoid-break"
+                  style={{
+                    border: "1px solid #d6d3d1",
+                    borderRadius: "12px",
+                    padding: "14px",
+                    display: "grid",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1.5fr) repeat(2, minmax(0, 1fr))",
+                      gap: "12px",
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: "2px" }}>
+                      <span style={sectionLabelStyle}>Item</span>
+                      <span style={sectionValueStyle}>{item.garment || "Custom garment"}</span>
+                    </div>
+
+                    <div style={{ display: "grid", gap: "2px" }}>
+                      <span style={sectionLabelStyle}>Quantity</span>
+                      <span style={sectionValueStyle}>{Number(item.quantity || 0)}</span>
+                    </div>
+
+                    <div style={{ display: "grid", gap: "2px" }}>
+                      <span style={sectionLabelStyle}>Production Type</span>
+                      <span style={sectionValueStyle}>{item.productionType || "—"}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gap: "2px" }}>
+                    <span style={sectionLabelStyle}>Placements</span>
+                    <span style={sectionValueStyle}>{item.placements || "—"}</span>
+                  </div>
+
+                  <div style={{ display: "grid", gap: "8px" }}>
+                    <span style={sectionLabelStyle}>Sizes</span>
+
+                    {sizeBreakdown.length ? (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))",
+                          gap: "8px",
+                        }}
+                      >
+                        {sizeBreakdown.map(([size, quantity]) => (
+                          <div
+                            key={size}
+                            className="print-avoid-break"
+                            style={{
+                              border: "1px solid #d6d3d1",
+                              borderRadius: "10px",
+                              padding: "8px 10px",
+                              display: "grid",
+                              gap: "2px",
+                            }}
+                          >
+                            <span style={sectionLabelStyle}>{size}</span>
+                            <span style={sectionValueStyle}>{Number(quantity)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={sectionValueStyle}>No size breakdown recorded.</span>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
-        </div>
+        </section>
 
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Approval Status</span>
-          <span style={rowValueStyle}>{order.approval_status || "Not Sent"}</span>
-        </div>
+        <section
+          className="print-avoid-break"
+          style={{
+            display: "grid",
+            gap: "8px",
+            borderTop: "1px solid #d6d3d1",
+            paddingTop: "18px",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: "18px" }}>Production Instructions</h2>
+          </div>
 
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Production Notes</span>
-          <span style={noteValueStyle}>{order.production_notes || "—"}</span>
-        </div>
+          <div style={{ display: "grid", gap: "10px" }}>
+            <div style={{ display: "grid", gap: "2px" }}>
+              <span style={sectionLabelStyle}>Production Notes</span>
+              <span style={{ ...sectionValueStyle, whiteSpace: "pre-wrap", fontWeight: 600 }}>
+                {order.production_notes || "—"}
+              </span>
+            </div>
 
-        <div style={{ display: "grid", gap: "2px" }}>
-          <span style={rowLabelStyle}>Internal Notes</span>
-          <span style={noteValueStyle}>{order.internal_note || "—"}</span>
-        </div>
+            <div style={{ display: "grid", gap: "2px" }}>
+              <span style={sectionLabelStyle}>Internal Notes</span>
+              <span style={{ ...sectionValueStyle, whiteSpace: "pre-wrap", fontWeight: 600 }}>
+                {order.internal_note || "—"}
+              </span>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
   );
