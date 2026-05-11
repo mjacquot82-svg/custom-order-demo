@@ -20,10 +20,27 @@ export const PAYMENT_METHOD_OPTIONS = [
   "Other",
 ];
 
-function normalizeCurrency(value) {
-  const amount = Number(value || 0);
+function parseCurrency(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
 
-  if (!Number.isFinite(amount)) return 0;
+  if (typeof value === "string") {
+    const normalized = value.replace(/[^0-9.-]/g, "");
+
+    if (!normalized) return null;
+
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  return null;
+}
+
+function normalizeCurrency(value) {
+  const amount = parseCurrency(value);
+
+  if (amount === null) return 0;
 
   return Math.round(amount * 100) / 100;
 }
@@ -35,6 +52,115 @@ function normalizeText(value, fallback = "") {
 
 function normalizePaymentMethod(method) {
   return PAYMENT_METHOD_OPTIONS.includes(method) ? method : "Other";
+}
+
+function resolveCurrency(...values) {
+  for (const value of values) {
+    const amount = parseCurrency(value);
+
+    if (amount !== null) {
+      return normalizeCurrency(amount);
+    }
+  }
+
+  return null;
+}
+
+function sumCurrencies(...values) {
+  let total = 0;
+  let hasValue = false;
+
+  values.forEach((value) => {
+    const amount = parseCurrency(value);
+
+    if (amount !== null) {
+      total += amount;
+      hasValue = true;
+    }
+  });
+
+  return hasValue ? normalizeCurrency(total) : null;
+}
+
+function resolveQuoteSubtotal(quote = {}) {
+  const explicitSubtotal = resolveCurrency(
+    quote.subtotal,
+    quote.sub_total
+  );
+
+  if (explicitSubtotal !== null) {
+    return explicitSubtotal;
+  }
+
+  const placementSubtotal = resolveCurrency(quote.placement_subtotal);
+  const productionSubtotal = resolveCurrency(quote.production_subtotal);
+  const productionMethodSubtotal = resolveCurrency(
+    quote.production_method_subtotal,
+    quote.production_charges_subtotal
+  );
+  const additionalFeesSubtotal = resolveCurrency(
+    quote.additional_fees_subtotal,
+    quote.setup_subtotal
+  );
+
+  const resolvedProductionSubtotal =
+    productionSubtotal ??
+    sumCurrencies(productionMethodSubtotal, placementSubtotal);
+
+  return sumCurrencies(
+    quote.garment_subtotal,
+    resolvedProductionSubtotal,
+    additionalFeesSubtotal
+  );
+}
+
+function resolveOrderSubtotal(order = {}) {
+  return (
+    resolveCurrency(
+      order.subtotal,
+      order.sub_total,
+      order.pricing?.subtotal,
+      order.pricing?.sub_total
+    ) ??
+    resolveQuoteSubtotal(order.quote) ??
+    null
+  );
+}
+
+function resolveOrderTaxAmount(order = {}) {
+  return (
+    resolveCurrency(
+      order.tax_amount,
+      order.tax_total,
+      order.tax,
+      order.pricing?.tax_amount,
+      order.pricing?.tax_total,
+      order.pricing?.tax,
+      order.quote?.tax_amount,
+      order.quote?.tax_total,
+      order.quote?.tax
+    ) ?? null
+  );
+}
+
+function resolveOrderTotalAmount(order = {}) {
+  return (
+    resolveCurrency(
+      order.total_amount,
+      order.total,
+      order.order_total,
+      order.grand_total,
+      order.pricing?.total_amount,
+      order.pricing?.total,
+      order.pricing?.order_total,
+      order.pricing?.grand_total,
+      order.quote?.total_amount,
+      order.quote?.total,
+      order.quote?.order_total,
+      order.quote?.grand_total,
+      order.quote?.final_total
+    ) ?? null
+  );
 }
 
 function buildLegacyDepositPayment(order) {
@@ -103,13 +229,38 @@ export function normalizePaymentHistory(history, order = {}) {
 
 export function deriveOrderFinancials(order = {}) {
   const paymentHistory = normalizePaymentHistory(order.payment_history, order);
-  const subtotal = normalizeCurrency(order.subtotal ?? order.quote?.subtotal);
-  const taxAmount = normalizeCurrency(order.tax_amount ?? order.quote?.tax);
-  const fallbackTotal = subtotal + taxAmount;
-  const totalAmount = normalizeCurrency(order.total_amount ?? order.quote?.total ?? fallbackTotal);
+  const resolvedSubtotal = resolveOrderSubtotal(order);
+  const resolvedTaxAmount = resolveOrderTaxAmount(order);
+  const resolvedTotalAmount = resolveOrderTotalAmount(order);
+  const subtotal = normalizeCurrency(
+    resolvedSubtotal ??
+      (resolvedTotalAmount !== null
+        ? normalizeCurrency(resolvedTotalAmount - (resolvedTaxAmount ?? 0))
+        : 0)
+  );
+  const taxAmount = normalizeCurrency(
+    resolvedTaxAmount ??
+      (resolvedTotalAmount !== null && resolvedSubtotal !== null
+        ? Math.max(resolvedTotalAmount - resolvedSubtotal, 0)
+        : 0)
+  );
+  const totalAmount = normalizeCurrency(
+    resolvedTotalAmount ?? subtotal + taxAmount
+  );
   const depositAmount = normalizeCurrency(order.deposit_amount ?? order.deposit?.amount);
-  const totalPaid = normalizeCurrency(
+  const historyPaid = normalizeCurrency(
     paymentHistory.reduce((sum, payment) => sum + normalizeCurrency(payment.amount), 0)
+  );
+  const totalPaid = normalizeCurrency(
+    paymentHistory.length
+      ? historyPaid
+      : resolveCurrency(
+          order.total_paid,
+          order.amount_paid,
+          order.paid_amount,
+          order.pricing?.total_paid,
+          order.pricing?.amount_paid
+        ) ?? historyPaid
   );
   const balanceDue = normalizeCurrency(Math.max(totalAmount - totalPaid, 0));
 
