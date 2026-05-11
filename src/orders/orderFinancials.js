@@ -20,6 +20,33 @@ export const PAYMENT_METHOD_OPTIONS = [
   "Other",
 ];
 
+const SUBTOTAL_KEYS = ["subtotal", "sub_total", "subtotal_amount", "subtotalAmount"];
+const TAX_KEYS = [
+  "tax_amount",
+  "tax_total",
+  "tax",
+  "taxAmount",
+  "taxTotal",
+  "total_tax",
+  "totalTax",
+  "sales_tax",
+  "salesTax",
+];
+const TOTAL_KEYS = [
+  "total_amount",
+  "total",
+  "order_total",
+  "grand_total",
+  "grandTotal",
+  "final_total",
+  "finalTotal",
+  "total_price",
+  "totalPrice",
+  "amount_total",
+  "amountTotal",
+];
+const ORDER_FINANCIAL_WARNING_CACHE = new Set();
+
 function parseCurrency(value) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
@@ -82,157 +109,210 @@ function sumCurrencies(...values) {
   return hasValue ? normalizeCurrency(total) : null;
 }
 
-function buildFinancialSources(order = {}) {
-  const sources = [
-    order,
-    order.pricing,
-    order.quote,
-    order.quote_snapshot,
-    order.quoteSnapshot,
-    order.pricing_summary,
-    order.pricingSummary,
-    order.summary,
-    order.totals,
-    order.quote?.pricing,
-    order.quote?.pricing_summary,
-    order.quote?.pricingSummary,
-    order.quote?.summary,
-    order.quote?.totals,
-    order.quote_snapshot?.pricing,
-    order.quote_snapshot?.pricing_summary,
-    order.quote_snapshot?.pricingSummary,
-    order.quote_snapshot?.summary,
-    order.quote_snapshot?.totals,
-    order.quoteSnapshot?.pricing,
-    order.quoteSnapshot?.pricing_summary,
-    order.quoteSnapshot?.pricingSummary,
-    order.quoteSnapshot?.summary,
-    order.quoteSnapshot?.totals,
-    order.pricing?.summary,
-    order.pricing?.totals,
-  ];
-
-  return sources.filter(Boolean);
+function resolveCurrencyFromKeys(source, keys) {
+  return resolveCurrency(...keys.map((key) => source?.[key]));
 }
 
-function resolveQuoteSubtotal(quote = {}) {
-  const explicitSubtotal = resolveCurrency(
-    quote.subtotal,
-    quote.sub_total,
-    quote.subtotal_amount,
-    quote.subtotalAmount
-  );
-
-  if (explicitSubtotal !== null) {
-    return explicitSubtotal;
+function sumLineAmounts(lines, amountKey) {
+  if (!Array.isArray(lines) || !lines.length) {
+    return null;
   }
 
-  const placementSubtotal = resolveCurrency(quote.placement_subtotal);
-  const productionSubtotal = resolveCurrency(quote.production_subtotal);
+  return sumCurrencies(...lines.map((line) => line?.[amountKey]));
+}
+
+function buildFinancialSources(order = {}, options = {}) {
+  const explicitSources = [];
+  const addSource = (value, label) => {
+    if (!value || typeof value !== "object") return;
+    explicitSources.push({ value, label });
+  };
+
+  (options.additionalSources || []).forEach((entry, index) => {
+    if (entry && typeof entry === "object" && "value" in entry) {
+      addSource(entry.value, entry.label || `additionalSources[${index}]`);
+      return;
+    }
+
+    addSource(entry, `additionalSources[${index}]`);
+  });
+
+  addSource(order, "order");
+  addSource(order.pricing, "order.pricing");
+  addSource(order.quote, "order.quote");
+  addSource(order.quote_snapshot, "order.quote_snapshot");
+  addSource(order.quoteSnapshot, "order.quoteSnapshot");
+  addSource(order.pricing_summary, "order.pricing_summary");
+  addSource(order.pricingSummary, "order.pricingSummary");
+  addSource(order.summary, "order.summary");
+  addSource(order.totals, "order.totals");
+  addSource(order.quote?.pricing, "order.quote.pricing");
+  addSource(order.quote?.pricing_summary, "order.quote.pricing_summary");
+  addSource(order.quote?.pricingSummary, "order.quote.pricingSummary");
+  addSource(order.quote?.summary, "order.quote.summary");
+  addSource(order.quote?.totals, "order.quote.totals");
+  addSource(order.quote_snapshot?.pricing, "order.quote_snapshot.pricing");
+  addSource(order.quote_snapshot?.pricing_summary, "order.quote_snapshot.pricing_summary");
+  addSource(order.quote_snapshot?.pricingSummary, "order.quote_snapshot.pricingSummary");
+  addSource(order.quote_snapshot?.summary, "order.quote_snapshot.summary");
+  addSource(order.quote_snapshot?.totals, "order.quote_snapshot.totals");
+  addSource(order.quoteSnapshot?.pricing, "order.quoteSnapshot.pricing");
+  addSource(order.quoteSnapshot?.pricing_summary, "order.quoteSnapshot.pricing_summary");
+  addSource(order.quoteSnapshot?.pricingSummary, "order.quoteSnapshot.pricingSummary");
+  addSource(order.quoteSnapshot?.summary, "order.quoteSnapshot.summary");
+  addSource(order.quoteSnapshot?.totals, "order.quoteSnapshot.totals");
+  addSource(order.pricing?.summary, "order.pricing.summary");
+  addSource(order.pricing?.totals, "order.pricing.totals");
+
+  return explicitSources;
+}
+
+function buildSourceBreakdown(source = {}) {
+  const placementSubtotal =
+    resolveCurrency(source.placement_subtotal) ??
+    sumLineAmounts(source.placement_lines, "line_total");
+  const productionLineSubtotal = sumLineAmounts(source.production_lines, "line_total");
   const productionMethodSubtotal = resolveCurrency(
-    quote.production_method_subtotal,
-    quote.production_charges_subtotal
+    source.production_method_subtotal,
+    source.production_charges_subtotal
   );
-  const additionalFeesSubtotal = resolveCurrency(
-    quote.additional_fees_subtotal,
-    quote.setup_subtotal
-  );
+  const baseProductionSubtotal = productionMethodSubtotal ?? productionLineSubtotal;
+  const productionSubtotal =
+    resolveCurrency(source.production_subtotal) ??
+    sumCurrencies(baseProductionSubtotal, placementSubtotal);
+  const additionalFeesSubtotal =
+    resolveCurrency(source.additional_fees_subtotal, source.setup_subtotal) ??
+    sumLineAmounts(source.setup_fees, "amount");
 
-  const resolvedProductionSubtotal =
-    productionSubtotal ??
-    sumCurrencies(productionMethodSubtotal, placementSubtotal);
-
-  return sumCurrencies(
-    quote.garment_subtotal,
-    resolvedProductionSubtotal,
-    additionalFeesSubtotal
-  );
+  return {
+    garmentSubtotal: resolveCurrency(source.garment_subtotal),
+    placementSubtotal,
+    productionSubtotal,
+    additionalFeesSubtotal,
+  };
 }
 
-function resolveOrderSubtotal(order = {}) {
-  for (const source of buildFinancialSources(order)) {
-    const explicitSubtotal = resolveCurrency(
-      source.subtotal,
-      source.sub_total,
-      source.subtotal_amount,
-      source.subtotalAmount
-    );
+function collectSourceFinancialCandidates(sourceDescriptor) {
+  const { value: source, label } = sourceDescriptor;
+  const candidates = { subtotal: [], tax: [], total: [] };
+  const pushCandidate = (metric, amount, origin) => {
+    if (amount === null) return;
 
-    if (explicitSubtotal !== null) {
-      return explicitSubtotal;
-    }
+    candidates[metric].push({
+      amount: normalizeCurrency(amount),
+      source: label,
+      origin,
+    });
+  };
 
-    const quoteSubtotal = resolveQuoteSubtotal(source);
+  const explicitSubtotal = resolveCurrencyFromKeys(source, SUBTOTAL_KEYS);
+  const explicitTax = resolveCurrencyFromKeys(source, TAX_KEYS);
+  const explicitTotal = resolveCurrencyFromKeys(source, TOTAL_KEYS);
 
-    if (quoteSubtotal !== null) {
-      return quoteSubtotal;
-    }
-  }
+  pushCandidate("subtotal", explicitSubtotal, "explicit");
+  pushCandidate("tax", explicitTax, "explicit");
+  pushCandidate("total", explicitTotal, "explicit");
 
-  return null;
+  const breakdown = buildSourceBreakdown(source);
+  const computedSubtotal = sumCurrencies(
+    breakdown.garmentSubtotal,
+    breakdown.productionSubtotal,
+    breakdown.additionalFeesSubtotal
+  );
+  const resolvedSubtotal = explicitSubtotal ?? computedSubtotal;
+
+  pushCandidate("subtotal", computedSubtotal, "computed_breakdown");
+  pushCandidate(
+    "total",
+    explicitTotal ?? sumCurrencies(resolvedSubtotal, explicitTax),
+    explicitTotal !== null ? "explicit_or_breakdown" : "computed_subtotal_plus_tax"
+  );
+
+  return candidates;
 }
 
-function resolveOrderTaxAmount(order = {}) {
-  for (const source of buildFinancialSources(order)) {
-    const taxAmount = resolveCurrency(
-      source.tax_amount,
-      source.tax_total,
-      source.tax,
-      source.taxAmount,
-      source.taxTotal,
-      source.total_tax,
-      source.totalTax,
-      source.sales_tax,
-      source.salesTax
-    );
+function chooseBestCandidate(candidates = []) {
+  if (!candidates.length) return null;
 
-    if (taxAmount !== null) {
-      return taxAmount;
-    }
-  }
-
-  return null;
+  return candidates.find((candidate) => candidate.amount > 0) || candidates[0];
 }
 
-function resolveOrderTotalAmount(order = {}) {
-  for (const source of buildFinancialSources(order)) {
-    const explicitTotal = resolveCurrency(
-      source.total_amount,
-      source.total,
-      source.order_total,
-      source.grand_total,
-      source.grandTotal,
-      source.final_total,
-      source.finalTotal,
-      source.total_price,
-      source.totalPrice,
-      source.amount_total,
-      source.amountTotal
-    );
+function buildCandidateConflict(metric, candidates = []) {
+  const uniqueAmounts = [...new Set(candidates.map((candidate) => candidate.amount))];
 
-    if (explicitTotal !== null) {
-      return explicitTotal;
-    }
-
-    const fallbackSubtotal = resolveQuoteSubtotal(source);
-    const fallbackTax = resolveCurrency(
-      source.tax_amount,
-      source.tax_total,
-      source.tax,
-      source.taxAmount,
-      source.taxTotal,
-      source.total_tax,
-      source.totalTax,
-      source.sales_tax,
-      source.salesTax
-    );
-
-    if (fallbackSubtotal !== null || fallbackTax !== null) {
-      return normalizeCurrency((fallbackSubtotal ?? 0) + (fallbackTax ?? 0));
-    }
+  if (uniqueAmounts.length <= 1) {
+    return null;
   }
 
-  return null;
+  return {
+    metric,
+    amounts: uniqueAmounts,
+    candidates: candidates.map((candidate) => ({
+      amount: candidate.amount,
+      source: candidate.source,
+      origin: candidate.origin,
+    })),
+  };
+}
+
+function warnFinancialNormalization(order, diagnostics) {
+  const orderNumber = normalizeText(order?.order_number, "unknown-order");
+  const warningKey = JSON.stringify({
+    orderNumber,
+    unresolved: diagnostics.unresolved,
+    conflicts: diagnostics.conflicts,
+  });
+
+  if (ORDER_FINANCIAL_WARNING_CACHE.has(warningKey)) {
+    return;
+  }
+
+  ORDER_FINANCIAL_WARNING_CACHE.add(warningKey);
+
+  console.warn("[orderFinancials] Financial normalization warning", {
+    orderNumber,
+    unresolved: diagnostics.unresolved,
+    conflicts: diagnostics.conflicts,
+  });
+}
+
+function resolveOrderFinancialCandidates(order = {}, options = {}) {
+  const sources = buildFinancialSources(order, options);
+  const totals = { subtotal: [], tax: [], total: [] };
+
+  sources.forEach((sourceDescriptor) => {
+    const sourceCandidates = collectSourceFinancialCandidates(sourceDescriptor);
+    totals.subtotal.push(...sourceCandidates.subtotal);
+    totals.tax.push(...sourceCandidates.tax);
+    totals.total.push(...sourceCandidates.total);
+  });
+
+  const subtotalCandidate = chooseBestCandidate(totals.subtotal);
+  const taxCandidate = chooseBestCandidate(totals.tax);
+  const totalCandidate = chooseBestCandidate(totals.total);
+  const conflicts = ["subtotal", "tax", "total"]
+    .map((metric) => buildCandidateConflict(metric, totals[metric]))
+    .filter(Boolean);
+
+  const unresolved = [];
+
+  if (!subtotalCandidate && !totalCandidate) {
+    unresolved.push("missing_subtotal_and_total");
+  }
+
+  if (!totalCandidate && subtotalCandidate && !taxCandidate) {
+    unresolved.push("missing_total_with_only_subtotal");
+  }
+
+  if (unresolved.length || conflicts.length) {
+    warnFinancialNormalization(order, { unresolved, conflicts });
+  }
+
+  return {
+    subtotalCandidate,
+    taxCandidate,
+    totalCandidate,
+  };
 }
 
 function buildLegacyDepositPayment(order) {
@@ -299,11 +379,16 @@ export function normalizePaymentHistory(history, order = {}) {
   );
 }
 
-export function deriveOrderFinancials(order = {}) {
+export function deriveOrderFinancials(order = {}, options = {}) {
   const paymentHistory = normalizePaymentHistory(order.payment_history, order);
-  const resolvedSubtotal = resolveOrderSubtotal(order);
-  const resolvedTaxAmount = resolveOrderTaxAmount(order);
-  const resolvedTotalAmount = resolveOrderTotalAmount(order);
+  const {
+    subtotalCandidate,
+    taxCandidate,
+    totalCandidate,
+  } = resolveOrderFinancialCandidates(order, options);
+  const resolvedSubtotal = subtotalCandidate?.amount ?? null;
+  const resolvedTaxAmount = taxCandidate?.amount ?? null;
+  const resolvedTotalAmount = totalCandidate?.amount ?? null;
   const subtotal = normalizeCurrency(
     resolvedSubtotal ??
       (resolvedTotalAmount !== null
@@ -370,9 +455,9 @@ export function deriveOrderFinancials(order = {}) {
   };
 }
 
-export function normalizeOrderFinancials(order = {}) {
+export function normalizeOrderFinancials(order = {}, options = {}) {
   return {
     ...order,
-    ...deriveOrderFinancials(order),
+    ...deriveOrderFinancials(order, options),
   };
 }

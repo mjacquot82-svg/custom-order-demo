@@ -15,7 +15,7 @@ import ArtworkPreviewPanel from "../order-detail/ArtworkPreviewPanel";
 import PrintableProductionTicket from "../order-detail/PrintableProductionTicket";
 import FinancialSummaryPanel from "../order-detail/FinancialSummaryPanel";
 import { buildOrderUrgency } from "../order-detail/buildOrderUrgency";
-import { deriveOrderFinancials } from "../orders/orderFinancials";
+import { deriveOrderFinancials, normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
   getNextOperationalStatus,
   normalizeOperationalStatus,
@@ -57,6 +57,15 @@ export default function OrderDetail() {
     if (!order) return null;
     return generateQuoteSnapshot(order, selectedProduct);
   }, [order, selectedProduct]);
+  const normalizedOrder = useMemo(() => {
+    if (!order) return null;
+
+    return normalizeOrderFinancials(order, {
+      additionalSources: quoteSnapshot
+        ? [{ label: "generatedQuoteSnapshot", value: quoteSnapshot }]
+        : [],
+    });
+  }, [order, quoteSnapshot]);
 
   if (!order) {
     return (
@@ -148,6 +157,10 @@ export default function OrderDetail() {
     const nextFinancials = deriveOrderFinancials({
       ...order,
       payment_history: paymentHistory,
+    }, {
+      additionalSources: quoteSnapshot
+        ? [{ label: "generatedQuoteSnapshot", value: quoteSnapshot }]
+        : [],
     });
     const paymentNote = paymentEntry.note ? ` Note: ${paymentEntry.note}` : "";
     const statusNote =
@@ -165,7 +178,9 @@ export default function OrderDetail() {
   function handleMarkPickedUp() {
     const now = new Date().toISOString();
     const balanceNote =
-      order.balance_due > 0 ? ` Outstanding balance: ${money(order.balance_due)}.` : "";
+      normalizedOrder.balance_due > 0
+        ? ` Outstanding balance: ${money(normalizedOrder.balance_due)}.`
+        : "";
 
     saveOrderUpdates({
       pickup_status: "Picked Up",
@@ -299,7 +314,7 @@ export default function OrderDetail() {
           </section>
 
           <FinancialSummaryPanel
-            order={order}
+            order={normalizedOrder}
             onRecordPayment={handleRecordPayment}
             onMarkPickedUp={handleMarkPickedUp}
           />
