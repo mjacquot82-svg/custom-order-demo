@@ -8,7 +8,8 @@ import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./brows
 const STORAGE_KEY = "teeCoProducts";
 const EMPTY_PRODUCTS = [];
 const productListeners = new Set();
-let cachedProductsRaw = null;
+let cachedProductsStorageRaw = null;
+let cachedProductsSnapshotRaw = null;
 let cachedProductsSnapshot = EMPTY_PRODUCTS;
 let cachedDefaultProductsSnapshot = null;
 
@@ -380,11 +381,18 @@ function cacheProductsSnapshot(products) {
   const normalizedProducts = normalizeStoredProductsCollection(products);
   const normalizedSnapshot = JSON.stringify(normalizedProducts);
 
-  cachedProductsRaw = normalizedSnapshot;
+  if (normalizedSnapshot === cachedProductsSnapshotRaw) {
+    return {
+      normalizedProducts: cachedProductsSnapshot,
+      normalizedSnapshot,
+    };
+  }
+
+  cachedProductsSnapshotRaw = normalizedSnapshot;
   cachedProductsSnapshot = normalizedProducts;
 
   return {
-    normalizedProducts,
+    normalizedProducts: cachedProductsSnapshot,
     normalizedSnapshot,
   };
 }
@@ -394,23 +402,22 @@ export function getStoredProducts() {
 
   try {
     const rawProducts = getRawStorageItem(STORAGE_KEY);
-    const normalizedRawProducts = rawProducts || "";
+    const storageRawProducts = rawProducts || "";
 
-    if (normalizedRawProducts === cachedProductsRaw) {
+    if (storageRawProducts === cachedProductsStorageRaw) {
       return cachedProductsSnapshot;
     }
 
     const parsedProducts = rawProducts ? JSON.parse(rawProducts) : getDefaultProductsSnapshot();
-    const { normalizedProducts, normalizedSnapshot } = cacheProductsSnapshot(parsedProducts);
+    const { normalizedProducts } = cacheProductsSnapshot(parsedProducts);
 
-    if (rawProducts && normalizedRawProducts !== normalizedSnapshot) {
-      setRawStorageItem(STORAGE_KEY, normalizedSnapshot);
-    }
+    cachedProductsStorageRaw = storageRawProducts;
 
     return normalizedProducts;
   } catch (error) {
     console.error("Unable to read Tee & Co products", error);
-    cachedProductsRaw = null;
+    cachedProductsStorageRaw = null;
+    cachedProductsSnapshotRaw = null;
     cachedProductsSnapshot = getDefaultProductsSnapshot();
     return cachedProductsSnapshot;
   }
@@ -420,6 +427,7 @@ export function saveStoredProducts(products) {
   if (!hasBrowserStorage()) return;
 
   const { normalizedSnapshot } = cacheProductsSnapshot(products);
+  cachedProductsStorageRaw = normalizedSnapshot;
   setRawStorageItem(STORAGE_KEY, normalizedSnapshot);
   emitProductsUpdated();
 }
