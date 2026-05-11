@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useMemo } from "react";
+import "./OrderDetail.css";
 import { recordStoredOrderPayment, updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { useStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
@@ -213,7 +214,7 @@ export default function OrderDetail() {
   const sizeBreakdownEntries = buildSizeBreakdownEntries(order.size_breakdown);
   const printOrder = normalizedOrder || order;
   return (
-    <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
+    <div className="order-detail-page" style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div
         style={{
           display: "flex",
@@ -330,14 +331,7 @@ export default function OrderDetail() {
         <ProductionProgressTracker order={order} />
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.1fr) minmax(320px, 0.9fr)",
-          gap: "18px",
-          alignItems: "start",
-        }}
-      >
+      <div className="order-detail-main-grid">
         <div style={{ display: "grid", gap: "18px" }}>
           <section style={cardStyle}>
             <div
@@ -456,13 +450,6 @@ export default function OrderDetail() {
           </section>
 
           <ProductionInstructionsPanel order={order} />
-
-          <AssignmentPanel
-            order={order}
-            staffUsers={staffUsers}
-            onAssign={handleAssign}
-            onAdvanceStatus={handleAdvanceStatus}
-          />
         </div>
 
         <aside style={{ display: "grid", gap: "18px" }}>
@@ -492,9 +479,17 @@ export default function OrderDetail() {
         </aside>
       </div>
 
-      <div style={{ marginTop: "18px" }}>
+      <div className="order-detail-operational-grid">
+        <AssignmentPanel
+          order={order}
+          staffUsers={staffUsers}
+          onAssign={handleAssign}
+          onAdvanceStatus={handleAdvanceStatus}
+        />
+
         <ActivityTimeline
           events={order.activity_log || []}
+          compact
         />
       </div>
     </div>
