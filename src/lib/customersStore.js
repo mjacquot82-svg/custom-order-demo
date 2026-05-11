@@ -1,20 +1,15 @@
+import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
+
 const STORAGE_KEY = "teeCoCustomers";
 
 export function getStoredCustomers() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const rawCustomers = window.localStorage.getItem(STORAGE_KEY);
-    return rawCustomers ? JSON.parse(rawCustomers) : [];
-  } catch (error) {
-    console.error("Unable to read Tee & Co customers", error);
-    return [];
-  }
+  if (!hasBrowserStorage()) return [];
+  return getJsonStorageItem(STORAGE_KEY, []);
 }
 
 export function saveStoredCustomers(customers) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+  if (!hasBrowserStorage()) return;
+  setJsonStorageItem(STORAGE_KEY, customers);
 }
 
 export function createStoredCustomer(customerInput) {

@@ -3,6 +3,7 @@ import {
   PRODUCTION_TYPES,
 } from "../constants/productionTypes";
 import { useSyncExternalStore } from "react";
+import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 
 const STORAGE_KEY = "teeCoProducts";
 const EMPTY_PRODUCTS = [];
@@ -389,10 +390,10 @@ function cacheProductsSnapshot(products) {
 }
 
 export function getStoredProducts() {
-  if (typeof window === "undefined") return getDefaultProductsSnapshot();
+  if (!hasBrowserStorage()) return getDefaultProductsSnapshot();
 
   try {
-    const rawProducts = window.localStorage.getItem(STORAGE_KEY);
+    const rawProducts = getRawStorageItem(STORAGE_KEY);
     const normalizedRawProducts = rawProducts || "";
 
     if (normalizedRawProducts === cachedProductsRaw) {
@@ -403,7 +404,7 @@ export function getStoredProducts() {
     const { normalizedProducts, normalizedSnapshot } = cacheProductsSnapshot(parsedProducts);
 
     if (rawProducts && normalizedRawProducts !== normalizedSnapshot) {
-      window.localStorage.setItem(STORAGE_KEY, normalizedSnapshot);
+      setRawStorageItem(STORAGE_KEY, normalizedSnapshot);
     }
 
     return normalizedProducts;
@@ -416,10 +417,10 @@ export function getStoredProducts() {
 }
 
 export function saveStoredProducts(products) {
-  if (typeof window === "undefined") return;
+  if (!hasBrowserStorage()) return;
 
   const { normalizedSnapshot } = cacheProductsSnapshot(products);
-  window.localStorage.setItem(STORAGE_KEY, normalizedSnapshot);
+  setRawStorageItem(STORAGE_KEY, normalizedSnapshot);
   emitProductsUpdated();
 }
 
@@ -483,6 +484,10 @@ export function createStoredProduct(productInput) {
   const nextProducts = [product, ...products];
   saveStoredProducts(nextProducts);
   return product;
+}
+
+export function getStoredProduct(productId) {
+  return getStoredProducts().find((product) => product.id === productId) || null;
 }
 
 export function updateStoredProduct(productId, updates) {

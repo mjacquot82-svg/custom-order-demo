@@ -1,20 +1,15 @@
+import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
+
 const STORAGE_KEY = "teeCoCustomerArtwork";
 
 export function getAllCustomerArtwork() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const rawArtwork = window.localStorage.getItem(STORAGE_KEY);
-    return rawArtwork ? JSON.parse(rawArtwork) : [];
-  } catch (error) {
-    console.error("Unable to read Tee & Co customer artwork", error);
-    return [];
-  }
+  if (!hasBrowserStorage()) return [];
+  return getJsonStorageItem(STORAGE_KEY, []);
 }
 
 export function saveAllCustomerArtwork(artwork) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(artwork));
+  if (!hasBrowserStorage()) return;
+  setJsonStorageItem(STORAGE_KEY, artwork);
 }
 
 export function getCustomerArtwork(customerId) {

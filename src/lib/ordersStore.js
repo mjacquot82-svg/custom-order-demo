@@ -7,6 +7,7 @@ import {
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
+import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 
 const STORAGE_KEY = "teeCoStaffOrders";
 const orderListeners = new Set();
@@ -107,10 +108,10 @@ function buildSeedOrder(order, index = 0) {
 }
 
 function readStoredOrders() {
-  if (typeof window === "undefined") return [];
+  if (!hasBrowserStorage()) return [];
 
   try {
-    const rawOrders = window.localStorage.getItem(STORAGE_KEY);
+    const rawOrders = getRawStorageItem(STORAGE_KEY);
     const normalizedRawOrders = rawOrders || "";
 
     if (normalizedRawOrders === cachedOrdersRaw) {
@@ -244,7 +245,8 @@ function describeActivityType(updates) {
 }
 
 function stripActivityMeta(updates) {
-  const { activity_note, activity_type, ...cleanUpdates } = updates;
+  const { activity_note: _ACTIVITY_NOTE, activity_type: _ACTIVITY_TYPE, ...cleanUpdates } =
+    updates;
   return cleanUpdates;
 }
 
@@ -253,13 +255,13 @@ export function getStoredOrders() {
 }
 
 export function saveStoredOrders(orders) {
-  if (typeof window === "undefined") return;
+  if (!hasBrowserStorage()) return;
 
   const normalizedOrders = Array.isArray(orders)
     ? orders.map((order) => normalizeStoredOrder(order))
     : [];
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedOrders));
+  setRawStorageItem(STORAGE_KEY, JSON.stringify(normalizedOrders));
   emitOrdersUpdated();
 }
 

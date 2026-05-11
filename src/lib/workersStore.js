@@ -1,3 +1,5 @@
+import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
+
 const STORAGE_KEY = "teeCoWorkers";
 
 export const defaultWorkers = [
@@ -25,20 +27,13 @@ export const defaultWorkers = [
 ];
 
 export function getStoredWorkers() {
-  if (typeof window === "undefined") return defaultWorkers;
-
-  try {
-    const rawWorkers = window.localStorage.getItem(STORAGE_KEY);
-    return rawWorkers ? JSON.parse(rawWorkers) : defaultWorkers;
-  } catch (error) {
-    console.error("Unable to read Tee & Co workers", error);
-    return defaultWorkers;
-  }
+  if (!hasBrowserStorage()) return defaultWorkers;
+  return getJsonStorageItem(STORAGE_KEY, defaultWorkers);
 }
 
 export function saveStoredWorkers(workers) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workers));
+  if (!hasBrowserStorage()) return;
+  setJsonStorageItem(STORAGE_KEY, workers);
 }
 
 export function createStoredWorker(workerInput) {

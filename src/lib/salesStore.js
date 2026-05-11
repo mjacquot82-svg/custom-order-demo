@@ -1,21 +1,16 @@
-const STORAGE_KEY = "teeCoQuickSales";
 import { buildStaffAuditFields } from "./staffUsersStore";
+import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
+
+const STORAGE_KEY = "teeCoQuickSales";
 
 export function getStoredQuickSales() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const rawSales = window.localStorage.getItem(STORAGE_KEY);
-    return rawSales ? JSON.parse(rawSales) : [];
-  } catch (error) {
-    console.error("Unable to read Tee & Co quick sales", error);
-    return [];
-  }
+  if (!hasBrowserStorage()) return [];
+  return getJsonStorageItem(STORAGE_KEY, []);
 }
 
 export function saveStoredQuickSales(sales) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sales));
+  if (!hasBrowserStorage()) return;
+  setJsonStorageItem(STORAGE_KEY, sales);
 }
 
 export function createStoredQuickSale(saleInput) {
@@ -56,4 +51,24 @@ export function createStoredQuickSale(saleInput) {
 
 export function findStoredQuickSale(saleNumber) {
   return getStoredQuickSales().find((sale) => sale.sale_number === saleNumber);
+}
+
+export function updateStoredQuickSale(saleNumber, updates) {
+  const currentSales = getStoredQuickSales();
+  let updatedSale = null;
+
+  const nextSales = currentSales.map((sale) => {
+    if (sale.sale_number !== saleNumber) return sale;
+
+    updatedSale = {
+      ...sale,
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+
+    return updatedSale;
+  });
+
+  saveStoredQuickSales(nextSales);
+  return updatedSale;
 }

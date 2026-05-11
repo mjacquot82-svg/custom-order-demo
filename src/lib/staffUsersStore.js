@@ -1,3 +1,12 @@
+import {
+  getJsonStorageItem,
+  getRawStorageItem,
+  hasBrowserStorage,
+  removeStorageItem,
+  setJsonStorageItem,
+  setRawStorageItem,
+} from "./browserStorage";
+
 const STORAGE_KEY = "teeCoStaffUsers";
 const ACTIVE_STAFF_KEY = "teeCoActiveStaffUser";
 const STAFF_USERS_UPDATED_EVENT = "tee-co-staff-users-updated";
@@ -113,20 +122,20 @@ function emitActiveStaffUpdated() {
 }
 
 export function getStoredStaffUsers() {
-  if (typeof window === "undefined") return DEFAULT_STAFF_USERS;
+  if (!hasBrowserStorage()) return DEFAULT_STAFF_USERS;
 
   try {
-    const rawUsers = window.localStorage.getItem(STORAGE_KEY);
+    const rawUsers = getRawStorageItem(STORAGE_KEY);
     if (rawUsers) {
       const parsedUsers = JSON.parse(rawUsers);
       if (Array.isArray(parsedUsers) && parsedUsers.length > 0) {
         const normalizedUsers = buildPersistedStaffUsers(parsedUsers);
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUsers));
+        setJsonStorageItem(STORAGE_KEY, normalizedUsers);
         return normalizedUsers;
       }
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_STAFF_USERS));
+    setJsonStorageItem(STORAGE_KEY, DEFAULT_STAFF_USERS);
     return DEFAULT_STAFF_USERS;
   } catch (error) {
     console.error("Unable to read Tee & Co staff users", error);
@@ -135,9 +144,9 @@ export function getStoredStaffUsers() {
 }
 
 export function saveStoredStaffUsers(users) {
-  if (typeof window === "undefined") return;
+  if (!hasBrowserStorage()) return;
   const normalizedUsers = buildPersistedStaffUsers(users);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedUsers));
+  setJsonStorageItem(STORAGE_KEY, normalizedUsers);
   emitStaffUsersUpdated();
 }
 
@@ -230,10 +239,10 @@ export function validateStaffPin(pin) {
 }
 
 export function setActiveStaffUser(user) {
-  if (typeof window === "undefined") return;
+  if (!hasBrowserStorage()) return;
   if (!user) {
-    window.localStorage.removeItem(ACTIVE_STAFF_KEY);
-    window.sessionStorage.removeItem(ACTIVE_STAFF_KEY);
+    removeStorageItem(ACTIVE_STAFF_KEY);
+    removeStorageItem(ACTIVE_STAFF_KEY, { storage: "session" });
     emitActiveStaffUpdated();
     return;
   }
@@ -244,7 +253,7 @@ export function setActiveStaffUser(user) {
     role: user.role,
   });
 
-  window.localStorage.setItem(ACTIVE_STAFF_KEY, nextActiveUser);
+  setRawStorageItem(ACTIVE_STAFF_KEY, nextActiveUser);
   emitActiveStaffUpdated();
 }
 
@@ -253,13 +262,12 @@ export function clearActiveStaffSession() {
 }
 
 export function getActiveStaffUser() {
-  if (typeof window === "undefined") return null;
+  if (!hasBrowserStorage()) return null;
 
   try {
-    const rawUser =
-      window.localStorage.getItem(ACTIVE_STAFF_KEY) ||
-      window.sessionStorage.getItem(ACTIVE_STAFF_KEY);
-    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+    const parsedUser =
+      getJsonStorageItem(ACTIVE_STAFF_KEY, null) ||
+      getJsonStorageItem(ACTIVE_STAFF_KEY, null, { storage: "session" });
 
     if (!parsedUser?.id) {
       return null;
