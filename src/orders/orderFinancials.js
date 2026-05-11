@@ -82,10 +82,45 @@ function sumCurrencies(...values) {
   return hasValue ? normalizeCurrency(total) : null;
 }
 
+function buildFinancialSources(order = {}) {
+  const sources = [
+    order,
+    order.pricing,
+    order.quote,
+    order.quote_snapshot,
+    order.quoteSnapshot,
+    order.pricing_summary,
+    order.pricingSummary,
+    order.summary,
+    order.totals,
+    order.quote?.pricing,
+    order.quote?.pricing_summary,
+    order.quote?.pricingSummary,
+    order.quote?.summary,
+    order.quote?.totals,
+    order.quote_snapshot?.pricing,
+    order.quote_snapshot?.pricing_summary,
+    order.quote_snapshot?.pricingSummary,
+    order.quote_snapshot?.summary,
+    order.quote_snapshot?.totals,
+    order.quoteSnapshot?.pricing,
+    order.quoteSnapshot?.pricing_summary,
+    order.quoteSnapshot?.pricingSummary,
+    order.quoteSnapshot?.summary,
+    order.quoteSnapshot?.totals,
+    order.pricing?.summary,
+    order.pricing?.totals,
+  ];
+
+  return sources.filter(Boolean);
+}
+
 function resolveQuoteSubtotal(quote = {}) {
   const explicitSubtotal = resolveCurrency(
     quote.subtotal,
-    quote.sub_total
+    quote.sub_total,
+    quote.subtotal_amount,
+    quote.subtotalAmount
   );
 
   if (explicitSubtotal !== null) {
@@ -115,52 +150,89 @@ function resolveQuoteSubtotal(quote = {}) {
 }
 
 function resolveOrderSubtotal(order = {}) {
-  return (
-    resolveCurrency(
-      order.subtotal,
-      order.sub_total,
-      order.pricing?.subtotal,
-      order.pricing?.sub_total
-    ) ??
-    resolveQuoteSubtotal(order.quote) ??
-    null
-  );
+  for (const source of buildFinancialSources(order)) {
+    const explicitSubtotal = resolveCurrency(
+      source.subtotal,
+      source.sub_total,
+      source.subtotal_amount,
+      source.subtotalAmount
+    );
+
+    if (explicitSubtotal !== null) {
+      return explicitSubtotal;
+    }
+
+    const quoteSubtotal = resolveQuoteSubtotal(source);
+
+    if (quoteSubtotal !== null) {
+      return quoteSubtotal;
+    }
+  }
+
+  return null;
 }
 
 function resolveOrderTaxAmount(order = {}) {
-  return (
-    resolveCurrency(
-      order.tax_amount,
-      order.tax_total,
-      order.tax,
-      order.pricing?.tax_amount,
-      order.pricing?.tax_total,
-      order.pricing?.tax,
-      order.quote?.tax_amount,
-      order.quote?.tax_total,
-      order.quote?.tax
-    ) ?? null
-  );
+  for (const source of buildFinancialSources(order)) {
+    const taxAmount = resolveCurrency(
+      source.tax_amount,
+      source.tax_total,
+      source.tax,
+      source.taxAmount,
+      source.taxTotal,
+      source.total_tax,
+      source.totalTax,
+      source.sales_tax,
+      source.salesTax
+    );
+
+    if (taxAmount !== null) {
+      return taxAmount;
+    }
+  }
+
+  return null;
 }
 
 function resolveOrderTotalAmount(order = {}) {
-  return (
-    resolveCurrency(
-      order.total_amount,
-      order.total,
-      order.order_total,
-      order.grand_total,
-      order.pricing?.total_amount,
-      order.pricing?.total,
-      order.pricing?.order_total,
-      order.pricing?.grand_total,
-      order.quote?.total_amount,
-      order.quote?.total,
-      order.quote?.order_total,
-      order.quote?.grand_total,
-      order.quote?.final_total
-    ) ?? null
-  );
+  for (const source of buildFinancialSources(order)) {
+    const explicitTotal = resolveCurrency(
+      source.total_amount,
+      source.total,
+      source.order_total,
+      source.grand_total,
+      source.grandTotal,
+      source.final_total,
+      source.finalTotal,
+      source.total_price,
+      source.totalPrice,
+      source.amount_total,
+      source.amountTotal
+    );
+
+    if (explicitTotal !== null) {
+      return explicitTotal;
+    }
+
+    const fallbackSubtotal = resolveQuoteSubtotal(source);
+    const fallbackTax = resolveCurrency(
+      source.tax_amount,
+      source.tax_total,
+      source.tax,
+      source.taxAmount,
+      source.taxTotal,
+      source.total_tax,
+      source.totalTax,
+      source.sales_tax,
+      source.salesTax
+    );
+
+    if (fallbackSubtotal !== null || fallbackTax !== null) {
+      return normalizeCurrency((fallbackSubtotal ?? 0) + (fallbackTax ?? 0));
+    }
+  }
+
+  return null;
 }
 
 function buildLegacyDepositPayment(order) {
