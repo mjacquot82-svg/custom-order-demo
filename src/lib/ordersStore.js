@@ -10,6 +10,7 @@ import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import { validatePaymentAmount } from "./financialValidation";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
+import { formatShortDate, toIsoTimestamp } from "./dateFormatting";
 
 const STORAGE_KEY = "teeCoStaffOrders";
 const orderListeners = new Set();
@@ -45,6 +46,78 @@ function normalizePlacements(order = {}) {
   return [];
 }
 
+function resolveFirstTimestamp(candidates = [], fallbackTimestamp = new Date().toISOString()) {
+  for (const candidate of candidates) {
+    const resolvedValue = toIsoTimestamp(candidate);
+    if (resolvedValue) return resolvedValue;
+  }
+
+  return fallbackTimestamp;
+}
+
+function resolveLatestTimestamp(candidates = [], fallbackTimestamp = new Date().toISOString()) {
+  const timestamps = candidates
+    .map((candidate) => toIsoTimestamp(candidate))
+    .filter(Boolean);
+
+  if (!timestamps.length) {
+    return fallbackTimestamp;
+  }
+
+  return timestamps.sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0];
+}
+
+function normalizeOrderTimestamps(order = {}) {
+  const fallbackTimestamp = new Date().toISOString();
+  const paymentTimestamps = Array.isArray(order.payment_history)
+    ? order.payment_history.flatMap((payment) => [
+        payment?.timestamp,
+        payment?.created_at,
+        payment?.recorded_at,
+      ])
+    : [];
+  const activityTimestamps = Array.isArray(order.activity_log)
+    ? order.activity_log.map((event) => event?.created_at)
+    : [];
+  const createdAt = resolveFirstTimestamp(
+    [
+      order.created_at,
+      order.date,
+      order.submitted_at,
+      order.approval_sent_at,
+      order.approved_at,
+      order.customer_approved_at,
+      order.production_started_at,
+      ...activityTimestamps,
+      ...paymentTimestamps,
+      order.updated_at,
+    ],
+    fallbackTimestamp
+  );
+  const updatedAt = resolveLatestTimestamp(
+    [
+      order.updated_at,
+      order.completed_at,
+      order.picked_up_at,
+      order.production_started_at,
+      order.approved_at,
+      order.customer_approved_at,
+      order.customer_revision_requested_at,
+      order.revision_requested_at,
+      order.approval_sent_at,
+      ...activityTimestamps,
+      ...paymentTimestamps,
+      createdAt,
+    ],
+    createdAt
+  );
+
+  return {
+    created_at: createdAt,
+    updated_at: updatedAt,
+  };
+}
+
 function normalizeStoredOrder(order = {}) {
   const assignedToStaffId = order.assigned_to_staff_id || "";
   const assignedToStaffName = order.assigned_to_staff_name || "";
@@ -54,9 +127,12 @@ function normalizeStoredOrder(order = {}) {
   const placements = normalizePlacements(order);
   const primaryPlacement = placements[0] || null;
   const primaryArtwork = artworkFiles[0] || null;
+  const timestamps = normalizeOrderTimestamps(order);
 
   return normalizeOrderFinancials({
     ...order,
+    ...timestamps,
+    date: order.date || formatShortDate(timestamps.created_at),
     status,
     placements,
     artwork_files: artworkFiles,
@@ -107,8 +183,9 @@ function buildSeedOrder(order, index = 0) {
     qty: Number(order.qty || 0),
     due_date: order.due_date || "",
     source: order.source || "Demo Seed",
-    date: order.date || new Date(createdAt).toLocaleDateString(),
+    date: order.date || formatShortDate(order.created_at || createdAt),
     created_at: order.created_at || createdAt,
+    updated_at: order.updated_at || order.created_at || createdAt,
     activity_log: order.activity_log || [],
   });
 }
@@ -336,8 +413,9 @@ export function createStoredOrder(orderInput) {
     ...createdAuditFields,
     order_number: orderNumber,
     status: normalizeOperationalStatus(orderInput.status || "New"),
-    date: new Date(createdAt).toLocaleDateString(),
+    date: formatShortDate(createdAt),
     created_at: createdAt,
+    updated_at: createdAt,
     source: orderInput.source || "Staff Entry",
     activity_log: [
       buildActivityEvent(
@@ -373,6 +451,7 @@ export function updateStoredOrder(orderNumber, updates) {
       ...order,
       ...cleanUpdates,
       ...buildStaffAuditFields("updated"),
+      created_at: order.created_at,
       updated_at: now,
       activity_log: [
         buildActivityEvent(

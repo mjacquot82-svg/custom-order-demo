@@ -1,17 +1,4 @@
-function formatTimestamp(value) {
-  if (!value) return "";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatDateTime } from "../lib/dateFormatting";
 
 export default function ArtworkPreviewPanel({ artwork = [] }) {
   return (
@@ -84,7 +71,7 @@ export default function ArtworkPreviewPanel({ artwork = [] }) {
 
                 <span>
                   Uploaded:
-                  {formatTimestamp(file.uploaded_at)}
+                  {formatDateTime(file.uploaded_at)}
                 </span>
 
                 <span>

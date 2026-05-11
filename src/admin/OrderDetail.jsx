@@ -16,6 +16,7 @@ import PrintableProductionTicket from "../order-detail/PrintableProductionTicket
 import FinancialSummaryPanel from "../order-detail/FinancialSummaryPanel";
 import { buildOrderUrgency } from "../order-detail/buildOrderUrgency";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
+import { formatDateTimeParts } from "../lib/dateFormatting";
 import {
   getNextOperationalStatus,
   normalizeOperationalStatus,
@@ -84,7 +85,6 @@ export default function OrderDetail() {
     const updated = updateStoredOrder(orderNumber, {
       updated_by_staff_name: activeStaff?.name || "Unknown Staff",
       updated_by_staff_role: activeStaff?.role || "",
-      updated_at: new Date().toISOString(),
       ...updates,
     });
 
@@ -172,6 +172,28 @@ export default function OrderDetail() {
     });
   }
 
+  function handleSendDepositRequest(requestDetails = {}) {
+    const now = new Date().toISOString();
+
+    saveOrderUpdates({
+      deposit: {
+        ...(order.deposit || {}),
+        amount: normalizedOrder.deposit_amount,
+        status: "pending",
+        requested_at: now,
+        updated_at: now,
+        request_channel: requestDetails.channel || "",
+        last_requested_subject: requestDetails.subject || "",
+        last_requested_message: requestDetails.body || "",
+      },
+      activity_type: "deposit_request",
+      activity_note: `Deposit request prepared via ${requestDetails.channel || "manual workflow"}.`,
+    });
+  }
+
+  const placedAt = formatDateTimeParts(order.created_at);
+  const updatedAt = formatDateTimeParts(order.updated_at);
+
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div
@@ -220,6 +242,37 @@ export default function OrderDetail() {
             >
               {urgency.label}
             </span>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gap: "8px",
+              marginTop: "14px",
+              padding: "14px 16px",
+              borderRadius: "16px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              maxWidth: "420px",
+            }}
+          >
+            <div>
+              <p style={{ margin: 0, color: "#64748b", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Placed
+              </p>
+              <p style={{ margin: "4px 0 0", color: "#171717", fontWeight: 700 }}>
+                {placedAt.date} — {placedAt.time}
+              </p>
+            </div>
+
+            <div>
+              <p style={{ margin: 0, color: "#64748b", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Last Updated
+              </p>
+              <p style={{ margin: "4px 0 0", color: "#171717", fontWeight: 700 }}>
+                {updatedAt.date} — {updatedAt.time}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -295,6 +348,7 @@ export default function OrderDetail() {
             order={normalizedOrder}
             onRecordPayment={handleRecordPayment}
             onMarkPickedUp={handleMarkPickedUp}
+            onSendDepositRequest={handleSendDepositRequest}
           />
 
           <ActivityTimeline

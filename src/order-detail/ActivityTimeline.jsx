@@ -1,17 +1,4 @@
-function formatTimestamp(value) {
-  if (!value) return "";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "";
-
-  return date.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatDateTime } from "../lib/dateFormatting";
 
 export default function ActivityTimeline({ events = [] }) {
   return (
@@ -59,7 +46,7 @@ export default function ActivityTimeline({ events = [] }) {
                   : ""}
 
                 {event.created_at
-                  ? ` • ${formatTimestamp(event.created_at)}`
+                  ? ` • ${formatDateTime(event.created_at)}`
                   : ""}
               </div>
             </article>

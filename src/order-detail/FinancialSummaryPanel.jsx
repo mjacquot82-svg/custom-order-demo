@@ -1,24 +1,15 @@
 import { useState } from "react";
 import { validatePaymentAmount } from "../lib/financialValidation";
+import { formatDateTime, formatShortDate } from "../lib/dateFormatting";
 import { PAYMENT_METHOD_OPTIONS } from "../orders/orderFinancials";
+import {
+  buildDepositRequestContent,
+  buildDepositRequestMailto,
+} from "../orders/depositRequests";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
-}
-
-function formatTimestamp(value) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 function getPickupStatusStyle(status) {
@@ -67,17 +58,22 @@ export default function FinancialSummaryPanel({
   order,
   onRecordPayment,
   onMarkPickedUp,
+  onSendDepositRequest,
 }) {
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+  const [depositRequestOpen, setDepositRequestOpen] = useState(false);
+  const [depositRequestStatus, setDepositRequestStatus] = useState("");
   const [amount, setAmount] = useState(order.balance_due > 0 ? String(order.balance_due) : "");
   const [method, setMethod] = useState(PAYMENT_METHOD_OPTIONS[0]);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const depositRequest = buildDepositRequestContent(order);
   const paymentValidation = validatePaymentAmount({
     amount,
     remainingBalance: order.balance_due,
   });
   const paymentError = error || (!paymentValidation.valid ? paymentValidation.message : "");
+  const canSendDepositRequest = Number(order.deposit_amount || 0) > 0 || Number(order.balance_due || 0) > 0;
 
   const canMarkPickedUp =
     order.pickup_status !== "Picked Up" &&
@@ -99,6 +95,11 @@ export default function FinancialSummaryPanel({
     } else {
       resetPaymentForm("");
     }
+  }
+
+  function handleToggleDepositRequest() {
+    setDepositRequestOpen((current) => !current);
+    setDepositRequestStatus("");
   }
 
   function handleSubmit(event) {
@@ -132,6 +133,38 @@ export default function FinancialSummaryPanel({
 
     setPaymentFormOpen(false);
     resetPaymentForm("");
+  }
+
+  async function handleCopyDepositRequest() {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(depositRequest.fullMessage);
+      } else {
+        throw new Error("Clipboard unavailable");
+      }
+
+      onSendDepositRequest?.({
+        channel: "clipboard",
+        subject: depositRequest.subject,
+        body: depositRequest.body,
+      });
+      setDepositRequestStatus("Deposit request copied to clipboard.");
+    } catch (copyError) {
+      setDepositRequestStatus("Clipboard unavailable. Use the email draft action instead.");
+    }
+  }
+
+  function handleOpenEmailDraft() {
+    if (typeof window !== "undefined") {
+      window.location.href = buildDepositRequestMailto(order);
+    }
+
+    onSendDepositRequest?.({
+      channel: "mailto",
+      subject: depositRequest.subject,
+      body: depositRequest.body,
+    });
+    setDepositRequestStatus("Email draft opened with the deposit request.");
   }
 
   return (
@@ -172,6 +205,23 @@ export default function FinancialSummaryPanel({
             }}
           >
             Record Payment
+          </button>
+
+          <button
+            type="button"
+            disabled={!canSendDepositRequest}
+            onClick={handleToggleDepositRequest}
+            style={{
+              border: "1px solid #cbd5e1",
+              background: "#ffffff",
+              borderRadius: "12px",
+              padding: "11px 14px",
+              fontWeight: 700,
+              cursor: canSendDepositRequest ? "pointer" : "not-allowed",
+              opacity: canSendDepositRequest ? 1 : 0.6,
+            }}
+          >
+            Send Deposit Request
           </button>
 
           <button
@@ -250,6 +300,13 @@ export default function FinancialSummaryPanel({
         <div style={{ display: "grid", gap: "6px" }}>
           <span style={rowLabelStyle}>Pickup Status</span>
           <span style={getPickupStatusStyle(order.pickup_status)}>{order.pickup_status}</span>
+        </div>
+
+        <div style={{ display: "grid", gap: "6px" }}>
+          <span style={rowLabelStyle}>Due Date</span>
+          <span style={{ color: "#334155", fontWeight: 700 }}>
+            {order.due_date ? formatShortDate(order.due_date) : "—"}
+          </span>
         </div>
       </div>
 
@@ -355,6 +412,107 @@ export default function FinancialSummaryPanel({
         </form>
       ) : null}
 
+      {depositRequestOpen ? (
+        <div
+          style={{
+            borderTop: "1px solid #e2e8f0",
+            marginTop: paymentFormOpen ? "0" : "18px",
+            paddingTop: "18px",
+            display: "grid",
+            gap: "14px",
+          }}
+        >
+          <div>
+            <h3 style={{ margin: "0 0 4px", fontSize: "16px" }}>Deposit Request</h3>
+            <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
+              Generate a customer-facing deposit request without payment gateway integration.
+            </p>
+          </div>
+
+          <div
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: "14px",
+              padding: "14px",
+              background: "#f8fafc",
+              display: "grid",
+              gap: "10px",
+            }}
+          >
+            <div>
+              <span style={rowLabelStyle}>Subject</span>
+              <p style={{ margin: "4px 0 0", color: "#171717", fontWeight: 700 }}>
+                {depositRequest.subject}
+              </p>
+            </div>
+
+            <div>
+              <span style={rowLabelStyle}>Message</span>
+              <pre
+                style={{
+                  margin: "6px 0 0",
+                  whiteSpace: "pre-wrap",
+                  fontFamily: "inherit",
+                  color: "#334155",
+                  lineHeight: 1.5,
+                }}
+              >
+                {depositRequest.body}
+              </pre>
+            </div>
+          </div>
+
+          {depositRequestStatus ? (
+            <p style={{ margin: 0, color: "#166534", fontWeight: 700 }}>{depositRequestStatus}</p>
+          ) : null}
+
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleCopyDepositRequest}
+              style={{
+                background: "#171717",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                fontWeight: 700,
+              }}
+            >
+              Copy Message
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenEmailDraft}
+              style={{
+                border: "1px solid #cbd5e1",
+                background: "#ffffff",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                fontWeight: 700,
+              }}
+            >
+              Open Email Draft
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleDepositRequest}
+              style={{
+                border: "1px solid #cbd5e1",
+                background: "#ffffff",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                fontWeight: 700,
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div
         style={{
           borderTop: "1px solid #e2e8f0",
@@ -400,7 +558,7 @@ export default function FinancialSummaryPanel({
                 </div>
 
                 <div style={{ marginTop: "4px", color: "#64748b", fontSize: "13px" }}>
-                  {payment.staff_member} • {formatTimestamp(payment.timestamp)}
+                  {payment.staff_member} • {formatDateTime(payment.timestamp)}
                 </div>
 
                 {payment.note ? (

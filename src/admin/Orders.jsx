@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { normalizeProductionType } from "../constants/productionTypes";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
+import { formatShortDate } from "../lib/dateFormatting";
 import StatusBadge from "../components/StatusBadge";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import {
@@ -207,7 +208,8 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Garment</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Production Type</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Assigned Worker</th>
-            <th style={{ padding: "12px 8px", textAlign: "left" }}>Due / Created</th>
+            <th style={{ padding: "12px 8px", textAlign: "left", minWidth: "120px" }}>Created</th>
+            <th style={{ padding: "12px 8px", textAlign: "left", minWidth: "120px" }}>Due Date</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Payment</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Status</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Action</th>
@@ -253,8 +255,12 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
                 </span>
               </td>
 
-              <td style={{ padding: "14px 8px", color: "#57534e" }}>
-                {order.due_date || (order.created_at ? new Date(order.created_at).toLocaleDateString() : "—")}
+              <td style={{ padding: "14px 8px", color: "#57534e", whiteSpace: "nowrap" }}>
+                {formatShortDate(order.created_at)}
+              </td>
+
+              <td style={{ padding: "14px 8px", color: "#57534e", whiteSpace: "nowrap" }}>
+                {order.due_date ? formatShortDate(order.due_date) : "—"}
               </td>
 
               <td style={{ padding: "14px 8px" }}>
@@ -305,7 +311,7 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
           {orders.length === 0 ? (
             <tr>
               <td
-                colSpan="9"
+                colSpan="10"
                 style={{
                   padding: "24px 8px",
                   textAlign: "center",

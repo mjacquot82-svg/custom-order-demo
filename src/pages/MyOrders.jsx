@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
+import { formatDateTime } from "../lib/dateFormatting";
 
 export default function MyOrders() {
   const location = useLocation();
@@ -15,7 +16,7 @@ export default function MyOrders() {
       quantity: latestOrder?.quantity || 3,
       placement: latestOrder?.placement || "Sleeve",
       artworkName: latestOrder?.artworkName || "No artwork uploaded",
-      submittedAt: "Today",
+      created_at: latestOrder?.created_at || new Date().toISOString(),
     },
     {
       id: "TEE-1038",
@@ -26,7 +27,7 @@ export default function MyOrders() {
       quantity: 12,
       placement: "Left Chest",
       artworkName: "team-logo-final.png",
-      submittedAt: "2 days ago",
+      created_at: "2026-05-09T16:30:00.000Z",
     },
     {
       id: "TEE-1031",
@@ -37,7 +38,7 @@ export default function MyOrders() {
       quantity: 24,
       placement: "Front Panel",
       artworkName: "hat-patch-artwork.pdf",
-      submittedAt: "5 days ago",
+      created_at: "2026-05-06T13:05:00.000Z",
     },
   ];
 
@@ -148,7 +149,7 @@ export default function MyOrders() {
                     fontSize: "14px",
                   }}
                 >
-                  Submitted {order.submittedAt}
+                  Placed {formatDateTime(order.created_at)}
                 </p>
               </div>
 

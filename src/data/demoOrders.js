@@ -10,6 +10,8 @@ export const demoOrders = [
     tax_amount: 42.12,
     total_amount: 366.12,
     deposit_amount: 120,
+    created_at: "2026-05-06T14:42:00.000Z",
+    updated_at: "2026-05-06T14:42:00.000Z",
     pickup_status: "Pending",
   },
   {
@@ -23,6 +25,8 @@ export const demoOrders = [
     tax_amount: 156,
     total_amount: 1356,
     deposit_amount: 300,
+    created_at: "2026-05-07T15:10:00.000Z",
+    updated_at: "2026-05-08T15:30:00.000Z",
     payment_history: [
       {
         id: "payment-tc-1002-deposit",
@@ -46,6 +50,8 @@ export const demoOrders = [
     tax_amount: 70.2,
     total_amount: 610.2,
     deposit_amount: 200,
+    created_at: "2026-05-07T12:15:00.000Z",
+    updated_at: "2026-05-09T18:05:00.000Z",
     payment_history: [
       {
         id: "payment-tc-1003-deposit",
