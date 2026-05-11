@@ -1,5 +1,6 @@
 import { normalizeProductionType } from "../../constants/productionTypes";
 import { formatShortDate } from "../../lib/dateFormatting";
+import { getArtworkDisplayName, getOrderArtworkFiles } from "../../lib/orderArtwork";
 
 function normalizeText(value, fallback = "—") {
   if (typeof value === "string") {
@@ -103,6 +104,7 @@ export default function ProductionPrintSheet({ order = {} }) {
   const dueDate = order.due_date ? formatShortDate(order.due_date) : "—";
   const orderItems = buildOrderItems(order);
   const instructionSections = buildInstructionSections(order);
+  const artworkFiles = getOrderArtworkFiles(order);
 
   return (
     <section
@@ -242,7 +244,7 @@ export default function ProductionPrintSheet({ order = {} }) {
       <section className="print-avoid-break">
         <h2 style={{ margin: "0 0 12px", fontSize: "18px" }}>Production Instructions</h2>
 
-        {instructionSections.length ? (
+        {instructionSections.length || artworkFiles.length ? (
           <div style={{ display: "grid", gap: "12px" }}>
             {instructionSections.map((entry) => (
               <div key={entry.label}>
@@ -250,6 +252,30 @@ export default function ProductionPrintSheet({ order = {} }) {
                 <p style={{ ...sectionValueStyle, whiteSpace: "pre-wrap" }}>{entry.value}</p>
               </div>
             ))}
+
+            <div>
+              <p style={sectionLabelStyle}>Artwork Files</p>
+              {artworkFiles.length ? (
+                <div style={{ display: "grid", gap: "6px", marginTop: "6px" }}>
+                  {artworkFiles.map((file, index) => (
+                    <p
+                      key={file.id || `${getArtworkDisplayName(file)}-${index}`}
+                      style={{
+                        ...sectionValueStyle,
+                        margin: 0,
+                        padding: "8px 10px",
+                        border: "1px solid #d4d4d4",
+                        background: "#fafafa",
+                      }}
+                    >
+                      {getArtworkDisplayName(file)}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p style={sectionValueStyle}>No artwork files recorded.</p>
+              )}
+            </div>
           </div>
         ) : (
           <p style={sectionValueStyle}>No production instructions recorded.</p>

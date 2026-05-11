@@ -367,9 +367,13 @@ export default function NewOrder() {
           {
             id: savedArtwork.id,
             name: savedArtwork.name,
+            display_name: savedArtwork.display_name || savedArtwork.name,
             file_name: savedArtwork.file_name,
+            original_filename: savedArtwork.original_filename || savedArtwork.file_name,
             type: savedArtwork.file_type,
+            file_type: savedArtwork.file_type,
             size: savedArtwork.file_size,
+            file_size: savedArtwork.file_size,
             preview: savedArtwork.preview,
             placement_hint: savedArtwork.placement_hint,
             uploaded_at: savedArtwork.created_at,

@@ -1,4 +1,6 @@
 import { normalizeProductionType } from "../constants/productionTypes";
+import ArtworkFilesSummary from "../components/ArtworkFilesSummary";
+import { getOrderArtworkFiles } from "../lib/orderArtwork";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -36,6 +38,7 @@ export default function ProductionInstructionsPanel({ order = {} }) {
       order.production_type ||
       "Screen Printing"
   );
+  const artworkFiles = getOrderArtworkFiles(order);
 
   return (
     <section
@@ -122,6 +125,16 @@ export default function ProductionInstructionsPanel({ order = {} }) {
             {order.internal_note || "—"}
           </span>
         </div>
+      </div>
+
+      <div style={{ marginTop: "16px" }}>
+        <ArtworkFilesSummary
+          artwork={artworkFiles}
+          title="Artwork Files"
+          subtitle="Files the production team should pull for this job."
+          emptyMessage="No artwork files recorded for production yet."
+          compact
+        />
       </div>
     </section>
   );

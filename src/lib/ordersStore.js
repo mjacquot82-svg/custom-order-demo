@@ -11,6 +11,7 @@ import { validatePaymentAmount } from "./financialValidation";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 import { formatShortDate, toIsoTimestamp } from "./dateFormatting";
+import { getArtworkDisplayName, getOrderArtworkFiles } from "./orderArtwork";
 
 const STORAGE_KEY = "teeCoStaffOrders";
 const orderListeners = new Set();
@@ -21,10 +22,6 @@ let cachedOrdersSnapshot = EMPTY_ORDERS;
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
-}
-
-function normalizeArtworkFiles(files) {
-  return Array.isArray(files) ? files.filter(Boolean) : [];
 }
 
 function normalizePlacements(order = {}) {
@@ -123,7 +120,7 @@ function normalizeStoredOrder(order = {}) {
   const assignedToStaffName = order.assigned_to_staff_name || "";
   const hasAssignedStaff = Boolean(assignedToStaffId);
   const status = normalizeOperationalStatus(order.status || "New");
-  const artworkFiles = normalizeArtworkFiles(order.artwork_files);
+  const artworkFiles = getOrderArtworkFiles(order);
   const placements = normalizePlacements(order);
   const primaryPlacement = placements[0] || null;
   const primaryArtwork = artworkFiles[0] || null;
@@ -136,6 +133,7 @@ function normalizeStoredOrder(order = {}) {
     status,
     placements,
     artwork_files: artworkFiles,
+    artwork_reference_names: artworkFiles.map((file) => getArtworkDisplayName(file)),
     placement: order.placement || primaryPlacement?.placement || "",
     decoration_type: normalizeProductionType(
       order.decoration_type || order.production_type || ""
@@ -144,7 +142,7 @@ function normalizeStoredOrder(order = {}) {
       order.customer_artwork_id || primaryArtwork?.id || primaryPlacement?.artwork_id || "",
     customer_artwork_name:
       order.customer_artwork_name ||
-      primaryArtwork?.name ||
+      getArtworkDisplayName(primaryArtwork) ||
       primaryPlacement?.artwork_name ||
       "",
     assigned_to_staff_id: assignedToStaffId,

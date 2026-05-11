@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { findStoredOrder } from "../lib/ordersStore";
 import StatusBadge from "../components/StatusBadge";
+import { getArtworkDisplayName, getOrderArtworkFiles } from "../lib/orderArtwork";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -40,7 +41,7 @@ export default function WorkOrder() {
         },
       ].filter((item) => item.placement || item.decoration_type || item.artwork_name);
 
-  const artworkFiles = order.artwork_files || [];
+  const artworkFiles = getOrderArtworkFiles(order);
   const quote = order.quote;
 
   return (
@@ -239,6 +240,29 @@ export default function WorkOrder() {
         >
           <h2 style={{ marginTop: 0 }}>Production Notes / Checklist</h2>
           <p><strong>Customer Notes:</strong> {label(order.notes)}</p>
+          <div style={{ marginTop: "14px" }}>
+            <p><strong>Artwork Files:</strong></p>
+            {artworkFiles.length ? (
+              <div style={{ display: "grid", gap: "8px" }}>
+                {artworkFiles.map((file, index) => (
+                  <span
+                    key={file.id || `${getArtworkDisplayName(file)}-${index}`}
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "12px",
+                      background: "#f8fafc",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {getArtworkDisplayName(file)}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: "#94a3b8" }}>No artwork files recorded.</p>
+            )}
+          </div>
           <div style={{ display: "grid", gap: "8px", marginTop: "14px" }}>
             <label><input type="checkbox" readOnly /> Product pulled / confirmed</label>
             <label><input type="checkbox" readOnly /> Artwork reviewed</label>

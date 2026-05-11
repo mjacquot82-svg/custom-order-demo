@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { normalizeProductionType } from "../constants/productionTypes";
 import { formatShortDate } from "../lib/dateFormatting";
+import { getArtworkDisplayName, getOrderArtworkFiles } from "../lib/orderArtwork";
 
 function buildOrderItems(order = {}) {
   if (Array.isArray(order.items) && order.items.length) {
@@ -54,6 +55,7 @@ const PrintableProductionTicket = forwardRef(function PrintableProductionTicket(
   const createdDate = order.created_at ? formatShortDate(order.created_at) : "—";
   const dueDate = order.due_date ? formatShortDate(order.due_date) : "—";
   const orderItems = buildOrderItems(order);
+  const artworkFiles = getOrderArtworkFiles(order);
 
   return (
     <section
@@ -234,6 +236,31 @@ const PrintableProductionTicket = forwardRef(function PrintableProductionTicket(
               <span style={{ ...sectionValueStyle, whiteSpace: "pre-wrap", fontWeight: 600 }}>
                 {order.internal_note || "—"}
               </span>
+            </div>
+
+            <div style={{ display: "grid", gap: "8px" }}>
+              <span style={sectionLabelStyle}>Artwork Files</span>
+
+              {artworkFiles.length ? (
+                <div style={{ display: "grid", gap: "6px" }}>
+                  {artworkFiles.map((file, index) => (
+                    <span
+                      key={file.id || `${getArtworkDisplayName(file)}-${index}`}
+                      style={{
+                        ...sectionValueStyle,
+                        margin: 0,
+                        padding: "8px 10px",
+                        border: "1px solid #d6d3d1",
+                        borderRadius: "10px",
+                      }}
+                    >
+                      {getArtworkDisplayName(file)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span style={sectionValueStyle}>No artwork files recorded.</span>
+              )}
             </div>
           </div>
         </section>
