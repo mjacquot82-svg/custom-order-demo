@@ -1,7 +1,14 @@
 import { buildStaffAuditFields } from "./staffUsersStore";
 import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
+import { validatePaymentAmount } from "./financialValidation";
 
 const STORAGE_KEY = "teeCoQuickSales";
+
+function buildPaymentValidationError(validation) {
+  const error = new Error(validation.message || "Invalid payment amount.");
+  error.code = validation.code || "INVALID_AMOUNT";
+  return error;
+}
 
 export function getStoredQuickSales() {
   if (!hasBrowserStorage()) return [];
@@ -17,8 +24,38 @@ export function createStoredQuickSale(saleInput) {
   const currentSales = getStoredQuickSales();
   const createdAt = new Date().toISOString();
   const saleNumber = saleInput.sale_number || `SALE-${Date.now().toString().slice(-6)}`;
-
+  const total = Number(saleInput.total) || 0;
+  const parsedAmountPaid = Number(saleInput.amount_paid);
+  const hasAmountPaidInput =
+    saleInput.amount_paid !== undefined &&
+    saleInput.amount_paid !== null &&
+    saleInput.amount_paid !== "";
+  const amountPaid = Number.isFinite(parsedAmountPaid) ? parsedAmountPaid : 0;
+  const balanceDue = Number(saleInput.balance_due) || 0;
   const staffAudit = buildStaffAuditFields("created");
+
+  if (hasAmountPaidInput && !Number.isFinite(parsedAmountPaid)) {
+    throw buildPaymentValidationError({
+      code: "INVALID_NUMBER",
+      message: "Enter a valid payment amount.",
+    });
+  }
+
+  if (amountPaid > 0) {
+    const validation = validatePaymentAmount({
+      amount: amountPaid,
+      remainingBalance: total,
+    });
+
+    if (!validation.valid) {
+      throw buildPaymentValidationError(validation);
+    }
+  } else if (amountPaid < 0) {
+    throw buildPaymentValidationError({
+      code: "INVALID_AMOUNT",
+      message: "Payment amount must be greater than 0.",
+    });
+  }
 
   const sale = {
     id: `quick-sale-${Date.now()}`,
@@ -33,9 +70,9 @@ export function createStoredQuickSale(saleInput) {
     discount_amount: Number(saleInput.discount_amount) || 0,
     tax_rate: Number(saleInput.tax_rate) || 0,
     tax_total: Number(saleInput.tax_total) || 0,
-    total: Number(saleInput.total) || 0,
-    amount_paid: Number(saleInput.amount_paid) || 0,
-    balance_due: Number(saleInput.balance_due) || 0,
+    total,
+    amount_paid: amountPaid,
+    balance_due: balanceDue,
     notes: saleInput.notes || "",
     square_payment_id: saleInput.square_payment_id || "",
     production_order_numbers: saleInput.production_order_numbers || [],

@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { normalizeProductionType } from "../constants/productionTypes";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
@@ -167,6 +168,11 @@ function tabMatchesOrder(order, activeTab) {
 function matchesSearch(order, searchTerm) {
   if (!searchTerm) return true;
   return getOrderSearchText(order).includes(normalizeLookup(searchTerm));
+}
+
+function matchesCustomer(order, customerFilter) {
+  if (!customerFilter) return true;
+  return normalizeLookup(order.customer_name) === normalizeLookup(customerFilter);
 }
 
 function money(value) {
@@ -342,23 +348,50 @@ export default function Orders() {
   const activeScope = searchParams.get("scope") || "active";
   const activeDateFilter = searchParams.get("date") || "all";
   const searchTerm = searchParams.get("q") || "";
+  const activeCustomerFilter = searchParams.get("customer") || "";
   const customStart = searchParams.get("start") || "";
   const customEnd = searchParams.get("end") || "";
+  const [customerInput, setCustomerInput] = useState(activeCustomerFilter);
+  const [isCustomerMenuOpen, setIsCustomerMenuOpen] = useState(false);
   const hasActiveFilters = (
     activeWorkflowFilter !== "all" ||
     activeScope !== "active" ||
     activeDateFilter !== "all" ||
+    Boolean(activeCustomerFilter) ||
     Boolean(searchTerm) ||
     Boolean(customStart) ||
     Boolean(customEnd)
   );
 
   const orders = sortOrdersByOperationalStatus(useStoredOrders().map(normalizeOrder));
+  const customerOptions = useMemo(() => {
+    const uniqueCustomers = new Map();
+
+    orders.forEach((order) => {
+      const customerName = String(order.customer_name || "").trim();
+      const normalizedCustomerName = normalizeLookup(customerName);
+      if (!normalizedCustomerName || uniqueCustomers.has(normalizedCustomerName)) return;
+      uniqueCustomers.set(normalizedCustomerName, customerName);
+    });
+
+    return Array.from(uniqueCustomers.entries())
+      .map(([normalizedName, name]) => ({ normalizedName, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [orders]);
+  const customerSuggestions = useMemo(() => {
+    const normalizedInput = normalizeLookup(customerInput);
+    if (!normalizedInput) return customerOptions;
+
+    return customerOptions.filter((customer) =>
+      customer.normalizedName.includes(normalizedInput)
+    );
+  }, [customerInput, customerOptions]);
 
   const filteredOrders = orders.filter(
     (order) =>
       tabMatchesOrder(order, activeWorkflowFilter) &&
       matchesDateFilter(order, activeDateFilter, customStart, customEnd) &&
+      matchesCustomer(order, activeCustomerFilter) &&
       matchesSearch(order, searchTerm)
   );
 
@@ -405,7 +438,42 @@ export default function Orders() {
   }
 
   function handleResetFilters() {
+    setCustomerInput("");
+    setIsCustomerMenuOpen(false);
     setSearchParams(new URLSearchParams());
+  }
+
+  function selectCustomerFilter(customerName) {
+    setCustomerInput(customerName);
+    setIsCustomerMenuOpen(false);
+    updateFilters({ customer: customerName });
+  }
+
+  function handleCustomerInputChange(event) {
+    const nextValue = event.target.value;
+    const normalizedNextValue = normalizeLookup(nextValue);
+    const exactMatch = customerOptions.find(
+      (customer) => customer.normalizedName === normalizedNextValue
+    );
+
+    setCustomerInput(nextValue);
+    setIsCustomerMenuOpen(true);
+
+    if (!nextValue.trim()) {
+      updateFilters({ customer: "" });
+      return;
+    }
+
+    if (exactMatch) {
+      updateFilters({ customer: exactMatch.name });
+    }
+  }
+
+  function handleCustomerInputBlur() {
+    window.setTimeout(() => {
+      setIsCustomerMenuOpen(false);
+      setCustomerInput(activeCustomerFilter);
+    }, 120);
   }
 
   return (
@@ -542,6 +610,75 @@ export default function Orders() {
               alignItems: "center",
             }}
           >
+            <div
+              style={{
+                position: "relative",
+                flex: "1 1 240px",
+                minWidth: 0,
+              }}
+            >
+              <input
+                type="search"
+                value={customerInput}
+                onChange={handleCustomerInputChange}
+                onFocus={() => setIsCustomerMenuOpen(true)}
+                onBlur={handleCustomerInputBlur}
+                placeholder="Filter by customer"
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "14px",
+                  padding: "12px 14px",
+                  boxSizing: "border-box",
+                  fontSize: "15px",
+                }}
+              />
+
+              {isCustomerMenuOpen && customerSuggestions.length > 0 ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    left: 0,
+                    right: 0,
+                    zIndex: 20,
+                    background: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    boxShadow: "0 12px 24px rgba(15, 23, 42, 0.12)",
+                    overflow: "hidden",
+                    maxHeight: "240px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {customerSuggestions.slice(0, 8).map((customer) => (
+                    <button
+                      key={customer.normalizedName}
+                      type="button"
+                      onMouseDown={() => selectCustomerFilter(customer.name)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "11px 12px",
+                        background:
+                          normalizeLookup(activeCustomerFilter) === customer.normalizedName
+                            ? "#f8fafc"
+                            : "#ffffff",
+                        border: "none",
+                        borderBottom: "1px solid #f1f5f9",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        color: "#292524",
+                      }}
+                    >
+                      <strong>{customer.name}</strong>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
             <input
               type="search"
               value={searchTerm}

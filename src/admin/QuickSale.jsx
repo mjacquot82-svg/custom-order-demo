@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStoredProducts } from "../lib/productsStore";
 import { createStoredQuickSale } from "../lib/salesStore";
@@ -122,18 +122,18 @@ export default function QuickSale() {
   const canAddItem = lineItem.name.trim() && Number(lineItem.qty) > 0;
   const canCompleteSale = cart.length > 0;
 
+  const handleGlobalEnter = useEffectEvent((event) => {
+    if (completedSaleNumber || event.key !== "Enter" || !canCompleteSale) return;
+    if (isTypingField(document.activeElement)) return;
+
+    event.preventDefault();
+    saveSale();
+  });
+
   useEffect(() => {
-    function handleGlobalEnter(event) {
-      if (completedSaleNumber || event.key !== "Enter" || !canCompleteSale) return;
-      if (isTypingField(document.activeElement)) return;
-
-      event.preventDefault();
-      saveSale();
-    }
-
     window.addEventListener("keydown", handleGlobalEnter);
     return () => window.removeEventListener("keydown", handleGlobalEnter);
-  }, [completedSaleNumber, canCompleteSale, cart, customerName, linkedCustomerId, paymentMethod, subtotal, taxTotal, total, notes]);
+  }, []);
 
   function updateCustomerName(value) {
     setCustomerName(value);
@@ -252,20 +252,31 @@ export default function QuickSale() {
   function saveSale() {
     if (!cart.length) return;
 
-    const sale = createStoredQuickSale({
-      customer_id: linkedCustomerId,
-      customer_name: customerName.trim() || "Walk-in Customer",
-      payment_method: paymentMethod,
-      payment_status: paymentMethod === "Pay Later" ? "Unpaid" : "Paid",
-      amount_paid: paymentMethod === "Pay Later" ? 0 : total,
-      balance_due: paymentMethod === "Pay Later" ? total : 0,
-      items: cart,
-      subtotal,
-      tax_rate: taxRate,
-      tax_total: taxTotal,
-      total,
-      notes,
-    });
+    let sale;
+
+    try {
+      sale = createStoredQuickSale({
+        customer_id: linkedCustomerId,
+        customer_name: customerName.trim() || "Walk-in Customer",
+        payment_method: paymentMethod,
+        payment_status: paymentMethod === "Pay Later" ? "Unpaid" : "Paid",
+        amount_paid: paymentMethod === "Pay Later" ? 0 : total,
+        balance_due: paymentMethod === "Pay Later" ? total : 0,
+        items: cart,
+        subtotal,
+        tax_rate: taxRate,
+        tax_total: taxTotal,
+        total,
+        notes,
+      });
+    } catch (error) {
+      alert(
+        error?.code === "OVERPAYMENT"
+          ? "Payment exceeds remaining balance."
+          : error?.message || "Unable to save payment."
+      );
+      return;
+    }
 
     navigate(`/admin/sales/new?completed=${sale.sale_number}`);
   }

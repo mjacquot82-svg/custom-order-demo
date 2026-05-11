@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useMemo, useRef } from "react";
-import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
+import { recordStoredOrderPayment, updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { useStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
@@ -15,7 +15,7 @@ import ArtworkPreviewPanel from "../order-detail/ArtworkPreviewPanel";
 import PrintableProductionTicket from "../order-detail/PrintableProductionTicket";
 import FinancialSummaryPanel from "../order-detail/FinancialSummaryPanel";
 import { buildOrderUrgency } from "../order-detail/buildOrderUrgency";
-import { deriveOrderFinancials, normalizeOrderFinancials } from "../orders/orderFinancials";
+import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
   getNextOperationalStatus,
   normalizeOperationalStatus,
@@ -144,34 +144,12 @@ export default function OrderDetail() {
   }
 
   function handleRecordPayment(paymentInput) {
-    const activeStaff = getActiveStaffUser();
-    const paymentEntry = {
-      id: `payment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      amount: Number(paymentInput.amount) || 0,
-      method: paymentInput.method || "Other",
-      timestamp: new Date().toISOString(),
-      staff_member: activeStaff?.name || "Unknown Staff",
-      note: String(paymentInput.note || "").trim(),
-    };
-    const paymentHistory = [paymentEntry, ...(order.payment_history || [])];
-    const nextFinancials = deriveOrderFinancials({
-      ...order,
-      payment_history: paymentHistory,
-    }, {
-      additionalSources: quoteSnapshot
-        ? [{ label: "generatedQuoteSnapshot", value: quoteSnapshot }]
-        : [],
-    });
-    const paymentNote = paymentEntry.note ? ` Note: ${paymentEntry.note}` : "";
-    const statusNote =
-      nextFinancials.payment_status === "Paid in Full"
-        ? " Order is now paid in full."
-        : ` Remaining balance: ${money(nextFinancials.balance_due)}.`;
-
-    saveOrderUpdates({
-      payment_history: paymentHistory,
-      activity_type: "payment",
-      activity_note: `Recorded payment of ${money(paymentEntry.amount)} via ${paymentEntry.method}.${paymentNote}${statusNote}`,
+    return recordStoredOrderPayment(orderNumber, paymentInput, {
+      financialOptions: {
+        additionalSources: quoteSnapshot
+          ? [{ label: "generatedQuoteSnapshot", value: quoteSnapshot }]
+          : [],
+      },
     });
   }
 

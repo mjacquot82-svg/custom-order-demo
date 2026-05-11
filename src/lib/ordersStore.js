@@ -7,6 +7,7 @@ import {
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
+import { validatePaymentAmount } from "./financialValidation";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 
@@ -16,6 +17,10 @@ const EMPTY_ORDERS = [];
 
 let cachedOrdersRaw = null;
 let cachedOrdersSnapshot = EMPTY_ORDERS;
+
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
 
 function normalizeArtworkFiles(files) {
   return Array.isArray(files) ? files.filter(Boolean) : [];
@@ -256,6 +261,12 @@ function stripActivityMeta(updates) {
   return cleanUpdates;
 }
 
+function buildPaymentValidationError(validation) {
+  const error = new Error(validation.message || "Invalid payment amount.");
+  error.code = validation.code || "INVALID_AMOUNT";
+  return error;
+}
+
 export function getStoredOrders() {
   return readStoredOrders();
 }
@@ -378,6 +389,51 @@ export function updateStoredOrder(orderNumber, updates) {
 
   saveStoredOrders(nextOrders);
   return updatedOrder;
+}
+
+export function recordStoredOrderPayment(orderNumber, paymentInput = {}, options = {}) {
+  const order = findStoredOrder(orderNumber);
+  if (!order) return null;
+
+  const financialOptions = options.financialOptions || {};
+  const activeStaff = options.staffUser || getActiveStaffUser();
+  const normalizedOrder = normalizeOrderFinancials(order, financialOptions);
+  const validation = validatePaymentAmount({
+    amount: paymentInput.amount,
+    remainingBalance: normalizedOrder.balance_due,
+  });
+
+  if (!validation.valid) {
+    throw buildPaymentValidationError(validation);
+  }
+
+  const paymentEntry = {
+    id: `payment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    amount: Number(paymentInput.amount) || 0,
+    method: paymentInput.method || "Other",
+    timestamp: new Date().toISOString(),
+    staff_member: activeStaff?.name || "Unknown Staff",
+    note: String(paymentInput.note || "").trim(),
+  };
+  const paymentHistory = [paymentEntry, ...(order.payment_history || [])];
+  const nextFinancials = normalizeOrderFinancials(
+    {
+      ...order,
+      payment_history: paymentHistory,
+    },
+    financialOptions
+  );
+  const paymentNote = paymentEntry.note ? ` Note: ${paymentEntry.note}` : "";
+  const statusNote =
+    nextFinancials.payment_status === "Paid in Full"
+      ? " Order is now paid in full."
+      : ` Remaining balance: ${money(nextFinancials.balance_due)}.`;
+
+  return updateStoredOrder(orderNumber, {
+    payment_history: paymentHistory,
+    activity_type: "payment",
+    activity_note: `Recorded payment of ${money(paymentEntry.amount)} via ${paymentEntry.method}.${paymentNote}${statusNote}`,
+  });
 }
 
 export function duplicateStoredOrder(orderNumber) {

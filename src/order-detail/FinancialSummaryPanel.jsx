@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { validatePaymentAmount } from "../lib/financialValidation";
 import { PAYMENT_METHOD_OPTIONS } from "../orders/orderFinancials";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 
@@ -72,6 +73,11 @@ export default function FinancialSummaryPanel({
   const [method, setMethod] = useState(PAYMENT_METHOD_OPTIONS[0]);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const paymentValidation = validatePaymentAmount({
+    amount,
+    remainingBalance: order.balance_due,
+  });
+  const paymentError = error || (!paymentValidation.valid ? paymentValidation.message : "");
 
   const canMarkPickedUp =
     order.pickup_status !== "Picked Up" &&
@@ -98,17 +104,31 @@ export default function FinancialSummaryPanel({
   function handleSubmit(event) {
     event.preventDefault();
 
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setError("Enter a valid payment amount.");
+    if (!paymentValidation.valid) {
+      setError(paymentValidation.message || "Enter a valid payment amount.");
+      alert(
+        paymentValidation.code === "OVERPAYMENT"
+          ? "Payment exceeds remaining balance."
+          : paymentValidation.message || "Enter a valid payment amount."
+      );
       return;
     }
 
-    onRecordPayment({
-      amount: parsedAmount,
-      method,
-      note,
-    });
+    try {
+      onRecordPayment({
+        amount: Number(amount),
+        method,
+        note,
+      });
+    } catch (submissionError) {
+      const message =
+        submissionError?.code === "OVERPAYMENT"
+          ? "Payment exceeds remaining balance."
+          : submissionError?.message || "Enter a valid payment amount.";
+      setError(message);
+      alert(message);
+      return;
+    }
 
     setPaymentFormOpen(false);
     resetPaymentForm("");
@@ -258,8 +278,15 @@ export default function FinancialSummaryPanel({
                 min="0"
                 step="0.01"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                style={fieldStyle}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setError("");
+                }}
+                style={{
+                  ...fieldStyle,
+                  border: paymentError ? "1px solid #dc2626" : fieldStyle.border,
+                  background: paymentError ? "#fef2f2" : fieldStyle.background,
+                }}
               />
             </label>
 
@@ -290,20 +317,22 @@ export default function FinancialSummaryPanel({
             />
           </label>
 
-          {error ? (
-            <p style={{ margin: 0, color: "#b91c1c", fontWeight: 700 }}>{error}</p>
+          {paymentError ? (
+            <p style={{ margin: 0, color: "#b91c1c", fontWeight: 700 }}>{paymentError}</p>
           ) : null}
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button
               type="submit"
+              disabled={!paymentValidation.valid}
               style={{
-                background: "#171717",
+                background: paymentValidation.valid ? "#171717" : "#a8a29e",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: "12px",
                 padding: "11px 14px",
                 fontWeight: 700,
+                cursor: paymentValidation.valid ? "pointer" : "not-allowed",
               }}
             >
               Save Payment
