@@ -6,6 +6,7 @@ import {
   isReadyForProductionStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
+import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 
@@ -49,7 +50,7 @@ function normalizeStoredOrder(order = {}) {
   const primaryPlacement = placements[0] || null;
   const primaryArtwork = artworkFiles[0] || null;
 
-  return {
+  return normalizeOrderFinancials({
     ...order,
     status,
     placements,
@@ -80,7 +81,7 @@ function normalizeStoredOrder(order = {}) {
       typeof order.operational_visible === "boolean"
         ? order.operational_visible
         : isActiveOperationalStatus(status),
-  };
+  });
 }
 
 function emitOrdersUpdated() {
@@ -224,6 +225,9 @@ function buildWorkflowDerivedUpdates(currentOrder, updates) {
 function describeOrderUpdate(updates) {
   if (updates.activity_note) return updates.activity_note;
   if (updates.status) return `Status changed to ${updates.status}.`;
+  if (updates.pickup_status === "Picked Up") return "Order marked as picked up.";
+  if (updates.pickup_status === "Ready for Pickup") return "Order marked ready for pickup.";
+  if (updates.payment_history) return "Payment recorded.";
   if (updates.deposit?.status === "paid") return "Deposit recorded as paid.";
   if (updates.deposit?.status === "pending") return "Deposit requested.";
   if (updates.artwork_files) return "Artwork file uploaded.";
@@ -236,6 +240,8 @@ function describeOrderUpdate(updates) {
 function describeActivityType(updates) {
   if (updates.activity_type) return updates.activity_type;
   if (updates.status) return "status_change";
+  if (updates.pickup_status) return "pickup";
+  if (updates.payment_history) return "payment";
   if (updates.deposit) return "deposit";
   if (updates.artwork_files) return "artwork";
   if (updates.size_breakdown) return "sizes";

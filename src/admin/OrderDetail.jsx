@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { useStoredProducts } from "../lib/productsStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
@@ -13,7 +13,9 @@ import ActivityTimeline from "../order-detail/ActivityTimeline";
 import ProductionInstructionsPanel from "../order-detail/ProductionInstructionsPanel";
 import ArtworkPreviewPanel from "../order-detail/ArtworkPreviewPanel";
 import PrintableProductionTicket from "../order-detail/PrintableProductionTicket";
+import FinancialSummaryPanel from "../order-detail/FinancialSummaryPanel";
 import { buildOrderUrgency } from "../order-detail/buildOrderUrgency";
+import { deriveOrderFinancials } from "../orders/orderFinancials";
 import {
   getNextOperationalStatus,
   normalizeOperationalStatus,
@@ -26,12 +28,9 @@ const cardStyle = {
   boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
 };
 
-const inputStyle = {
-  border: "1px solid #cbd5e1",
-  borderRadius: "12px",
-  padding: "11px",
-  boxSizing: "border-box",
-};
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
 
 export default function OrderDetail() {
   const { orderNumber } = useParams();
@@ -42,13 +41,7 @@ export default function OrderDetail() {
     () => storedOrders.find((entry) => entry.order_number === orderNumber) || null,
     [orderNumber, storedOrders]
   );
-  const [staffUsers, setStaffUsers] = useState([]);
-
-  useEffect(() => {
-    setStaffUsers(
-      getStoredStaffUsers().filter((staffUser) => staffUser.status !== "Inactive")
-    );
-  }, [orderNumber, storedOrders]);
+  const staffUsers = getStoredStaffUsers().filter((staffUser) => staffUser.status !== "Inactive");
 
   const selectedProduct = useMemo(() => {
     if (!order) return null;
@@ -138,6 +131,51 @@ export default function OrderDetail() {
   function handlePrintTicket() {
     printElement(printableTicketRef.current, {
       title: `Production Ticket ${order.order_number || orderNumber}`,
+    });
+  }
+
+  function handleRecordPayment(paymentInput) {
+    const activeStaff = getActiveStaffUser();
+    const paymentEntry = {
+      id: `payment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      amount: Number(paymentInput.amount) || 0,
+      method: paymentInput.method || "Other",
+      timestamp: new Date().toISOString(),
+      staff_member: activeStaff?.name || "Unknown Staff",
+      note: String(paymentInput.note || "").trim(),
+    };
+    const paymentHistory = [paymentEntry, ...(order.payment_history || [])];
+    const nextFinancials = deriveOrderFinancials({
+      ...order,
+      payment_history: paymentHistory,
+    });
+    const paymentNote = paymentEntry.note ? ` Note: ${paymentEntry.note}` : "";
+    const statusNote =
+      nextFinancials.payment_status === "Paid in Full"
+        ? " Order is now paid in full."
+        : ` Remaining balance: ${money(nextFinancials.balance_due)}.`;
+
+    saveOrderUpdates({
+      payment_history: paymentHistory,
+      activity_type: "payment",
+      activity_note: `Recorded payment of ${money(paymentEntry.amount)} via ${paymentEntry.method}.${paymentNote}${statusNote}`,
+    });
+  }
+
+  function handleMarkPickedUp() {
+    const now = new Date().toISOString();
+    const balanceNote =
+      order.balance_due > 0 ? ` Outstanding balance: ${money(order.balance_due)}.` : "";
+
+    saveOrderUpdates({
+      pickup_status: "Picked Up",
+      picked_up_at: order.picked_up_at || now,
+      status:
+        normalizeOperationalStatus(order.status) === "Ready for Pickup"
+          ? "Picked Up"
+          : order.status,
+      activity_type: "pickup",
+      activity_note: `Order marked as picked up.${balanceNote}`,
     });
   }
 
@@ -259,6 +297,12 @@ export default function OrderDetail() {
               </p>
             )}
           </section>
+
+          <FinancialSummaryPanel
+            order={order}
+            onRecordPayment={handleRecordPayment}
+            onMarkPickedUp={handleMarkPickedUp}
+          />
 
           <ActivityTimeline
             events={order.activity_log || []}
