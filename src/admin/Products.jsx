@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import "./Products.css";
 import ProductPricingFields from "../components/ProductPricingFields";
 import { PRODUCTION_TYPES } from "../constants/productionTypes";
 import {
@@ -167,15 +168,57 @@ function fileToDataUrl(file) {
   });
 }
 
+function normalizeProductStatus(status) {
+  return String(status || "Active").trim().toLowerCase();
+}
+
+function getStatusLabel(status) {
+  return normalizeProductStatus(status) === "active" ? "Active" : "Archived";
+}
+
+function getStatusTone(status) {
+  return normalizeProductStatus(status) === "active" ? "active" : "archived";
+}
+
+function getProductTimestamp(product, index) {
+  if (product?.created_at) {
+    const createdAt = Date.parse(product.created_at);
+    if (Number.isFinite(createdAt)) return createdAt;
+  }
+
+  const idMatch = String(product?.id || "").match(/(\d{10,})/);
+  if (idMatch) {
+    const parsedId = Number(idMatch[1]);
+    if (Number.isFinite(parsedId)) return parsedId;
+  }
+
+  return Number.MAX_SAFE_INTEGER - index;
+}
+
+function buildFilterOptions(products, key) {
+  return Array.from(
+    new Set(
+      products
+        .map((product) => String(product?.[key] || "").trim())
+        .filter(Boolean)
+    )
+  ).sort((left, right) => left.localeCompare(right));
+}
+
 export default function Products() {
   const pageRef = useRef(null);
   const editorRef = useRef(null);
   const nameInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const products = useStoredProducts();
   const [form, setForm] = useState(emptyProduct);
   const [editingProductId, setEditingProductId] = useState(null);
   const [selectedFileName, setSelectedFileName] = useState("");
-  const imageInputRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedMethod, setSelectedMethod] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
 
   const placementOptions = normalizeListInput(form.placementsText);
   const editingProduct = editingProductId
@@ -187,6 +230,86 @@ export default function Products() {
   const editorDescription = editingProduct
     ? "Update garment settings, pricing, and workflow options for this catalog item."
     : "Configure garment price, allowed placements, and supported production methods.";
+
+  const categoryOptions = useMemo(
+    () => buildFilterOptions(products, "category"),
+    [products]
+  );
+
+  const productionMethodOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          products.flatMap((product) =>
+            Array.isArray(product?.production_methods)
+              ? product.production_methods.filter(Boolean)
+              : []
+          )
+        )
+      ).sort((left, right) => left.localeCompare(right)),
+    [products]
+  );
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    const nextProducts = products.filter((product) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        [
+          product?.name,
+          product?.category,
+          product?.product_type,
+          product?.brand_model,
+          product?.notes,
+        ]
+          .filter(Boolean)
+          .some((value) =>
+            String(value).toLowerCase().includes(normalizedSearch)
+          );
+      const matchesCategory =
+        selectedCategory === "all" || product?.category === selectedCategory;
+      const matchesMethod =
+        selectedMethod === "all" ||
+        product?.production_methods?.includes(selectedMethod);
+      const matchesStatus =
+        selectedStatus === "all" ||
+        (selectedStatus === "active"
+          ? normalizeProductStatus(product?.status) === "active"
+          : normalizeProductStatus(product?.status) !== "active");
+
+      return matchesSearch && matchesCategory && matchesMethod && matchesStatus;
+    });
+
+    return [...nextProducts].sort((left, right) => {
+      if (sortBy === "alphabetical") {
+        return String(left?.name || "").localeCompare(String(right?.name || ""));
+      }
+
+      if (sortBy === "highest-price") {
+        return Number(right?.base_garment_price || 0) - Number(left?.base_garment_price || 0);
+      }
+
+      return getProductTimestamp(right, 0) - getProductTimestamp(left, 1);
+    });
+  }, [
+    products,
+    searchTerm,
+    selectedCategory,
+    selectedMethod,
+    selectedStatus,
+    sortBy,
+  ]);
+
+  const activeCount = useMemo(
+    () =>
+      products.filter(
+        (product) => normalizeProductStatus(product?.status) === "active"
+      ).length,
+    [products]
+  );
+
+  const archivedCount = products.length - activeCount;
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -328,7 +451,6 @@ export default function Products() {
     }
 
     resetForm();
-
     pageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -341,34 +463,12 @@ export default function Products() {
   }
 
   return (
-    <div ref={pageRef} style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-          gap: "22px",
-          alignItems: "start",
-        }}
-      >
+    <div ref={pageRef} className="products-page">
+      <div className="products-workspace">
         <form
           ref={editorRef}
           onSubmit={handleSubmit}
-          style={{
-            background: editingProduct
-              ? "linear-gradient(180deg, #f8fbff 0%, #ffffff 22%)"
-              : "#ffffff",
-            borderRadius: "22px",
-            padding: "22px",
-            border: editingProduct ? "1px solid #93c5fd" : "1px solid #e2e8f0",
-            boxShadow: editingProduct
-              ? "0 20px 44px rgba(14, 116, 144, 0.12)"
-              : "none",
-            display: "grid",
-            gap: "18px",
-            position: "sticky",
-            top: "18px",
-            scrollMarginTop: "18px",
-          }}
+          className={`products-editor ${editingProduct ? "is-editing" : ""}`}
         >
           <div style={{ display: "grid", gap: "12px" }}>
             <p
@@ -412,9 +512,7 @@ export default function Products() {
               ) : null}
               <h1 style={{ margin: 0 }}>{editorTitle}</h1>
             </div>
-            <p style={{ margin: 0, color: "#64748b" }}>
-              {editorDescription}
-            </p>
+            <p style={{ margin: 0, color: "#64748b" }}>{editorDescription}</p>
           </div>
 
           {editingProduct ? (
@@ -446,13 +544,7 @@ export default function Products() {
             </div>
           ) : null}
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gap: "12px",
-            }}
-          >
+          <div className="products-editor-grid">
             <label style={labelStyle}>
               Product Name
               <input
@@ -507,16 +599,7 @@ export default function Products() {
             labelStyle={labelStyle}
           />
 
-          <div
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: "18px",
-              padding: "16px",
-              background: "#f8fafc",
-              display: "grid",
-              gap: "12px",
-            }}
-          >
+          <div className="products-editor-section">
             <div>
               <strong style={{ display: "block", marginBottom: "4px" }}>
                 Supported Production Methods
@@ -533,15 +616,9 @@ export default function Products() {
                 return (
                   <label
                     key={method}
+                    className="products-price-row"
                     style={{
-                      display: "grid",
                       gridTemplateColumns: "auto minmax(0, 1fr) 120px",
-                      gap: "10px",
-                      alignItems: "center",
-                      background: "#ffffff",
-                      border: "1px solid #dbe4ee",
-                      borderRadius: "14px",
-                      padding: "12px",
                     }}
                   >
                     <input
@@ -566,16 +643,7 @@ export default function Products() {
             </div>
           </div>
 
-          <div
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: "18px",
-              padding: "16px",
-              background: "#f8fafc",
-              display: "grid",
-              gap: "12px",
-            }}
-          >
+          <div className="products-editor-section">
             <div>
               <strong style={{ display: "block", marginBottom: "4px" }}>
                 Placements And Pricing
@@ -600,15 +668,9 @@ export default function Products() {
               {placementOptions.map((placement) => (
                 <label
                   key={placement}
+                  className="products-price-row"
                   style={{
-                    display: "grid",
                     gridTemplateColumns: "minmax(0, 1fr) 120px",
-                    gap: "10px",
-                    alignItems: "center",
-                    background: "#ffffff",
-                    border: "1px solid #dbe4ee",
-                    borderRadius: "14px",
-                    padding: "12px",
                   }}
                 >
                   <span style={{ fontWeight: 700 }}>{placement}</span>
@@ -626,13 +688,7 @@ export default function Products() {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gap: "12px",
-            }}
-          >
+          <div className="products-editor-grid">
             <label style={labelStyle}>
               Colors
               <textarea
@@ -764,193 +820,255 @@ export default function Products() {
           </div>
         </form>
 
-        <section style={{ display: "grid", gap: "14px" }}>
-          {products.map((product) => {
-            const isActive = product.id === editingProductId;
+        <section className="products-catalog-panel">
+          <div className="products-catalog-header">
+            <div>
+              <p className="products-eyebrow">Catalog Workspace</p>
+              <h2 style={{ margin: "6px 0 0" }}>Browse and manage products</h2>
+            </div>
 
-            return (
-              <article
-                key={product.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "120px minmax(0, 1fr) auto",
-                  gap: "16px",
-                  border: isActive ? "1px solid #38bdf8" : "1px solid #e2e8f0",
-                  borderRadius: "20px",
-                  padding: "16px",
-                  background: isActive
-                    ? "linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%)"
-                    : "#ffffff",
-                  boxShadow: isActive
-                    ? "0 16px 36px rgba(14, 165, 233, 0.16)"
-                    : "none",
-                  position: "relative",
-                }}
+            <div className="products-stat-row">
+              <div className="products-stat-card">
+                <span>Total Products</span>
+                <strong>{products.length}</strong>
+              </div>
+              <div className="products-stat-card">
+                <span>Active</span>
+                <strong>{activeCount}</strong>
+              </div>
+              <div className="products-stat-card">
+                <span>Archived</span>
+                <strong>{archivedCount}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="products-toolbar">
+            <label className="products-toolbar-field">
+              <span>Search Products</span>
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search name, category, model, or notes"
+                style={fieldStyle}
+              />
+            </label>
+
+            <label className="products-toolbar-field">
+              <span>Category</span>
+              <select
+                value={selectedCategory}
+                onChange={(event) => setSelectedCategory(event.target.value)}
+                style={fieldStyle}
               >
-                {isActive ? (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "14px",
-                      right: "14px",
-                      padding: "6px 10px",
-                      borderRadius: "999px",
-                      background: "#0f172a",
-                      color: "#ffffff",
-                      fontSize: "11px",
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Editing Now
-                  </div>
-                ) : null}
-              <div>
-                {product.image ? (
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    style={{
-                      width: "120px",
-                      height: "120px",
-                      objectFit: "cover",
-                      borderRadius: "14px",
-                      border: isActive ? "2px solid #7dd3fc" : "none",
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: "120px",
-                      height: "120px",
-                      borderRadius: "14px",
-                      border: "1px dashed #cbd5e1",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#94a3b8",
-                    }}
-                  >
-                    No Image
-                  </div>
-                )}
-              </div>
+                <option value="all">All categories</option>
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-              <div style={{ minWidth: 0, paddingRight: isActive ? "84px" : 0 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <div>
-                    <h2 style={{ margin: "0 0 6px" }}>{product.name}</h2>
-                    <p style={{ margin: 0, color: "#64748b" }}>
-                      {product.category} • {product.product_type || "General"}
-                    </p>
-                  </div>
-
-                  <strong style={{ fontSize: "20px", color: "#0f172a" }}>
-                    {formatMoney(product?.base_garment_price)}
-                  </strong>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: "10px",
-                    marginTop: "14px",
-                  }}
-                >
-                  <div>
-                    <strong style={{ display: "block", marginBottom: "4px" }}>
-                      Production Methods
-                    </strong>
-                    <span style={{ color: "#475569" }}>
-                      {product?.production_methods?.join(", ") || "None"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <strong style={{ display: "block", marginBottom: "4px" }}>
-                      Placement Pricing
-                    </strong>
-                    <span style={{ color: "#475569" }}>
-                      {(product?.placement_config || [])
-                        .map((placement) =>
-                          placement?.label
-                            ? `${placement.label} ${formatMoney(placement?.price)}`
-                            : null
-                        )
-                        .filter(Boolean)
-                        .join(" • ") || "No placements"}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: "10px",
-                    marginTop: "14px",
-                    color: "#64748b",
-                  }}
-                >
-                  <span>Cost: {formatMoney(product?.cost_price)}</span>
-                  <span>Markup: {formatPercent(product?.markup_percentage)}</span>
-                  <span>Status: {product?.status || "Unknown"}</span>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  alignItems: "flex-start",
-                  flexWrap: "wrap",
-                }}
+            <label className="products-toolbar-field">
+              <span>Production Method</span>
+              <select
+                value={selectedMethod}
+                onChange={(event) => setSelectedMethod(event.target.value)}
+                style={fieldStyle}
               >
-                <button
-                  type="button"
-                  onClick={() => handleEdit(product)}
-                  style={{
-                    border: isActive ? "1px solid #0ea5e9" : "1px solid #cbd5e1",
-                    background: isActive ? "#0f172a" : "#ffffff",
-                    color: isActive ? "#ffffff" : "#171717",
-                    borderRadius: "10px",
-                    padding: "9px 12px",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  {isActive ? "Editing" : "Edit"}
-                </button>
+                <option value="all">All methods</option>
+                {productionMethodOptions.map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-                <button
-                  type="button"
-                  onClick={() => handleDelete(product.id)}
-                  style={{
-                    border: "1px solid #fecaca",
-                    background: "#fff1f2",
-                    color: "#be123c",
-                    borderRadius: "10px",
-                    padding: "9px 12px",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            </article>
-            );
-          })}
+            <label className="products-toolbar-field">
+              <span>Status</span>
+              <select
+                value={selectedStatus}
+                onChange={(event) => setSelectedStatus(event.target.value)}
+                style={fieldStyle}
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </label>
+
+            <label className="products-toolbar-field">
+              <span>Sort</span>
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value)}
+                style={fieldStyle}
+              >
+                <option value="newest">Newest</option>
+                <option value="alphabetical">Alphabetical</option>
+                <option value="highest-price">Highest Price</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="products-results-meta">
+            <span>
+              Showing <strong>{filteredProducts.length}</strong> of{" "}
+              <strong>{products.length}</strong> products
+            </span>
+            {(searchTerm || selectedCategory !== "all" || selectedMethod !== "all" || selectedStatus !== "all") ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedCategory("all");
+                  setSelectedMethod("all");
+                  setSelectedStatus("all");
+                }}
+                className="products-clear-filters"
+              >
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+
+          <div className="products-list-scroll">
+            <div className="products-list-grid">
+              {filteredProducts.length ? (
+                filteredProducts.map((product) => {
+                  const isActive = product.id === editingProductId;
+                  const visiblePlacements = (product?.placement_config || [])
+                    .map((placement) => placement?.label)
+                    .filter(Boolean)
+                    .slice(0, 3);
+                  const hasExtraPlacements =
+                    (product?.placement_config || []).length > visiblePlacements.length;
+
+                  return (
+                    <article
+                      key={product.id}
+                      className={`products-card ${isActive ? "is-active" : ""}`}
+                    >
+                      <div className="products-card-media">
+                        {product.image ? (
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="products-card-image"
+                          />
+                        ) : (
+                          <div className="products-card-image-placeholder">
+                            No Image
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="products-card-body">
+                        <div className="products-card-topline">
+                          <div style={{ minWidth: 0 }}>
+                            <div className="products-card-title-row">
+                              <h3 style={{ margin: 0 }}>{product.name}</h3>
+                              {isActive ? (
+                                <span className="products-card-editing-pill">
+                                  Editing
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="products-card-subtitle">
+                              {product.category || "General"} •{" "}
+                              {product.product_type || "General"}
+                            </p>
+                          </div>
+
+                          <strong className="products-card-price">
+                            {formatMoney(product?.base_garment_price)}
+                          </strong>
+                        </div>
+
+                        <div className="products-card-detail-grid">
+                          <div className="products-card-detail">
+                            <span>Production</span>
+                            <strong>
+                              {product?.production_methods?.join(", ") || "None"}
+                            </strong>
+                          </div>
+
+                          <div className="products-card-detail">
+                            <span>Status</span>
+                            <strong
+                              className={`products-status products-status-${getStatusTone(
+                                product?.status
+                              )}`}
+                            >
+                              {getStatusLabel(product?.status)}
+                            </strong>
+                          </div>
+
+                          <div className="products-card-detail">
+                            <span>Pricing</span>
+                            <strong>
+                              Cost {formatMoney(product?.cost_price)} • Markup{" "}
+                              {formatPercent(product?.markup_percentage)}
+                            </strong>
+                          </div>
+
+                          <div className="products-card-detail">
+                            <span>Placements</span>
+                            <strong>
+                              {visiblePlacements.join(", ") || "No placements"}
+                              {hasExtraPlacements ? " +" : ""}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="products-card-actions">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(product)}
+                          style={{
+                            border: isActive ? "1px solid #0ea5e9" : "1px solid #cbd5e1",
+                            background: isActive ? "#0f172a" : "#ffffff",
+                            color: isActive ? "#ffffff" : "#171717",
+                            borderRadius: "10px",
+                            padding: "9px 12px",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {isActive ? "Editing" : "Edit"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(product.id)}
+                          style={{
+                            border: "1px solid #fecaca",
+                            background: "#fff1f2",
+                            color: "#be123c",
+                            borderRadius: "10px",
+                            padding: "9px 12px",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="products-empty-state">
+                  <strong>No products match the current filters.</strong>
+                  <span>Adjust search, filters, or status selections to see more catalog items.</span>
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       </div>
     </div>
