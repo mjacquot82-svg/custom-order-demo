@@ -333,7 +333,36 @@ export default function OrderDetail() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1.1fr) minmax(320px, 0.9fr)",
+          gap: "18px",
+          maxWidth: "960px",
+          margin: "0 auto 18px",
+        }}
+      >
+        <section style={cardStyle}>
+          <h2 style={{ marginTop: 0 }}>Quote Snapshot</h2>
+
+          {quoteSnapshot ? (
+            <PricingSummary
+              quote={quoteSnapshot}
+              quantity={quoteSnapshot.quantity || order.qty || 0}
+              compact
+            />
+          ) : (
+            <p style={{ color: "#94a3b8" }}>
+              Quote snapshot unavailable.
+            </p>
+          )}
+        </section>
+
+        <ActivityTimeline
+          events={order.activity_log || []}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: "18px",
           alignItems: "start",
         }}
@@ -472,30 +501,7 @@ export default function OrderDetail() {
             onMarkPickedUp={handleMarkPickedUp}
             onSendDepositRequest={handleSendDepositRequest}
           />
-
-          <section style={cardStyle}>
-            <h2 style={{ marginTop: 0 }}>Quote Snapshot</h2>
-
-            {quoteSnapshot ? (
-              <PricingSummary
-                quote={quoteSnapshot}
-                quantity={quoteSnapshot.quantity || order.qty || 0}
-                compact
-              />
-            ) : (
-              <p style={{ color: "#94a3b8" }}>
-                Quote snapshot unavailable.
-              </p>
-            )}
-          </section>
-
         </aside>
-      </div>
-
-      <div style={{ marginTop: "18px" }}>
-        <ActivityTimeline
-          events={order.activity_log || []}
-        />
       </div>
     </div>
   );
