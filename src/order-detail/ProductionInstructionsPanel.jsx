@@ -1,6 +1,10 @@
 import { normalizeProductionType } from "../constants/productionTypes";
-import ArtworkFilesSummary from "../components/ArtworkFilesSummary";
-import { getOrderArtworkFiles } from "../lib/orderArtwork";
+import {
+  getArtworkAssetUrl,
+  getArtworkDisplayName,
+  getOrderArtworkFiles,
+  isArtworkImage,
+} from "../lib/orderArtwork";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -30,6 +34,11 @@ const rowValueStyle = {
   fontSize: "14px",
   fontWeight: 700,
   lineHeight: 1.32,
+};
+
+const fileLinkStyle = {
+  color: "inherit",
+  textDecoration: "none",
 };
 
 export default function ProductionInstructionsPanel({ order = {} }) {
@@ -127,14 +136,135 @@ export default function ProductionInstructionsPanel({ order = {} }) {
         </div>
       </div>
 
-      <div style={{ marginTop: "16px" }}>
-        <ArtworkFilesSummary
-          artwork={artworkFiles}
-          title="Artwork Files"
-          subtitle="Files the production team should pull for this job."
-          emptyMessage="No artwork files recorded for production yet."
-          compact
-        />
+      <div
+        style={{
+          marginTop: "16px",
+          paddingTop: "16px",
+          borderTop: "1px solid #e2e8f0",
+          display: "grid",
+          gap: "12px",
+        }}
+      >
+        <div style={{ display: "grid", gap: "4px" }}>
+          <span style={rowLabelStyle}>Artwork Files</span>
+          <span style={{ color: "#64748b", fontSize: "13px", lineHeight: 1.5 }}>
+            Files the production team should pull for this job.
+          </span>
+        </div>
+
+        {artworkFiles.length ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "12px",
+            }}
+          >
+            {artworkFiles.map((file, index) => {
+              const assetUrl = getArtworkAssetUrl(file);
+              const displayName = getArtworkDisplayName(file);
+              const imageFile = isArtworkImage(file) && Boolean(assetUrl);
+              const card = (
+                <article
+                  style={{
+                    display: "grid",
+                    gap: "10px",
+                    padding: "12px",
+                    borderRadius: "16px",
+                    background: "#f8fafc",
+                    border: "1px solid #dbe2ea",
+                    minHeight: "100%",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "14px",
+                      minHeight: "136px",
+                      overflow: "hidden",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: imageFile ? 0 : "18px",
+                    }}
+                  >
+                    {imageFile ? (
+                      <img
+                        src={assetUrl}
+                        alt={displayName}
+                        style={{
+                          width: "100%",
+                          height: "136px",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          width: "52px",
+                          height: "52px",
+                          borderRadius: "14px",
+                          background: "#e2e8f0",
+                          color: "#475569",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "24px",
+                          fontWeight: 800,
+                        }}
+                      >
+                        {assetUrl ? "FILE" : "N/A"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: "grid", gap: "4px" }}>
+                    <strong
+                      style={{
+                        color: "#111827",
+                        fontSize: "14px",
+                        lineHeight: 1.4,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {displayName}
+                    </strong>
+
+                    {(file.placement_hint || file.type || file.file_type) && (
+                      <span style={{ color: "#64748b", fontSize: "12px", lineHeight: 1.4 }}>
+                        {[file.placement_hint, file.type || file.file_type]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              );
+
+              return assetUrl ? (
+                <a
+                  key={file.id || `${displayName}-${index}`}
+                  href={assetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={fileLinkStyle}
+                  title={`Open ${displayName}`}
+                >
+                  {card}
+                </a>
+              ) : (
+                <div key={file.id || `${displayName}-${index}`}>{card}</div>
+              );
+            })}
+          </div>
+        ) : (
+          <p style={{ margin: 0, color: "#94a3b8" }}>
+            No artwork files recorded for production yet.
+          </p>
+        )}
       </div>
     </section>
   );

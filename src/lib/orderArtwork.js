@@ -20,6 +20,16 @@ export function normalizeArtworkFile(file = {}) {
   const displayName = getArtworkDisplayName(file);
   const type = normalizeText(file.type) || normalizeText(file.file_type);
   const size = Number(file.size ?? file.file_size ?? 0) || 0;
+  const assetUrl =
+    normalizeText(file.asset_url) ||
+    normalizeText(file.url) ||
+    normalizeText(file.source_url) ||
+    normalizeText(file.preview_url) ||
+    normalizeText(file.preview);
+  const previewUrl =
+    normalizeText(file.preview_url) ||
+    normalizeText(file.preview) ||
+    assetUrl;
 
   return {
     ...file,
@@ -38,7 +48,17 @@ export function normalizeArtworkFile(file = {}) {
     file_type: type,
     size,
     file_size: size,
-    preview: normalizeText(file.preview) || normalizeText(file.preview_url),
+    asset_url: assetUrl,
+    source_url: normalizeText(file.source_url) || assetUrl,
+    url: normalizeText(file.url) || assetUrl,
+    asset_reference:
+      normalizeText(file.asset_reference) ||
+      normalizeText(file.asset_id) ||
+      assetUrl ||
+      file.id ||
+      "",
+    preview: previewUrl,
+    preview_url: previewUrl,
   };
 }
 
@@ -77,4 +97,18 @@ export function getOrderArtworkFiles(order = {}) {
 
 export function getOrderArtworkNames(order = {}) {
   return getOrderArtworkFiles(order).map((file) => getArtworkDisplayName(file));
+}
+
+export function getArtworkAssetUrl(file = {}) {
+  return normalizeText(file.asset_url || file.url || file.source_url || file.preview_url || file.preview);
+}
+
+export function isArtworkImage(file = {}) {
+  const type = normalizeText(file.type || file.file_type).toLowerCase();
+  if (type.startsWith("image/")) {
+    return true;
+  }
+
+  const fileName = getArtworkDisplayName(file).toLowerCase();
+  return /\.(avif|gif|jpe?g|png|svg|webp|bmp|tiff?)$/.test(fileName);
 }

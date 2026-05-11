@@ -6,18 +6,15 @@ import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore"
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
 import { printProductionSheet } from "../lib/printProductionSheet";
 import PricingSummary from "../components/PricingSummary";
-import ArtworkFilesSummary from "../components/ArtworkFilesSummary";
 import StatusBadge from "../components/StatusBadge";
 import ProductionProgressTracker from "../order-detail/ProductionProgressTracker";
 import AssignmentPanel from "../order-detail/AssignmentPanel";
 import ActivityTimeline from "../order-detail/ActivityTimeline";
 import ProductionInstructionsPanel from "../order-detail/ProductionInstructionsPanel";
-import ArtworkPreviewPanel from "../order-detail/ArtworkPreviewPanel";
 import FinancialSummaryPanel from "../order-detail/FinancialSummaryPanel";
 import { buildOrderUrgency } from "../order-detail/buildOrderUrgency";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import { formatDateTimeParts } from "../lib/dateFormatting";
-import { getOrderArtworkFiles } from "../lib/orderArtwork";
 import {
   getNextOperationalStatus,
   normalizeOperationalStatus,
@@ -215,8 +212,6 @@ export default function OrderDetail() {
   const updatedAt = formatDateTimeParts(order.updated_at);
   const sizeBreakdownEntries = buildSizeBreakdownEntries(order.size_breakdown);
   const printOrder = normalizedOrder || order;
-  const artworkFiles = getOrderArtworkFiles(order);
-
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div
@@ -460,13 +455,6 @@ export default function OrderDetail() {
             </div>
           </section>
 
-          <ArtworkFilesSummary
-            artwork={artworkFiles}
-            title="Artwork Files"
-            subtitle="Operational production references for this order."
-            emptyMessage="No artwork files have been attached yet."
-          />
-
           <ProductionInstructionsPanel order={order} />
 
           <AssignmentPanel
@@ -501,9 +489,6 @@ export default function OrderDetail() {
             )}
           </section>
 
-          <ArtworkPreviewPanel
-            artwork={artworkFiles}
-          />
         </aside>
       </div>
 

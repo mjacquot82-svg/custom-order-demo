@@ -34,7 +34,29 @@ export function saveCustomerArtwork(customerId, artworkInput) {
       artworkInput.original_filename || artworkInput.file_name || displayName,
     file_type: fileType,
     file_size: fileSize,
-    preview: artworkInput.preview || "",
+    preview: artworkInput.preview || artworkInput.preview_url || "",
+    preview_url: artworkInput.preview_url || artworkInput.preview || "",
+    asset_url:
+      artworkInput.asset_url ||
+      artworkInput.url ||
+      artworkInput.source_url ||
+      artworkInput.preview_url ||
+      artworkInput.preview ||
+      "",
+    source_url:
+      artworkInput.source_url ||
+      artworkInput.asset_url ||
+      artworkInput.url ||
+      artworkInput.preview_url ||
+      artworkInput.preview ||
+      "",
+    asset_reference:
+      artworkInput.asset_reference ||
+      artworkInput.asset_id ||
+      artworkInput.asset_url ||
+      artworkInput.url ||
+      artworkInput.source_url ||
+      "",
     placement_hint: artworkInput.placement_hint || "",
     notes: artworkInput.notes || "",
     created_at: createdAt,

@@ -375,6 +375,20 @@ export default function NewOrder() {
             size: savedArtwork.file_size,
             file_size: savedArtwork.file_size,
             preview: savedArtwork.preview,
+            preview_url: savedArtwork.preview_url || savedArtwork.preview,
+            asset_url:
+              savedArtwork.asset_url ||
+              savedArtwork.source_url ||
+              savedArtwork.preview_url ||
+              savedArtwork.preview,
+            source_url:
+              savedArtwork.source_url ||
+              savedArtwork.asset_url ||
+              savedArtwork.preview_url ||
+              savedArtwork.preview,
+            asset_reference:
+              savedArtwork.asset_reference ||
+              savedArtwork.id,
             placement_hint: savedArtwork.placement_hint,
             uploaded_at: savedArtwork.created_at,
             uploaded_by_staff_name: "Order Intake",
