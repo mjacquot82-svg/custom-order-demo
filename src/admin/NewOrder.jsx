@@ -15,7 +15,7 @@ import {
   getStoredCustomers,
   linkOrderToCustomer,
 } from "../lib/customersStore";
-import { createStoredOrder, updateStoredOrder } from "../lib/ordersStore";
+import { createStoredOrder } from "../lib/ordersStore";
 import { useStoredProducts } from "../lib/productsStore";
 import { saveCustomerArtwork } from "../lib/customerArtworkStore";
 import { generateQuoteSnapshot } from "../lib/quoteEngine";
@@ -152,6 +152,9 @@ export default function NewOrder() {
     source: "Walk-in",
   });
   const [sizes, setSizes] = useState(buildSizeState(fallbackSizeKeys));
+  const [submitState, setSubmitState] = useState("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [validationMessages, setValidationMessages] = useState([]);
 
   const selectedProduct = useMemo(() => {
     return products.find((product) => product.id === selectedProductId);
@@ -195,12 +198,37 @@ export default function NewOrder() {
     );
   }, [form, normalizedDecorationType, selectedPlacements, selectedProduct, totalQty]);
 
+  function clearSubmitFeedback() {
+    setSubmitState("idle");
+    setSubmitMessage("");
+    setValidationMessages([]);
+  }
+
+  function buildValidationMessages() {
+    const messages = [];
+
+    if (!String(form.customer_name || "").trim()) {
+      messages.push("Enter the customer name before saving the quote.");
+    }
+
+    if (!selectedProductId || !String(form.garment || "").trim()) {
+      messages.push("Select a garment or product before saving the quote.");
+    }
+
+    if (totalQty <= 0) {
+      messages.push("Add at least one unit in the size breakdown before saving the quote.");
+    }
+
+    return messages;
+  }
+
   function selectCustomerById(customerId) {
     const customer = customers.find((item) => item.id === customerId);
     if (!customer) return;
 
     setSelectedCustomerId(customer.id);
     setCustomerSearchResults([]);
+    clearSubmitFeedback();
 
     setForm((current) => ({
       ...current,
@@ -215,6 +243,7 @@ export default function NewOrder() {
 
   function updateField(event) {
     const { name, value } = event.target;
+    clearSubmitFeedback();
 
     setForm((current) => ({
       ...current,
@@ -232,6 +261,7 @@ export default function NewOrder() {
 
   function selectCustomer(event) {
     const customerId = event.target.value;
+    clearSubmitFeedback();
     setSelectedCustomerId(customerId);
     setCustomerSearchResults([]);
 
@@ -247,6 +277,7 @@ export default function NewOrder() {
   }
 
   function resetArtworkUpload() {
+    clearSubmitFeedback();
     setArtworkUpload(null);
     setUploadError("");
 
@@ -258,6 +289,7 @@ export default function NewOrder() {
   function selectProduct(event) {
     const productId = event.target.value;
     const product = products.find((item) => item.id === productId);
+    clearSubmitFeedback();
     setSelectedProductId(productId);
 
     if (!product) {
@@ -310,11 +342,13 @@ export default function NewOrder() {
   }
 
   function updateSize(size, value) {
+    clearSubmitFeedback();
     setSizes((current) => ({ ...current, [size]: value }));
   }
 
   function togglePlacement(placementLabel) {
     if (!placementLabels.includes(placementLabel)) return;
+    clearSubmitFeedback();
 
     setSelectedPlacements((current) => {
       const exists = current.includes(placementLabel);
@@ -354,82 +388,115 @@ export default function NewOrder() {
     });
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
-    const customerId = resolveCustomerForOrder();
-    const normalizedSizes = Object.fromEntries(
-      Object.entries(sizes).map(([size, value]) => [size, Number(value) || 0])
-    );
-    const savedArtwork = buildArtworkPayload(customerId);
-    const artworkFiles = savedArtwork
-      ? [
-          {
-            id: savedArtwork.id,
-            name: savedArtwork.name,
-            display_name: savedArtwork.display_name || savedArtwork.name,
-            file_name: savedArtwork.file_name,
-            original_filename: savedArtwork.original_filename || savedArtwork.file_name,
-            type: savedArtwork.file_type,
-            file_type: savedArtwork.file_type,
-            size: savedArtwork.file_size,
-            file_size: savedArtwork.file_size,
-            preview: savedArtwork.preview,
-            preview_url: savedArtwork.preview_url || savedArtwork.preview,
-            asset_url:
-              savedArtwork.asset_url ||
-              savedArtwork.source_url ||
-              savedArtwork.preview_url ||
-              savedArtwork.preview,
-            source_url:
-              savedArtwork.source_url ||
-              savedArtwork.asset_url ||
-              savedArtwork.preview_url ||
-              savedArtwork.preview,
-            asset_reference:
-              savedArtwork.asset_reference ||
-              savedArtwork.id,
-            placement_hint: savedArtwork.placement_hint,
-            uploaded_at: savedArtwork.created_at,
-            uploaded_by_staff_name: "Order Intake",
-          },
-        ]
-      : [];
-    const placements = selectedPlacements.map((placement) => ({
-      placement,
-      decoration_type: normalizeProductionType(form.decoration_type),
-      artwork_id: savedArtwork?.id || "",
-      artwork_name: savedArtwork?.name || "",
-    }));
+    const nextValidationMessages = buildValidationMessages();
+    if (nextValidationMessages.length) {
+      setSubmitState("validation");
+      setSubmitMessage("Quote not saved. Resolve the required items below.");
+      setValidationMessages(nextValidationMessages);
+      return;
+    }
 
-    const order = createStoredOrder({
-      ...form,
-      customer_id: customerId,
-      quote_status: "Draft",
-      operational_visible: false,
-      production_ready: false,
-      product_image: selectedProduct?.image || "",
-      product_notes: selectedProduct?.notes || "",
-      qty: totalQty,
-      size_breakdown: normalizedSizes,
-      placement: selectedPlacements[0] || "",
-      placements,
-      decoration_type: normalizeProductionType(form.decoration_type),
-      artwork_files: artworkFiles,
-      customer_artwork_id: savedArtwork?.id || "",
-      customer_artwork_name: savedArtwork?.name || "",
-    });
-    const quote = generateQuoteSnapshot(order, selectedProduct);
-    updateStoredOrder(order.order_number, { quote });
+    setSubmitState("saving");
+    setSubmitMessage("Saving quote…");
+    setValidationMessages([]);
 
-    linkOrderToCustomer(customerId, order.order_number);
+    try {
+      const customerId = resolveCustomerForOrder();
+      const normalizedSizes = Object.fromEntries(
+        Object.entries(sizes).map(([size, value]) => [size, Number(value) || 0])
+      );
+      const savedArtwork = buildArtworkPayload(customerId);
+      const artworkFiles = savedArtwork
+        ? [
+            {
+              id: savedArtwork.id,
+              name: savedArtwork.name,
+              display_name: savedArtwork.display_name || savedArtwork.name,
+              file_name: savedArtwork.file_name,
+              original_filename: savedArtwork.original_filename || savedArtwork.file_name,
+              type: savedArtwork.file_type,
+              file_type: savedArtwork.file_type,
+              size: savedArtwork.file_size,
+              file_size: savedArtwork.file_size,
+              preview: savedArtwork.preview,
+              preview_url: savedArtwork.preview_url || savedArtwork.preview,
+              asset_url:
+                savedArtwork.asset_url ||
+                savedArtwork.source_url ||
+                savedArtwork.preview_url ||
+                savedArtwork.preview,
+              source_url:
+                savedArtwork.source_url ||
+                savedArtwork.asset_url ||
+                savedArtwork.preview_url ||
+                savedArtwork.preview,
+              asset_reference:
+                savedArtwork.asset_reference ||
+                savedArtwork.id,
+              placement_hint: savedArtwork.placement_hint,
+              uploaded_at: savedArtwork.created_at,
+              uploaded_by_staff_name: "Order Intake",
+            },
+          ]
+        : [];
+      const placements = selectedPlacements.map((placement) => ({
+        placement,
+        decoration_type: normalizeProductionType(form.decoration_type),
+        artwork_id: savedArtwork?.id || "",
+        artwork_name: savedArtwork?.name || "",
+      }));
+      const quote = generateQuoteSnapshot(
+        {
+          ...form,
+          qty: totalQty,
+          placement: selectedPlacements[0] || "",
+          placements,
+          decoration_type: normalizeProductionType(form.decoration_type),
+          setup_fees: [],
+        },
+        selectedProduct
+      );
 
-    navigate(`/admin/quotes/${order.order_number}`);
+      const order = createStoredOrder({
+        ...form,
+        customer_id: customerId,
+        quote_status: "Draft",
+        operational_visible: false,
+        production_ready: false,
+        product_image: selectedProduct?.image || "",
+        product_notes: selectedProduct?.notes || "",
+        qty: totalQty,
+        size_breakdown: normalizedSizes,
+        placement: selectedPlacements[0] || "",
+        placements,
+        decoration_type: normalizeProductionType(form.decoration_type),
+        artwork_files: artworkFiles,
+        customer_artwork_id: savedArtwork?.id || "",
+        customer_artwork_name: savedArtwork?.name || "",
+        quote,
+      });
+
+      linkOrderToCustomer(customerId, order.order_number);
+      setSubmitState("success");
+      setSubmitMessage(`Quote ${order.order_number} saved. Opening quote workspace…`);
+      navigate(`/admin/quotes/${order.order_number}`);
+    } catch (error) {
+      console.error("Unable to save quote", error);
+      setSubmitState("error");
+      setSubmitMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : "Quote could not be saved. Try again."
+      );
+    }
   }
 
   return (
     <div className="new-order-page">
-      <form onSubmit={handleSubmit} className="new-order-form">
+      <form onSubmit={handleSubmit} className="new-order-form" noValidate>
         <div style={{ marginBottom: "22px" }}>
           <p
             style={{
@@ -550,6 +617,54 @@ export default function NewOrder() {
             </p>
           )}
         </section>
+
+        {(submitMessage || validationMessages.length > 0) && (
+          <section
+            aria-live="polite"
+            style={{
+              marginBottom: "20px",
+              borderRadius: "16px",
+              padding: "16px 18px",
+              border:
+                submitState === "error" || submitState === "validation"
+                  ? "1px solid #fecaca"
+                  : submitState === "success"
+                  ? "1px solid #bbf7d0"
+                  : "1px solid #cbd5e1",
+              background:
+                submitState === "error" || submitState === "validation"
+                  ? "#fef2f2"
+                  : submitState === "success"
+                  ? "#ecfdf5"
+                  : "#f8fafc",
+            }}
+          >
+            {submitMessage ? (
+              <p
+                style={{
+                  margin: validationMessages.length ? "0 0 8px" : 0,
+                  color:
+                    submitState === "error" || submitState === "validation"
+                      ? "#991b1b"
+                      : submitState === "success"
+                      ? "#166534"
+                      : "#334155",
+                  fontWeight: 700,
+                }}
+              >
+                {submitMessage}
+              </p>
+            ) : null}
+
+            {validationMessages.length ? (
+              <ul style={{ margin: 0, paddingLeft: "18px", color: "#991b1b" }}>
+                {validationMessages.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        )}
 
         <section className="new-order-production-shell">
           <div className="new-order-config-panel">
@@ -788,18 +903,18 @@ export default function NewOrder() {
           </button>
           <button
             type="submit"
-            disabled={!form.customer_name || !form.garment || totalQty <= 0}
+            disabled={submitState === "saving"}
             style={{
-              background: totalQty > 0 && form.customer_name && form.garment ? "#171717" : "#a8a29e",
+              background: submitState === "saving" ? "#57534e" : "#171717",
               color: "#ffffff",
               border: "none",
               borderRadius: "12px",
               padding: "13px 18px",
-              cursor: totalQty > 0 && form.customer_name && form.garment ? "pointer" : "not-allowed",
+              cursor: submitState === "saving" ? "progress" : "pointer",
               fontWeight: 700,
             }}
           >
-            Save Order
+            {submitState === "saving" ? "Saving..." : "Save Order"}
           </button>
         </div>
       </form>

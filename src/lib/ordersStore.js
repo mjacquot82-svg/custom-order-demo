@@ -361,14 +361,19 @@ export function getStoredOrders() {
 }
 
 export function saveStoredOrders(orders) {
-  if (!hasBrowserStorage()) return;
+  if (!hasBrowserStorage()) return false;
 
   const normalizedOrders = Array.isArray(orders)
     ? orders.map((order) => normalizeStoredOrder(order))
     : [];
 
-  setRawStorageItem(STORAGE_KEY, JSON.stringify(normalizedOrders));
+  const saved = setRawStorageItem(STORAGE_KEY, JSON.stringify(normalizedOrders));
+  if (!saved) {
+    return false;
+  }
+
   emitOrdersUpdated();
+  return true;
 }
 
 export function subscribeToStoredOrders(listener) {
@@ -410,7 +415,9 @@ export function seedStoredOrders(seedOrders = demoOrders) {
     buildSeedOrder(order, index)
   );
 
-  saveStoredOrders(nextOrders);
+  if (!saveStoredOrders(nextOrders)) {
+    throw new Error("Unable to seed stored orders.");
+  }
   return nextOrders;
 }
 
@@ -439,7 +446,9 @@ export function createStoredOrder(orderInput) {
   };
 
   const nextOrders = [order, ...currentOrders];
-  saveStoredOrders(nextOrders);
+  if (!saveStoredOrders(nextOrders)) {
+    throw new Error("Unable to save order. Browser storage write failed.");
+  }
   return order;
 }
 
@@ -478,7 +487,9 @@ export function updateStoredOrder(orderNumber, updates) {
     return updatedOrder;
   });
 
-  saveStoredOrders(nextOrders);
+  if (!saveStoredOrders(nextOrders)) {
+    throw new Error("Unable to update order. Browser storage write failed.");
+  }
   return updatedOrder;
 }
 

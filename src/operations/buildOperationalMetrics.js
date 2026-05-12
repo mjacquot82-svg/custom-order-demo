@@ -11,11 +11,14 @@ export function buildOperationalMetrics(orders = []) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  let activeQuotes = 0;
+  let awaitingDeposit = 0;
   let overdue = 0;
   let dueToday = 0;
   let activeProduction = 0;
   let readyForPickup = 0;
   let needsAssignment = 0;
+  let outstandingPayments = 0;
 
   const productionTypes = PRODUCTION_TYPES.reduce((totals, type) => {
     totals[type] = 0;
@@ -24,6 +27,18 @@ export function buildOperationalMetrics(orders = []) {
   const workerLoad = {};
 
   orders.forEach((order) => {
+    if (order.operational_visible !== true) {
+      activeQuotes += 1;
+
+      if (order.quote_status === "Awaiting Deposit") {
+        awaitingDeposit += 1;
+      }
+    }
+
+    if (Number(order.balance_due || 0) > 0) {
+      outstandingPayments += 1;
+    }
+
     if (order.operational_visible === false) {
       return;
     }
@@ -62,11 +77,14 @@ export function buildOperationalMetrics(orders = []) {
   });
 
   return {
+    activeQuotes,
+    awaitingDeposit,
     overdue,
     dueToday,
     activeProduction,
     readyForPickup,
     needsAssignment,
+    outstandingPayments,
     productionTypes,
     workerLoad,
   };
