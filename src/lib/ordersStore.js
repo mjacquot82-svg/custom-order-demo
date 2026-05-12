@@ -150,7 +150,7 @@ function normalizeStoredOrder(order = {}) {
       order.customer_artwork_id || primaryArtwork?.id || primaryPlacement?.artwork_id || "",
     customer_artwork_name:
       order.customer_artwork_name ||
-      getArtworkDisplayName(primaryArtwork) ||
+      (primaryArtwork ? getArtworkDisplayName(primaryArtwork) : "") ||
       primaryPlacement?.artwork_name ||
       "",
     assigned_to_staff_id: assignedToStaffId,

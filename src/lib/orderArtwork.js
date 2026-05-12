@@ -6,56 +6,66 @@ function uniqueValues(values = []) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function normalizeArtworkRecord(file) {
+  return file && typeof file === "object" ? file : null;
+}
+
 export function getArtworkDisplayName(file = {}) {
+  const safeFile = normalizeArtworkRecord(file);
+  if (!safeFile) return "Customer artwork";
+
   return (
-    normalizeText(file.display_name) ||
-    normalizeText(file.original_filename) ||
-    normalizeText(file.file_name) ||
-    normalizeText(file.name) ||
+    normalizeText(safeFile.display_name) ||
+    normalizeText(safeFile.original_filename) ||
+    normalizeText(safeFile.file_name) ||
+    normalizeText(safeFile.name) ||
     "Customer artwork"
   );
 }
 
 export function normalizeArtworkFile(file = {}) {
-  const displayName = getArtworkDisplayName(file);
-  const type = normalizeText(file.type) || normalizeText(file.file_type);
-  const size = Number(file.size ?? file.file_size ?? 0) || 0;
+  const safeFile = normalizeArtworkRecord(file);
+  if (!safeFile) return null;
+
+  const displayName = getArtworkDisplayName(safeFile);
+  const type = normalizeText(safeFile.type) || normalizeText(safeFile.file_type);
+  const size = Number(safeFile.size ?? safeFile.file_size ?? 0) || 0;
   const assetUrl =
-    normalizeText(file.asset_url) ||
-    normalizeText(file.url) ||
-    normalizeText(file.source_url) ||
-    normalizeText(file.preview_url) ||
-    normalizeText(file.preview);
+    normalizeText(safeFile.asset_url) ||
+    normalizeText(safeFile.url) ||
+    normalizeText(safeFile.source_url) ||
+    normalizeText(safeFile.preview_url) ||
+    normalizeText(safeFile.preview);
   const previewUrl =
-    normalizeText(file.preview_url) ||
-    normalizeText(file.preview) ||
+    normalizeText(safeFile.preview_url) ||
+    normalizeText(safeFile.preview) ||
     assetUrl;
 
   return {
-    ...file,
-    id: file.id || `artwork-${displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    ...safeFile,
+    id: safeFile.id || `artwork-${displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     name: displayName,
-    display_name: normalizeText(file.display_name) || displayName,
+    display_name: normalizeText(safeFile.display_name) || displayName,
     file_name:
-      normalizeText(file.file_name) ||
-      normalizeText(file.original_filename) ||
+      normalizeText(safeFile.file_name) ||
+      normalizeText(safeFile.original_filename) ||
       displayName,
     original_filename:
-      normalizeText(file.original_filename) ||
-      normalizeText(file.file_name) ||
+      normalizeText(safeFile.original_filename) ||
+      normalizeText(safeFile.file_name) ||
       displayName,
     type,
     file_type: type,
     size,
     file_size: size,
     asset_url: assetUrl,
-    source_url: normalizeText(file.source_url) || assetUrl,
-    url: normalizeText(file.url) || assetUrl,
+    source_url: normalizeText(safeFile.source_url) || assetUrl,
+    url: normalizeText(safeFile.url) || assetUrl,
     asset_reference:
-      normalizeText(file.asset_reference) ||
-      normalizeText(file.asset_id) ||
+      normalizeText(safeFile.asset_reference) ||
+      normalizeText(safeFile.asset_id) ||
       assetUrl ||
-      file.id ||
+      safeFile.id ||
       "",
     preview: previewUrl,
     preview_url: previewUrl,
@@ -100,15 +110,27 @@ export function getOrderArtworkNames(order = {}) {
 }
 
 export function getArtworkAssetUrl(file = {}) {
-  return normalizeText(file.asset_url || file.url || file.source_url || file.preview_url || file.preview);
+  const safeFile = normalizeArtworkRecord(file);
+  if (!safeFile) return "";
+
+  return normalizeText(
+    safeFile.asset_url ||
+      safeFile.url ||
+      safeFile.source_url ||
+      safeFile.preview_url ||
+      safeFile.preview
+  );
 }
 
 export function isArtworkImage(file = {}) {
-  const type = normalizeText(file.type || file.file_type).toLowerCase();
+  const safeFile = normalizeArtworkRecord(file);
+  if (!safeFile) return false;
+
+  const type = normalizeText(safeFile.type || safeFile.file_type).toLowerCase();
   if (type.startsWith("image/")) {
     return true;
   }
 
-  const fileName = getArtworkDisplayName(file).toLowerCase();
+  const fileName = getArtworkDisplayName(safeFile).toLowerCase();
   return /\.(avif|gif|jpe?g|png|svg|webp|bmp|tiff?)$/.test(fileName);
 }
