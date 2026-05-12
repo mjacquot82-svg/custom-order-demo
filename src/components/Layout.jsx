@@ -60,7 +60,7 @@ function getAdminSections(role) {
     {
       title: "Actions",
       links: [
-        { to: "/admin/orders/new", label: "New Order", navKey: "newOrder" },
+        { to: "/admin/quotes/new", label: "New Quote", navKey: "newQuote" },
         { to: "/admin/sales/new", label: "Quick Sale", navKey: "quickSale" },
       ],
     },
@@ -68,9 +68,12 @@ function getAdminSections(role) {
       title: "Overview",
       links: [
         { to: "/admin", label: "Dashboard", navKey: "dashboard" },
-        { to: "/admin/orders", label: "Orders", navKey: "orders" },
         { to: "/admin/staff-users", label: "Manage Staff", navKey: "staffUsers" },
       ],
+    },
+    {
+      title: "Sales",
+      links: [{ to: "/admin/quotes", label: "Quotes", navKey: "quotes" }],
     },
     {
       title: "Production",
@@ -86,6 +89,16 @@ function getAdminSections(role) {
           label: "Assignments",
           navKey: "assignments",
           badgeKey: "assignments",
+        },
+      ],
+    },
+    {
+      title: "Financial",
+      links: [
+        {
+          to: "/admin/financial",
+          label: "Invoices & Payments",
+          navKey: "financial",
         },
       ],
     },
@@ -106,7 +119,9 @@ function getActiveSidebarLink(pathname) {
   if (pathname.startsWith("/admin/products")) return "products";
   if (pathname.startsWith("/admin/customers")) return "customers";
   if (pathname.startsWith("/admin/staff-users")) return "staffUsers";
-  if (pathname === "/admin/orders/new") return "newOrder";
+  if (pathname === "/admin/quotes") return "quotes";
+  if (pathname.startsWith("/admin/quotes/")) return pathname === "/admin/quotes/new" ? "newQuote" : "quotes";
+  if (pathname === "/admin/financial") return "financial";
   if (pathname === "/admin/sales/new") return "quickSale";
   if (pathname === "/admin/orders") return "productionOrders";
   if (pathname.startsWith("/admin/orders/")) return "productionOrders";

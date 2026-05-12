@@ -462,7 +462,7 @@ export default function Orders() {
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <Link
-              to="/admin/orders/new"
+              to="/admin/quotes"
               style={{
                 background: "#171717",
                 color: "#ffffff",
@@ -472,7 +472,7 @@ export default function Orders() {
                 fontWeight: 700,
               }}
             >
-              New Order
+              Open Quotes
             </Link>
             <Link
               to="/admin/assignments"

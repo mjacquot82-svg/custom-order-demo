@@ -405,6 +405,9 @@ export default function NewOrder() {
     const order = createStoredOrder({
       ...form,
       customer_id: customerId,
+      quote_status: "Draft",
+      operational_visible: false,
+      production_ready: false,
       product_image: selectedProduct?.image || "",
       product_notes: selectedProduct?.notes || "",
       qty: totalQty,
@@ -421,7 +424,7 @@ export default function NewOrder() {
 
     linkOrderToCustomer(customerId, order.order_number);
 
-    navigate(`/admin/orders/${order.order_number}`);
+    navigate(`/admin/quotes/${order.order_number}`);
   }
 
   return (
@@ -438,11 +441,11 @@ export default function NewOrder() {
               textTransform: "uppercase",
             }}
           >
-            Staff Order Entry
+            Quote Intake
           </p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "30px" }}>New Order</h1>
+          <h1 style={{ margin: "6px 0 8px", fontSize: "30px" }}>New Quote</h1>
           <p style={{ margin: 0, color: "#475569" }}>
-            Configure the garment first, confirm placements, and attach production artwork before saving.
+            Build the customer quote, confirm pricing and artwork requirements, then hold it in sales workflow until it is ready for production release.
           </p>
         </div>
 
@@ -543,7 +546,7 @@ export default function NewOrder() {
             </p>
           ) : (
             <p style={{ margin: "12px 0 0", color: "#475569", fontWeight: 700 }}>
-              If this customer is not already saved, a new customer profile will be created automatically when the order is saved.
+              If this customer is not already saved, a new customer profile will be created automatically when the quote is saved.
             </p>
           )}
         </section>
@@ -780,7 +783,7 @@ export default function NewOrder() {
         </section>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
-          <button type="button" onClick={() => navigate("/admin/orders")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "13px 18px", cursor: "pointer", fontWeight: 600 }}>
+          <button type="button" onClick={() => navigate("/admin/quotes")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "13px 18px", cursor: "pointer", fontWeight: 600 }}>
             Cancel
           </button>
           <button

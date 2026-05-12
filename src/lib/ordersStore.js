@@ -7,6 +7,10 @@ import {
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
+import {
+  isQuoteReadyForProduction,
+  normalizeQuoteStatus,
+} from "../quotes/quoteWorkflow";
 import { validatePaymentAmount } from "./financialValidation";
 import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
@@ -120,6 +124,9 @@ function normalizeStoredOrder(order = {}) {
   const assignedToStaffName = order.assigned_to_staff_name || "";
   const hasAssignedStaff = Boolean(assignedToStaffId);
   const status = normalizeOperationalStatus(order.status || "New");
+  const quoteStatus = normalizeQuoteStatus(
+    order.quote_status || (order.operational_visible === false ? "Draft" : "Ready For Production")
+  );
   const artworkFiles = getOrderArtworkFiles(order);
   const placements = normalizePlacements(order);
   const primaryPlacement = placements[0] || null;
@@ -131,6 +138,7 @@ function normalizeStoredOrder(order = {}) {
     ...timestamps,
     date: order.date || formatShortDate(timestamps.created_at),
     status,
+    quote_status: quoteStatus,
     placements,
     artwork_files: artworkFiles,
     artwork_reference_names: artworkFiles.map((file) => getArtworkDisplayName(file)),
@@ -155,11 +163,11 @@ function normalizeStoredOrder(order = {}) {
     production_ready:
       typeof order.production_ready === "boolean"
         ? order.production_ready
-        : isReadyForProductionStatus(status),
+        : isQuoteReadyForProduction(quoteStatus) && isReadyForProductionStatus(status),
     operational_visible:
       typeof order.operational_visible === "boolean"
         ? order.operational_visible
-        : isActiveOperationalStatus(status),
+        : isQuoteReadyForProduction(quoteStatus) && isActiveOperationalStatus(status),
   });
 }
 
@@ -284,11 +292,15 @@ function buildActivityEvent(type, note, timestamp = new Date().toISOString()) {
 
 function buildWorkflowDerivedUpdates(currentOrder, updates) {
   const nextStatus = normalizeOperationalStatus(updates.status || currentOrder.status);
+  const nextQuoteStatus = normalizeQuoteStatus(
+    updates.quote_status || currentOrder.quote_status
+  );
   const shouldDeriveStatus = Object.prototype.hasOwnProperty.call(updates, "status");
 
   return {
     ...updates,
     status: nextStatus,
+    quote_status: nextQuoteStatus,
     production_ready: shouldDeriveStatus
       ? isReadyForProductionStatus(nextStatus)
       : Object.prototype.hasOwnProperty.call(updates, "production_ready")
@@ -310,6 +322,7 @@ function describeOrderUpdate(updates) {
   if (updates.payment_history) return "Payment recorded.";
   if (updates.deposit?.status === "paid") return "Deposit recorded as paid.";
   if (updates.deposit?.status === "pending") return "Deposit requested.";
+  if (updates.quote_status) return `Quote status changed to ${updates.quote_status}.`;
   if (updates.artwork_files) return "Artwork file uploaded.";
   if (updates.size_breakdown) return "Size breakdown updated.";
   if (updates.quote) return "Quote snapshot saved.";
@@ -323,6 +336,7 @@ function describeActivityType(updates) {
   if (updates.pickup_status) return "pickup";
   if (updates.payment_history) return "payment";
   if (updates.deposit) return "deposit";
+  if (updates.quote_status) return "quote_status";
   if (updates.artwork_files) return "artwork";
   if (updates.size_breakdown) return "sizes";
   if (updates.quote) return "quote";

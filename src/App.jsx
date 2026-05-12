@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -24,6 +24,9 @@ import QuickSale from "./admin/QuickSale";
 import Sales from "./admin/Sales";
 import SaleReceipt from "./admin/SaleReceipt";
 import StaffUsers from "./admin/StaffUsers";
+import Quotes from "./admin/Quotes";
+import QuoteDetail from "./admin/QuoteDetail";
+import InvoicesPayments from "./admin/InvoicesPayments";
 import AppSplash from "./components/AppSplash";
 
 export default function App() {
@@ -46,12 +49,16 @@ export default function App() {
             <Route path="quote/:orderNumber" element={<QuoteView />} />
 
             <Route path="admin" element={<Dashboard />} />
+            <Route path="admin/quotes" element={<Quotes />} />
+            <Route path="admin/quotes/new" element={<NewOrder />} />
+            <Route path="admin/quotes/:orderNumber" element={<QuoteDetail />} />
             <Route path="admin/orders" element={<Orders />} />
-            <Route path="admin/orders/new" element={<NewOrder />} />
+            <Route path="admin/orders/new" element={<Navigate to="/admin/quotes/new" replace />} />
             <Route path="admin/orders/:orderNumber" element={<OrderDetail />} />
 
             <Route path="admin/products" element={<Products />} />
             <Route path="admin/assignments" element={<Assignments />} />
+            <Route path="admin/financial" element={<InvoicesPayments />} />
 
             <Route path="admin/customers" element={<Customers />} />
             <Route

@@ -131,7 +131,7 @@ export default function CustomerDetail() {
             Back to Customers
           </Link>
           <Link
-            to="/admin/orders/new"
+            to="/admin/quotes/new"
             style={{
               background: "#171717",
               color: "#ffffff",
@@ -141,7 +141,7 @@ export default function CustomerDetail() {
               fontWeight: 700,
             }}
           >
-            New Order
+            New Quote
           </Link>
         </div>
       </div>

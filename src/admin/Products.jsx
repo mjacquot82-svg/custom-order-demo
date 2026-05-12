@@ -605,7 +605,7 @@ export default function Products() {
                 Supported Production Methods
               </strong>
               <span style={{ color: "#64748b", fontSize: "13px" }}>
-                These methods appear on New Order and can carry per-unit production charges.
+                These methods appear on Quotes and can carry per-unit production charges.
               </span>
             </div>
 
