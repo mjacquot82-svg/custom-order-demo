@@ -127,6 +127,10 @@ const labelStyle = {
 export default function NewOrder() {
   const navigate = useNavigate();
   const artworkInputRef = useRef(null);
+  const customerNameInputRef = useRef(null);
+  const productSelectRef = useRef(null);
+  const sizeSectionRef = useRef(null);
+  const feedbackRef = useRef(null);
   const products = useStoredProducts().filter((product) => product.status !== "Inactive");
   const [customers, setCustomers] = useState(() => getStoredCustomers());
   const [customerSearchResults, setCustomerSearchResults] = useState([]);
@@ -155,6 +159,7 @@ export default function NewOrder() {
   const [submitState, setSubmitState] = useState("idle");
   const [submitMessage, setSubmitMessage] = useState("");
   const [validationMessages, setValidationMessages] = useState([]);
+  const [validationFields, setValidationFields] = useState({});
 
   const selectedProduct = useMemo(() => {
     return products.find((product) => product.id === selectedProductId);
@@ -202,24 +207,48 @@ export default function NewOrder() {
     setSubmitState("idle");
     setSubmitMessage("");
     setValidationMessages([]);
+    setValidationFields({});
   }
 
-  function buildValidationMessages() {
+  function focusFeedback(targetRef) {
+    window.requestAnimationFrame(() => {
+      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      if (targetRef?.current && typeof targetRef.current.focus === "function") {
+        targetRef.current.focus();
+        return;
+      }
+
+      if (feedbackRef.current && typeof feedbackRef.current.focus === "function") {
+        feedbackRef.current.focus();
+      }
+    });
+  }
+
+  function buildValidationState() {
     const messages = [];
+    const fields = {};
+    let firstInvalidRef = null;
 
     if (!String(form.customer_name || "").trim()) {
       messages.push("Enter the customer name before saving the quote.");
+      fields.customer_name = true;
+      firstInvalidRef ||= customerNameInputRef;
     }
 
     if (!selectedProductId || !String(form.garment || "").trim()) {
       messages.push("Select a garment or product before saving the quote.");
+      fields.product_id = true;
+      firstInvalidRef ||= productSelectRef;
     }
 
     if (totalQty <= 0) {
       messages.push("Add at least one unit in the size breakdown before saving the quote.");
+      fields.size_breakdown = true;
+      firstInvalidRef ||= sizeSectionRef;
     }
 
-    return messages;
+    return { messages, fields, firstInvalidRef };
   }
 
   function selectCustomerById(customerId) {
@@ -391,17 +420,20 @@ export default function NewOrder() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    const nextValidationMessages = buildValidationMessages();
-    if (nextValidationMessages.length) {
+    const validationState = buildValidationState();
+    if (validationState.messages.length) {
       setSubmitState("validation");
       setSubmitMessage("Quote not saved. Resolve the required items below.");
-      setValidationMessages(nextValidationMessages);
+      setValidationMessages(validationState.messages);
+      setValidationFields(validationState.fields);
+      focusFeedback(validationState.firstInvalidRef);
       return;
     }
 
     setSubmitState("saving");
     setSubmitMessage("Saving quote…");
     setValidationMessages([]);
+    setValidationFields({});
 
     try {
       const customerId = resolveCustomerForOrder();
@@ -482,7 +514,16 @@ export default function NewOrder() {
       linkOrderToCustomer(customerId, order.order_number);
       setSubmitState("success");
       setSubmitMessage(`Quote ${order.order_number} saved. Opening quote workspace…`);
-      navigate(`/admin/quotes/${order.order_number}`);
+      navigate(`/admin/quotes/${order.order_number}`, {
+        state: {
+          flashMessage: `Quote ${order.order_number} saved successfully.`,
+          flashTone: "success",
+          savedOrder: {
+            ...order,
+            quote,
+          },
+        },
+      });
     } catch (error) {
       console.error("Unable to save quote", error);
       setSubmitState("error");
@@ -491,6 +532,7 @@ export default function NewOrder() {
           ? error.message
           : "Quote could not be saved. Try again."
       );
+      focusFeedback();
     }
   }
 
@@ -541,7 +583,18 @@ export default function NewOrder() {
 
             <label style={{ ...labelStyle, position: "relative" }}>
               Customer Name
-              <input name="customer_name" value={form.customer_name} onChange={updateField} required placeholder="ABC Construction" style={fieldStyle} />
+              <input
+                ref={customerNameInputRef}
+                name="customer_name"
+                value={form.customer_name}
+                onChange={updateField}
+                required
+                placeholder="ABC Construction"
+                style={{
+                  ...fieldStyle,
+                  borderColor: validationFields.customer_name ? "#dc2626" : "#cbd5e1",
+                }}
+              />
 
               {customerSearchResults.length > 0 && !selectedCustomerId && (
                 <div
@@ -620,7 +673,9 @@ export default function NewOrder() {
 
         {(submitMessage || validationMessages.length > 0) && (
           <section
+            ref={feedbackRef}
             aria-live="polite"
+            tabIndex={-1}
             style={{
               marginBottom: "20px",
               borderRadius: "16px",
@@ -671,7 +726,16 @@ export default function NewOrder() {
             <div className="new-order-field-stack">
               <label style={labelStyle}>
                 Garment / Product
-                <select value={selectedProductId} onChange={selectProduct} required style={fieldStyle}>
+                <select
+                  ref={productSelectRef}
+                  value={selectedProductId}
+                  onChange={selectProduct}
+                  required
+                  style={{
+                    ...fieldStyle,
+                    borderColor: validationFields.product_id ? "#dc2626" : "#cbd5e1",
+                  }}
+                >
                   <option value="">Select a catalog product...</option>
                   {products.map((product) => (
                     <option key={product.id} value={product.id}>
@@ -815,7 +879,20 @@ export default function NewOrder() {
                 <span className="new-order-selection-count">Total {totalQty}</span>
               </div>
 
-              <div className="new-order-size-grid">
+              <div
+                ref={sizeSectionRef}
+                className="new-order-size-grid"
+                style={
+                  validationFields.size_breakdown
+                    ? {
+                        border: "1px solid #fecaca",
+                        borderRadius: "16px",
+                        padding: "12px",
+                        background: "#fef2f2",
+                      }
+                    : undefined
+                }
+              >
                 {sizeKeys.map((size) => (
                   <label key={size} className="new-order-size-field">
                     <span>{size}</span>

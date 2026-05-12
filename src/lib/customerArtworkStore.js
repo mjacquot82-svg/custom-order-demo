@@ -10,7 +10,7 @@ export function getAllCustomerArtwork() {
 
 export function saveAllCustomerArtwork(artwork) {
   if (!hasBrowserStorage()) return;
-  setJsonStorageItem(STORAGE_KEY, artwork);
+  return setJsonStorageItem(STORAGE_KEY, artwork);
 }
 
 export function getCustomerArtwork(customerId) {
@@ -64,13 +64,15 @@ export function saveCustomerArtwork(customerId, artworkInput) {
   };
 
   const nextArtwork = [artwork, ...currentArtwork];
-  saveAllCustomerArtwork(nextArtwork);
+  if (!saveAllCustomerArtwork(nextArtwork)) {
+    throw new Error("Unable to save artwork. Browser storage write failed.");
+  }
   return artwork;
 }
 
 export function removeCustomerArtwork(artworkId) {
   const nextArtwork = getAllCustomerArtwork().filter((item) => item.id !== artworkId);
-  saveAllCustomerArtwork(nextArtwork);
+  return saveAllCustomerArtwork(nextArtwork);
 }
 
 export function updateCustomerArtwork(artworkId, updates) {
@@ -85,6 +87,8 @@ export function updateCustomerArtwork(artworkId, updates) {
       : item
   );
 
-  saveAllCustomerArtwork(nextArtwork);
+  if (!saveAllCustomerArtwork(nextArtwork)) {
+    throw new Error("Unable to update artwork. Browser storage write failed.");
+  }
   return nextArtwork.find((item) => item.id === artworkId);
 }

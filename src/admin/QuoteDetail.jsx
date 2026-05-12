@@ -1,8 +1,7 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import PricingSummary from "../components/PricingSummary";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
-import { useStoredProducts } from "../lib/productsStore";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
   canAdvanceQuoteStatus,
@@ -34,20 +33,18 @@ function DetailItem({ label, value }) {
 
 export default function QuoteDetail() {
   const { orderNumber } = useParams();
+  const location = useLocation();
   const orders = useStoredOrders();
-  const products = useStoredProducts();
+  const savedOrder = location.state?.savedOrder || null;
   const order = useMemo(
-    () => orders.find((entry) => entry.order_number === orderNumber) || null,
-    [orderNumber, orders]
-  );
-  const product = useMemo(
     () =>
-      products.find(
-        (entry) => entry.id === order?.product_id || entry.name === order?.garment
-      ) || null,
-    [order, products]
+      orders.find((entry) => entry.order_number === orderNumber) ||
+      (savedOrder?.order_number === orderNumber ? savedOrder : null),
+    [orderNumber, orders, savedOrder]
   );
   const quoteSnapshot = order?.quote || null;
+  const flashMessage = location.state?.flashMessage || "";
+  const flashTone = location.state?.flashTone || "default";
   const financials = useMemo(
     () =>
       order
@@ -93,6 +90,23 @@ export default function QuoteDetail() {
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
+      {flashMessage ? (
+        <section
+          aria-live="polite"
+          style={{
+            marginBottom: "20px",
+            borderRadius: "16px",
+            padding: "16px 18px",
+            border: flashTone === "success" ? "1px solid #bbf7d0" : "1px solid #cbd5e1",
+            background: flashTone === "success" ? "#ecfdf5" : "#f8fafc",
+            color: flashTone === "success" ? "#166534" : "#334155",
+            fontWeight: 700,
+          }}
+        >
+          {flashMessage}
+        </section>
+      ) : null}
+
       <div
         style={{
           display: "flex",

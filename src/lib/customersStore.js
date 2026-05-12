@@ -9,7 +9,7 @@ export function getStoredCustomers() {
 
 export function saveStoredCustomers(customers) {
   if (!hasBrowserStorage()) return;
-  setJsonStorageItem(STORAGE_KEY, customers);
+  return setJsonStorageItem(STORAGE_KEY, customers);
 }
 
 export function createStoredCustomer(customerInput) {
@@ -29,7 +29,9 @@ export function createStoredCustomer(customerInput) {
   };
 
   const nextCustomers = [customer, ...currentCustomers];
-  saveStoredCustomers(nextCustomers);
+  if (!saveStoredCustomers(nextCustomers)) {
+    throw new Error("Unable to save customer. Browser storage write failed.");
+  }
   return customer;
 }
 
@@ -45,7 +47,9 @@ export function updateStoredCustomer(customerId, updates) {
       : customer
   );
 
-  saveStoredCustomers(nextCustomers);
+  if (!saveStoredCustomers(nextCustomers)) {
+    throw new Error("Unable to update customer. Browser storage write failed.");
+  }
   return nextCustomers.find((customer) => customer.id === customerId);
 }
 
