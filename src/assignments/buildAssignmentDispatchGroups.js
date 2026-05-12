@@ -1,7 +1,5 @@
-import {
-  isCompletedOperationalStatus,
-  sortOrdersByOperationalStatus,
-} from "../orders/orderWorkflow";
+import { sortOrdersByOperationalStatus } from "../orders/orderWorkflow";
+import { buildQueuePriority, sortQueueByPriority } from "../queue/buildQueuePriority";
 
 export function buildAssignmentDispatchGroups(orders = []) {
   const grouped = {};
@@ -16,22 +14,26 @@ export function buildAssignmentDispatchGroups(orders = []) {
     grouped[worker].push(order);
   });
 
-  return Object.entries(grouped).map(([workerName, workerOrders]) => {
-    const overdueCount = workerOrders.filter((order) => {
-      if (!order.due_date) return false;
+  return Object.entries(grouped)
+    .map(([workerName, workerOrders]) => {
+      const overdueCount = workerOrders.filter((order) => buildQueuePriority(order).overdue).length;
 
-      const dueDate = new Date(`${order.due_date}T00:00:00`);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      return {
+        workerName,
+        overdueCount,
+        orderCount: workerOrders.length,
+        orders: sortQueueByPriority(sortOrdersByOperationalStatus(workerOrders)),
+      };
+    })
+    .sort((left, right) => {
+      if (right.overdueCount !== left.overdueCount) {
+        return right.overdueCount - left.overdueCount;
+      }
 
-      return dueDate < today && !isCompletedOperationalStatus(order.status);
-    }).length;
+      if (right.orderCount !== left.orderCount) {
+        return right.orderCount - left.orderCount;
+      }
 
-    return {
-      workerName,
-      overdueCount,
-      orderCount: workerOrders.length,
-      orders: sortOrdersByOperationalStatus(workerOrders),
-    };
-  });
+      return left.workerName.localeCompare(right.workerName);
+    });
 }

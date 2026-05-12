@@ -11,30 +11,14 @@ import {
   isActiveOperationalStatus,
   isCompletedOperationalStatus,
   normalizeOperationalStatus,
-  sortOrdersByOperationalStatus,
+  sortOrdersByOperationalStatus
 } from "../orders/orderWorkflow";
 
 const cardStyle = { background: "#ffffff", borderRadius: "20px", padding: "22px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", border: "1px solid #e7e5e4" };
-const selectStyle = { width: "100%", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "10px 11px", background: "#ffffff", color: "#0f172a", fontWeight: 700 };
 function isOpenOrder(order) { return order.operational_visible !== false && isActiveOperationalStatus(order.status); }
 function normalizeOrder(order, index = 0) { return { ...order, customer_name: order.customer_name || ["ABC Construction", "City Hockey", "Local Customer"][index] || "Walk-in Customer", garment: order.garment || order.item || "Custom garment", status: normalizeOperationalStatus(order.status || "New"), qty: Number(order.qty || 0), due_date: order.due_date || "", assigned_to_staff_id: order.assigned_to_staff_id || "", assigned_to_staff_name: order.assigned_to_staff_name || "", operational_visible: order.operational_visible !== false }; }
 function isOverdue(order) { if (!order.due_date) return false; const due = new Date(`${order.due_date}T00:00:00`); const today = new Date(); today.setHours(0,0,0,0); return due < today && !isCompletedOperationalStatus(order.status); }
 function formatWorkerName(worker) { return `${worker.name}${worker.role ? ` (${worker.role})` : ""}`; }
-
-function UrgentAssignmentCard({ order, staffUsers, onAssign }) {
-  return (
-    <article style={{ border: isOverdue(order) ? "1px solid #fecaca" : "1px dashed #cbd5e1", borderRadius: "16px", padding: "14px", background: isOverdue(order) ? "#fef2f2" : "#f8fafc" }}>
-      <strong>{order.order_number}</strong>
-      <p style={{ margin: "5px 0", color: "#334155", fontWeight: 700 }}>{order.customer_name}</p>
-      <p style={{ margin: "0 0 8px", color: "#64748b" }}>{order.garment} • Qty {order.qty}</p>
-      {order.due_date && <p style={{ margin: "0 0 10px", color: isOverdue(order) ? "#b91c1c" : "#92400e", fontWeight: 900 }}>Due: {order.due_date}{isOverdue(order) ? " • OVERDUE" : ""}</p>}
-      <select value={order.assigned_to_staff_id || ""} onChange={(event) => onAssign(order, event.target.value)} style={selectStyle}>
-        <option value="">Assign worker…</option>
-        {staffUsers.map((worker) => <option key={worker.id} value={worker.id}>{formatWorkerName(worker)}</option>)}
-      </select>
-    </article>
-  );
-}
 
 export default function Assignments() {
   const storedOrders = useStoredOrders();
@@ -49,13 +33,18 @@ export default function Assignments() {
     () => getStoredStaffUsers().filter((user) => user.status !== "Inactive"),
     []
   );
-  const orders = useMemo(
-    () => sortOrdersByOperationalStatus(storedOrders.map(normalizeOrder).filter(isOpenOrder)),
+  const allOrders = useMemo(
+    () => sortOrdersByOperationalStatus(storedOrders.map(normalizeOrder)),
     [storedOrders]
   );
-  const unassignedOrders = orders.filter((order) => !order.assigned_to_staff_id).sort((a, b) => String(a.due_date || "").localeCompare(String(b.due_date || "")));
-  const assignedOrders = orders.filter((order) => order.assigned_to_staff_id);
-  const overdueOrders = orders.filter(isOverdue);
+  const activeOrders = useMemo(
+    () => allOrders.filter(isOpenOrder),
+    [allOrders]
+  );
+  const unassignedOrders = activeOrders.filter((order) => !order.assigned_to_staff_id);
+  const assignedOrders = activeOrders.filter((order) => order.assigned_to_staff_id);
+  const completedOrders = allOrders.filter((order) => isCompletedOperationalStatus(order.status));
+  const overdueOrders = activeOrders.filter(isOverdue);
 
   function handleAssign(order, staffId) {
     const selectedWorker = staffUsers.find((worker) => worker.id === staffId);
@@ -82,18 +71,19 @@ export default function Assignments() {
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "14px", marginBottom: "18px" }}>
-        <div style={cardStyle}><p style={{ margin: 0, color: "#64748b", fontWeight: 800 }}>Open Jobs</p><h2 style={{ margin: "8px 0 0", fontSize: "34px" }}>{orders.length}</h2></div>
+        <div style={cardStyle}><p style={{ margin: 0, color: "#64748b", fontWeight: 800 }}>Open Jobs</p><h2 style={{ margin: "8px 0 0", fontSize: "34px" }}>{activeOrders.length}</h2></div>
         <div style={{ ...cardStyle, background: unassignedOrders.length ? "#fffbeb" : "#fff" }}><p style={{ margin: 0, color: "#92400e", fontWeight: 800 }}>Need Assignment</p><h2 style={{ margin: "8px 0 0", fontSize: "34px" }}>{unassignedOrders.length}</h2></div>
         <div style={{ ...cardStyle, background: overdueOrders.length ? "#fef2f2" : "#fff" }}><p style={{ margin: 0, color: "#b91c1c", fontWeight: 800 }}>Overdue</p><h2 style={{ margin: "8px 0 0", fontSize: "34px" }}>{overdueOrders.length}</h2></div>
         <div style={cardStyle}><p style={{ margin: 0, color: "#047857", fontWeight: 800 }}>Assigned</p><h2 style={{ margin: "8px 0 0", fontSize: "34px" }}>{assignedOrders.length}</h2></div>
+        <div style={cardStyle}><p style={{ margin: 0, color: "#0f766e", fontWeight: 800 }}>Completed</p><h2 style={{ margin: "8px 0 0", fontSize: "34px" }}>{completedOrders.length}</h2></div>
       </section>
 
-      <section style={{ ...cardStyle, marginBottom: "18px", background: unassignedOrders.length ? "#fffbeb" : "#ffffff", borderColor: unassignedOrders.length ? "#fde68a" : "#e7e5e4" }}>
-        <h2 style={{ marginTop: 0 }}>Unassigned Urgency Section</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px" }}>{unassignedOrders.length ? unassignedOrders.map((order) => <UrgentAssignmentCard key={order.order_number} order={order} staffUsers={staffUsers} onAssign={handleAssign} />) : <p style={{ margin: 0, color: "#64748b" }}>All open jobs are currently assigned.</p>}</div>
-      </section>
-
-      <AssignmentDispatchBoard orders={orders} />
+      <AssignmentDispatchBoard
+        orders={allOrders}
+        staffUsers={staffUsers}
+        onAssign={handleAssign}
+        formatWorkerName={formatWorkerName}
+      />
     </div>
   );
 }
