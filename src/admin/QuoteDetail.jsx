@@ -8,6 +8,11 @@ import {
   getNextQuoteStatus,
   isQuoteReadyForProduction,
 } from "../quotes/quoteWorkflow";
+import {
+  buildApprovalStatus,
+  buildDepositStatus,
+  buildProductionReadiness,
+} from "../quotes/productionReadiness";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -58,50 +63,6 @@ function StatusPill({ children, tone = "default" }) {
   );
 }
 
-function buildDepositStatus(order, financials) {
-  const depositTarget = Number(financials?.deposit_amount || 0);
-  const totalPaid = Number(financials?.total_paid || 0);
-  const depositStatus = String(order?.deposit?.status || "").trim().toLowerCase();
-
-  if (depositTarget <= 0) return "No deposit";
-  if (depositStatus === "paid" || totalPaid >= depositTarget) return "Paid";
-  if (depositStatus === "pending") return "Requested";
-  if (totalPaid > 0) return "Partial";
-  return "Outstanding";
-}
-
-function buildReleaseChecks(order, financials) {
-  const approvalStatus = String(order?.approval_status || "").trim().toLowerCase();
-  const depositTarget = Number(financials?.deposit_amount || 0);
-  const totalPaid = Number(financials?.total_paid || 0);
-  const depositStatus = String(order?.deposit?.status || "").trim().toLowerCase();
-  const artworkCount = Array.isArray(order?.artwork_files) ? order.artwork_files.length : 0;
-  const artworkWaiting = String(order?.quote_status || "").trim().toLowerCase() === "awaiting artwork approval";
-
-  const checks = [
-    {
-      label: "Customer approval",
-      passed: approvalStatus.includes("approved"),
-      detail: order?.approval_status || "Not Sent",
-    },
-    {
-      label: "Deposit",
-      passed: depositTarget <= 0 || depositStatus === "paid" || totalPaid >= depositTarget,
-      detail: buildDepositStatus(order, financials),
-    },
-    {
-      label: "Artwork",
-      passed: artworkCount === 0 || !artworkWaiting,
-      detail: artworkCount ? "Artwork on file" : "No artwork blocker",
-    },
-  ];
-
-  return {
-    checks,
-    blockers: checks.filter((check) => !check.passed).length,
-  };
-}
-
 export default function QuoteDetail() {
   const { orderNumber } = useParams();
   const location = useLocation();
@@ -126,7 +87,11 @@ export default function QuoteDetail() {
     [order, quoteSnapshot]
   );
   const depositStatus = useMemo(() => buildDepositStatus(order, financials), [order, financials]);
-  const releaseChecks = useMemo(() => buildReleaseChecks(order, financials), [order, financials]);
+  const approvalStatus = useMemo(() => buildApprovalStatus(order), [order]);
+  const productionReadiness = useMemo(
+    () => buildProductionReadiness(order, financials),
+    [order, financials]
+  );
 
   if (!order) {
     return (
@@ -267,14 +232,16 @@ export default function QuoteDetail() {
             <StatusPill tone={isQuoteReadyForProduction(order.quote_status) ? "success" : "default"}>
               {order.quote_status}
             </StatusPill>
-            <StatusPill tone={depositStatus === "Paid" ? "success" : "warning"}>
-              Deposit {depositStatus}
+            <StatusPill tone={depositStatus === "Deposit received" ? "success" : "warning"}>
+              {depositStatus}
             </StatusPill>
-            <StatusPill tone={String(order.approval_status || "").toLowerCase().includes("approved") ? "success" : "warning"}>
-              Approval {order.approval_status || "Not Sent"}
+            <StatusPill tone={approvalStatus === "Approved" ? "success" : "warning"}>
+              {approvalStatus}
             </StatusPill>
-            <StatusPill tone={releaseChecks.blockers ? "warning" : "success"}>
-              {releaseChecks.blockers ? `${releaseChecks.blockers} blocker${releaseChecks.blockers === 1 ? "" : "s"}` : "Release clear"}
+            <StatusPill tone={productionReadiness.ready ? "success" : "warning"}>
+              {productionReadiness.ready
+                ? "Ready for production"
+                : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`}
             </StatusPill>
           </div>
 
@@ -288,16 +255,20 @@ export default function QuoteDetail() {
             <DetailItem label="Customer" value={order.customer_name} />
             <DetailItem label="Company" value={order.customer_company} />
             <DetailItem label="Quote Status" value={order.quote_status} />
-            <DetailItem label="Deposit Status" value={depositStatus} />
-            <DetailItem label="Approval" value={order.approval_status || "Not Sent"} />
+            <DetailItem label="Production Readiness" value={productionReadiness.ready ? "Ready for production" : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`} />
+            <DetailItem label="Customer Approval" value={approvalStatus} />
+            <DetailItem label="Deposit" value={depositStatus} />
             <DetailItem label="Source" value={order.source} />
             <DetailItem label="Due Date" value={order.due_date} />
-            <DetailItem label="Artwork Required" value={order.artwork_files?.length ? "Attached" : "Pending"} />
+            <DetailItem
+              label="Artwork"
+              value={productionReadiness.checks.find((check) => check.label === "Artwork")?.detail || "No artwork required"}
+            />
           </div>
         </section>
 
         <section
-          style={cardStyle(releaseChecks.blockers ? "#fff7ed" : "#ecfdf5")}
+          style={cardStyle(productionReadiness.ready ? "#ecfdf5" : "#fff7ed")}
         >
           <div
             style={{
@@ -313,28 +284,32 @@ export default function QuoteDetail() {
               <p
                 style={{
                   margin: 0,
-                  color: releaseChecks.blockers ? "#9a3412" : "#166534",
+                  color: productionReadiness.ready ? "#166534" : "#9a3412",
                   fontSize: "12px",
                   fontWeight: 800,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
                 }}
               >
-                Release Rules
+                Production Readiness
               </p>
               <p
                 style={{
                   margin: "6px 0 0",
-                  color: releaseChecks.blockers ? "#7c2d12" : "#166534",
+                  color: productionReadiness.ready ? "#166534" : "#7c2d12",
                   lineHeight: 1.6,
                   fontWeight: 700,
                 }}
               >
-                A quote can move into production only after approval, deposit confirmation, and artwork sign-off where required.
+                {productionReadiness.ready
+                  ? "This quote has everything needed to move into production."
+                  : "This section shows what is still required before this quote can move into production."}
               </p>
             </div>
-            <StatusPill tone={releaseChecks.blockers ? "warning" : "success"}>
-              {releaseChecks.blockers ? `${releaseChecks.blockers} blocker${releaseChecks.blockers === 1 ? "" : "s"}` : "Ready for release"}
+            <StatusPill tone={productionReadiness.ready ? "success" : "warning"}>
+              {productionReadiness.ready
+                ? "Ready for production"
+                : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`}
             </StatusPill>
           </div>
 
@@ -345,7 +320,7 @@ export default function QuoteDetail() {
               gap: "12px",
             }}
           >
-            {releaseChecks.checks.map((check) => (
+            {productionReadiness.checks.map((check) => (
               <div
                 key={check.label}
                 style={{
@@ -374,9 +349,8 @@ export default function QuoteDetail() {
                     color: check.passed ? "#166534" : "#7c2d12",
                   }}
                 >
-                  {check.passed ? "Clear" : "Blocked"}
+                  {check.detail}
                 </strong>
-                <p style={{ margin: "4px 0 0", color: "#475569" }}>{check.detail}</p>
               </div>
             ))}
           </div>

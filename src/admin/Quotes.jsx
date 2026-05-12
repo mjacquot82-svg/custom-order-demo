@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getOrderArtworkNames } from "../lib/orderArtwork";
+import { getJsonStorageItem, setJsonStorageItem } from "../lib/browserStorage";
 import { useStoredOrders } from "../lib/ordersStore";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
@@ -9,6 +10,13 @@ import {
   isQuoteReadyForProduction,
   sortQuotesByStatus,
 } from "../quotes/quoteWorkflow";
+import {
+  buildApprovalStatus,
+  buildDepositStatus,
+  buildProductionReadiness,
+} from "../quotes/productionReadiness";
+
+const EXPANDED_QUOTES_STORAGE_KEY = "teeCoQuotesExpandedState";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -24,67 +32,15 @@ function formatList(values = [], fallback = "—") {
   return items.length ? items.join(", ") : fallback;
 }
 
-function buildDepositStatus(order, financials) {
-  const depositTarget = Number(financials.deposit_amount || 0);
-  const totalPaid = Number(financials.total_paid || 0);
-  const depositStatus = String(order.deposit?.status || "").trim().toLowerCase();
+function readExpandedQuotesState() {
+  const storedState = getJsonStorageItem(EXPANDED_QUOTES_STORAGE_KEY, {});
+  if (!storedState || typeof storedState !== "object" || Array.isArray(storedState)) {
+    return {};
+  }
 
-  if (depositTarget <= 0) return "No deposit";
-  if (depositStatus === "paid" || totalPaid >= depositTarget) return "Paid";
-  if (depositStatus === "pending") return "Requested";
-  if (totalPaid > 0) return "Partial";
-  return "Outstanding";
-}
-
-function buildApprovalStatus(order) {
-  return formatValue(order.approval_status, "Not Sent");
-}
-
-function isApprovalSatisfied(order) {
-  const approvalStatus = String(order.approval_status || "").trim().toLowerCase();
-
-  return approvalStatus.includes("approved");
-}
-
-function isDepositSatisfied(order, financials) {
-  const depositTarget = Number(financials.deposit_amount || 0);
-  const totalPaid = Number(financials.total_paid || 0);
-  const depositStatus = String(order.deposit?.status || "").trim().toLowerCase();
-
-  return depositTarget <= 0 || depositStatus === "paid" || totalPaid >= depositTarget;
-}
-
-function isArtworkSatisfied(order) {
-  const artworkCount = Array.isArray(order.artwork_files) ? order.artwork_files.length : 0;
-  return artworkCount === 0 || String(order.quote_status || "").trim().toLowerCase() !== "awaiting artwork approval";
-}
-
-function buildReleaseChecks(order, financials) {
-  const checks = [
-    {
-      label: "Customer approval",
-      passed: isApprovalSatisfied(order),
-      detail: buildApprovalStatus(order),
-    },
-    {
-      label: "Deposit",
-      passed: isDepositSatisfied(order, financials),
-      detail: buildDepositStatus(order, financials),
-    },
-    {
-      label: "Artwork",
-      passed: isArtworkSatisfied(order),
-      detail:
-        Array.isArray(order.artwork_files) && order.artwork_files.length
-          ? "Artwork on file"
-          : "No artwork blocker",
-    },
-  ];
-
-  return {
-    checks,
-    blockers: checks.filter((check) => !check.passed).length,
-  };
+  return Object.fromEntries(
+    Object.entries(storedState).filter(([, value]) => typeof value === "boolean")
+  );
 }
 
 function buildQuoteSummary(order) {
@@ -93,7 +49,7 @@ function buildQuoteSummary(order) {
   });
   const placements = Array.isArray(order.placements) ? order.placements : [];
   const artworkNames = getOrderArtworkNames(order);
-  const release = buildReleaseChecks(order, financials);
+  const readiness = buildProductionReadiness(order, financials);
 
   return {
     financials,
@@ -109,7 +65,7 @@ function buildQuoteSummary(order) {
       placements.map((entry) => entry.decoration_type || order.decoration_type),
       formatValue(order.decoration_type)
     ),
-    release,
+    readiness,
   };
 }
 
@@ -219,7 +175,7 @@ function ExpandIcon({ open }) {
       aria-hidden="true"
       style={{
         transform: open ? "rotate(180deg)" : "rotate(0deg)",
-        transition: "transform 160ms ease",
+        transition: "transform 180ms ease",
       }}
     >
       <path
@@ -234,9 +190,15 @@ function ExpandIcon({ open }) {
   );
 }
 
+function buildReadinessSummary(readiness) {
+  if (readiness.ready) return "Ready for production";
+
+  return `${readiness.remainingRequirements} requirement${readiness.remainingRequirements === 1 ? "" : "s"} remaining`;
+}
+
 export default function Quotes() {
   const orders = useStoredOrders();
-  const [expandedQuotes, setExpandedQuotes] = useState({});
+  const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
   const quotes = useMemo(
     () =>
       sortQuotesByStatus(orders.filter((order) => order.operational_visible !== true)),
@@ -248,10 +210,26 @@ export default function Quotes() {
     [quotes]
   );
 
+  useEffect(() => {
+    const activeOrderNumbers = new Set(quotes.map((quote) => quote.order_number));
+
+    setExpandedQuotes((current) => {
+      const nextState = Object.fromEntries(
+        Object.entries(current).filter(([orderNumber]) => activeOrderNumbers.has(orderNumber))
+      );
+
+      return Object.keys(nextState).length === Object.keys(current).length ? current : nextState;
+    });
+  }, [quotes]);
+
+  useEffect(() => {
+    setJsonStorageItem(EXPANDED_QUOTES_STORAGE_KEY, expandedQuotes);
+  }, [expandedQuotes]);
+
   function toggleQuote(orderNumber) {
     setExpandedQuotes((current) => ({
       ...current,
-      [orderNumber]: !current[orderNumber],
+      [orderNumber]: !Boolean(current[orderNumber]),
     }));
   }
 
@@ -328,263 +306,58 @@ export default function Quotes() {
             quotes.map((quote) => {
               const summary = buildQuoteSummary(quote);
               const isExpanded = Boolean(expandedQuotes[quote.order_number]);
-              const blockerTone = summary.release.blockers ? "warning" : "success";
+              const readinessTone = summary.readiness.ready ? "success" : "warning";
 
               return (
                 <article
                   key={quote.order_number}
                   style={{
-                    border: "1px solid #e2e8f0",
+                    border: `1px solid ${isExpanded ? "#cbd5e1" : "#e2e8f0"}`,
                     borderRadius: "18px",
                     padding: "16px 18px",
                     display: "grid",
                     gap: "14px",
                     background: isExpanded ? "#fcfdff" : "#ffffff",
+                    boxShadow: isExpanded ? "0 8px 24px rgba(15, 23, 42, 0.06)" : "none",
                   }}
                 >
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "12px",
-                      alignItems: "flex-start",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      <StatusPill tone={isQuoteReadyForProduction(quote.quote_status) ? "success" : "default"}>
-                        {formatValue(quote.quote_status, "Draft")}
-                      </StatusPill>
-                      <StatusPill tone={summary.depositStatus === "Paid" ? "success" : "warning"}>
-                        Deposit {summary.depositStatus}
-                      </StatusPill>
-                      <StatusPill tone={blockerTone}>
-                        {summary.release.blockers ? `${summary.release.blockers} blocker${summary.release.blockers === 1 ? "" : "s"}` : "Release clear"}
-                      </StatusPill>
-                    </div>
-
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                      <Link
-                        to={`/admin/quotes/${quote.order_number}`}
-                        style={{
-                          color: "#0f172a",
-                          textDecoration: "none",
-                          fontWeight: 700,
-                          padding: "9px 12px",
-                          borderRadius: "10px",
-                          border: "1px solid #d6dbe4",
-                          background: "#ffffff",
-                        }}
-                      >
-                        Open Quote
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => toggleQuote(quote.order_number)}
-                        aria-expanded={isExpanded}
-                        aria-controls={`quote-details-${quote.order_number}`}
-                        style={{
-                          border: "1px solid #d6dbe4",
-                          background: "#ffffff",
-                          color: "#0f172a",
-                          borderRadius: "10px",
-                          padding: "9px 12px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        {isExpanded ? "Collapse" : "Expand"}
-                        <ExpandIcon open={isExpanded} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-                      gap: "14px",
+                      gridTemplateColumns: "minmax(0, 1fr) auto",
+                      gap: "12px",
+                      alignItems: "stretch",
                     }}
                   >
-                    <Field label="Quote #" value={quote.order_number} />
-                    <Field label="Customer" value={formatValue(quote.customer_name, "Walk-in Customer")} />
-                    <Field label="Status" value={formatValue(quote.quote_status, "Draft")} />
-                    <Field
-                      label="Deposit Status"
-                      value={summary.depositStatus}
-                      tone={summary.depositStatus === "Paid" ? "success" : "warning"}
-                    />
-                    <Field label="Due Date" value={summary.dueDate} />
-                    <Field label="Total" value={money(summary.total)} />
-                    <Field
-                      label="Approval"
-                      value={summary.approvalStatus}
-                      tone={summary.approvalStatus.toLowerCase().includes("approved") ? "success" : "warning"}
-                    />
-                  </div>
-
-                  {isExpanded ? (
-                    <div
-                      id={`quote-details-${quote.order_number}`}
+                    <button
+                      type="button"
+                      onClick={() => toggleQuote(quote.order_number)}
+                      aria-expanded={isExpanded}
+                      aria-controls={`quote-details-${quote.order_number}`}
                       style={{
-                        borderTop: "1px solid #e2e8f0",
-                        paddingTop: "14px",
+                        border: `1px solid ${isExpanded ? "#cbd5e1" : "#d6dbe4"}`,
+                        background: isExpanded ? "#f8fafc" : "#ffffff",
+                        color: "#0f172a",
+                        borderRadius: "14px",
+                        padding: "14px 16px",
+                        fontWeight: 700,
+                        cursor: "pointer",
                         display: "grid",
-                        gap: "14px",
+                        gap: "12px",
+                        textAlign: "left",
+                        minWidth: 0,
                       }}
                     >
-                      <section
-                        style={{
-                          borderRadius: "16px",
-                          border: `1px solid ${summary.release.blockers ? "#fed7aa" : "#bbf7d0"}`,
-                          background: summary.release.blockers ? "#fff7ed" : "#ecfdf5",
-                          padding: "14px 16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: "12px",
-                            alignItems: "center",
-                            flexWrap: "wrap",
-                            marginBottom: "10px",
-                          }}
-                        >
-                          <div>
-                            <p
-                              style={{
-                                margin: 0,
-                                color: summary.release.blockers ? "#9a3412" : "#166534",
-                                fontSize: "11px",
-                                fontWeight: 800,
-                                letterSpacing: "0.08em",
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              Release Rules
-                            </p>
-                            <p
-                              style={{
-                                margin: "4px 0 0",
-                                color: summary.release.blockers ? "#7c2d12" : "#166534",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {summary.release.blockers
-                                ? "Production release is blocked until all required checkpoints are clear."
-                                : "Operational blockers are clear for production release."}
-                            </p>
-                          </div>
-                          <StatusPill tone={blockerTone}>
-                            {summary.release.blockers
-                              ? `${summary.release.blockers} blocker${summary.release.blockers === 1 ? "" : "s"}`
-                              : "Ready for release"}
-                          </StatusPill>
-                        </div>
-
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                            gap: "10px",
-                          }}
-                        >
-                          {summary.release.checks.map((check) => (
-                            <div
-                              key={check.label}
-                              style={{
-                                borderRadius: "12px",
-                                padding: "12px",
-                                border: `1px solid ${check.passed ? "#bbf7d0" : "#fed7aa"}`,
-                                background: check.passed ? "#f0fdf4" : "#fffaf0",
-                              }}
-                            >
-                              <p
-                                style={{
-                                  margin: 0,
-                                  color: check.passed ? "#166534" : "#9a3412",
-                                  fontSize: "11px",
-                                  fontWeight: 800,
-                                  letterSpacing: "0.06em",
-                                  textTransform: "uppercase",
-                                }}
-                              >
-                                {check.label}
-                              </p>
-                              <strong
-                                style={{
-                                  display: "block",
-                                  marginTop: "6px",
-                                  color: check.passed ? "#166534" : "#7c2d12",
-                                }}
-                              >
-                                {check.passed ? "Clear" : "Blocked"}
-                              </strong>
-                              <p style={{ margin: "4px 0 0", color: "#475569", fontSize: "13px" }}>{check.detail}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-
                       <div
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                          display: "flex",
+                          justifyContent: "space-between",
                           gap: "12px",
+                          alignItems: "flex-start",
+                          flexWrap: "wrap",
                         }}
                       >
-                        <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
-                          <Field label="Garment" value={formatValue(quote.garment, "Custom garment")} />
-                          <div style={{ marginTop: "12px" }}>
-                            <Field label="Decoration" value={summary.decorationSummary} />
-                          </div>
-                          <div style={{ marginTop: "12px" }}>
-                            <Field label="Quantity" value={formatValue(quote.qty, "0")} />
-                          </div>
-                        </div>
-
-                        <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
-                          <Field label="Placements" value={summary.placementSummary} />
-                          <div style={{ marginTop: "12px" }}>
-                            <Field label="Artwork" value={formatList(summary.artworkNames)} />
-                          </div>
-                        </div>
-
-                        <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
-                          <Field label="Pricing" value={`Deposit ${money(summary.depositTarget)} • Balance ${money(summary.balance)}`} />
-                          <div style={{ marginTop: "12px" }}>
-                            <Field label="Payment State" value={formatValue(summary.financials.payment_status, "Unpaid")} />
-                          </div>
-                        </div>
-
-                        <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
-                          <Field
-                            label="Production Info"
-                            value={
-                              canAdvanceQuoteStatus(quote.quote_status)
-                                ? `Next: ${getNextQuoteStatus(quote.quote_status)}`
-                                : "Next: Release to Production"
-                            }
-                          />
-                          <div style={{ marginTop: "12px" }}>
-                            <Field label="Source" value={formatValue(quote.source)} />
-                          </div>
-                        </div>
-                      </div>
-
-                      {quote.notes ? (
-                        <div
-                          style={{
-                            border: "1px solid #e2e8f0",
-                            borderRadius: "14px",
-                            padding: "14px",
-                            background: "#ffffff",
-                          }}
-                        >
+                        <div>
                           <p
                             style={{
                               margin: 0,
@@ -595,13 +368,273 @@ export default function Quotes() {
                               textTransform: "uppercase",
                             }}
                           >
-                            Notes
+                            Quote {quote.order_number}
                           </p>
-                          <p style={{ margin: "8px 0 0", color: "#0f172a", lineHeight: 1.6 }}>{quote.notes}</p>
+                          <p style={{ margin: "6px 0 0", color: "#0f172a", fontSize: "16px", fontWeight: 800 }}>
+                            {formatValue(quote.customer_name, "Walk-in Customer")}
+                          </p>
                         </div>
-                      ) : null}
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            color: "#334155",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span>{isExpanded ? "Hide details" : "Show details"}</span>
+                          <ExpandIcon open={isExpanded} />
+                        </span>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        <StatusPill tone={isQuoteReadyForProduction(quote.quote_status) ? "success" : "default"}>
+                          {formatValue(quote.quote_status, "Draft")}
+                        </StatusPill>
+                        <StatusPill tone={summary.depositStatus === "Deposit received" ? "success" : "warning"}>
+                          {summary.depositStatus}
+                        </StatusPill>
+                        <StatusPill tone={readinessTone}>
+                          {buildReadinessSummary(summary.readiness)}
+                        </StatusPill>
+                      </div>
+
+                      <p style={{ margin: 0, color: "#475569", fontSize: "13px" }}>
+                        Review pricing, customer approval, deposit, artwork, and next production step.
+                      </p>
+                    </button>
+
+                    <Link
+                      to={`/admin/quotes/${quote.order_number}`}
+                      style={{
+                        color: "#0f172a",
+                        textDecoration: "none",
+                        fontWeight: 700,
+                        padding: "0 14px",
+                        borderRadius: "12px",
+                        border: "1px solid #d6dbe4",
+                        background: "#ffffff",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minHeight: "100%",
+                      }}
+                    >
+                      Open Quote
+                    </Link>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                      gap: "14px",
+                    }}
+                  >
+                    <Field label="Status" value={formatValue(quote.quote_status, "Draft")} />
+                    <Field
+                      label="Production Readiness"
+                      value={buildReadinessSummary(summary.readiness)}
+                      tone={readinessTone}
+                    />
+                    <Field
+                      label="Customer Approval"
+                      value={summary.approvalStatus}
+                      tone={summary.approvalStatus === "Approved" ? "success" : "warning"}
+                    />
+                    <Field
+                      label="Deposit"
+                      value={summary.depositStatus}
+                      tone={summary.depositStatus === "Deposit received" ? "success" : "warning"}
+                    />
+                    <Field label="Due Date" value={summary.dueDate} />
+                    <Field label="Total" value={money(summary.total)} />
+                  </div>
+
+                  <div
+                    id={`quote-details-${quote.order_number}`}
+                    style={{
+                      display: "grid",
+                      gridTemplateRows: isExpanded ? "1fr" : "0fr",
+                      transition: "grid-template-rows 220ms ease, opacity 180ms ease",
+                      opacity: isExpanded ? 1 : 0,
+                    }}
+                  >
+                    <div style={{ overflow: "hidden" }}>
+                      <div
+                        style={{
+                          borderTop: "1px solid #e2e8f0",
+                          paddingTop: "14px",
+                          display: "grid",
+                          gap: "14px",
+                          pointerEvents: isExpanded ? "auto" : "none",
+                        }}
+                      >
+                        <section
+                          style={{
+                            borderRadius: "16px",
+                            border: `1px solid ${summary.readiness.ready ? "#bbf7d0" : "#fed7aa"}`,
+                            background: summary.readiness.ready ? "#ecfdf5" : "#fff7ed",
+                            padding: "14px 16px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: "12px",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              marginBottom: "10px",
+                            }}
+                          >
+                            <div>
+                              <p
+                                style={{
+                                  margin: 0,
+                                  color: summary.readiness.ready ? "#166534" : "#9a3412",
+                                  fontSize: "11px",
+                                  fontWeight: 800,
+                                  letterSpacing: "0.08em",
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                Production Readiness
+                              </p>
+                              <p
+                                style={{
+                                  margin: "4px 0 0",
+                                  color: summary.readiness.ready ? "#166534" : "#7c2d12",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {summary.readiness.ready
+                                  ? "This quote has everything needed to move into production."
+                                  : "This quote still needs the items below before it can move into production."}
+                              </p>
+                            </div>
+                            <StatusPill tone={readinessTone}>
+                              {buildReadinessSummary(summary.readiness)}
+                            </StatusPill>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                              gap: "10px",
+                            }}
+                          >
+                            {summary.readiness.checks.map((check) => (
+                              <div
+                                key={check.label}
+                                style={{
+                                  borderRadius: "12px",
+                                  padding: "12px",
+                                  border: `1px solid ${check.passed ? "#bbf7d0" : "#fed7aa"}`,
+                                  background: check.passed ? "#f0fdf4" : "#fffaf0",
+                                }}
+                              >
+                                <p
+                                  style={{
+                                    margin: 0,
+                                    color: check.passed ? "#166534" : "#9a3412",
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  {check.label}
+                                </p>
+                                <strong
+                                  style={{
+                                    display: "block",
+                                    marginTop: "6px",
+                                    color: check.passed ? "#166534" : "#7c2d12",
+                                  }}
+                                >
+                                  {check.detail}
+                                </strong>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                            gap: "12px",
+                          }}
+                        >
+                          <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
+                            <Field label="Garment" value={formatValue(quote.garment, "Custom garment")} />
+                            <div style={{ marginTop: "12px" }}>
+                              <Field label="Decoration" value={summary.decorationSummary} />
+                            </div>
+                            <div style={{ marginTop: "12px" }}>
+                              <Field label="Quantity" value={formatValue(quote.qty, "0")} />
+                            </div>
+                          </div>
+
+                          <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
+                            <Field label="Placements" value={summary.placementSummary} />
+                            <div style={{ marginTop: "12px" }}>
+                              <Field label="Artwork" value={formatList(summary.artworkNames)} />
+                            </div>
+                          </div>
+
+                          <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
+                            <Field label="Pricing" value={`Deposit ${money(summary.depositTarget)} • Balance ${money(summary.balance)}`} />
+                            <div style={{ marginTop: "12px" }}>
+                              <Field label="Payment State" value={formatValue(summary.financials.payment_status, "Unpaid")} />
+                            </div>
+                          </div>
+
+                          <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
+                            <Field
+                              label="Production Info"
+                              value={
+                                canAdvanceQuoteStatus(quote.quote_status)
+                                  ? `Next: ${getNextQuoteStatus(quote.quote_status)}`
+                                  : "Next: Release to Production"
+                              }
+                            />
+                            <div style={{ marginTop: "12px" }}>
+                              <Field label="Source" value={formatValue(quote.source)} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {quote.notes ? (
+                          <div
+                            style={{
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "14px",
+                              padding: "14px",
+                              background: "#ffffff",
+                            }}
+                          >
+                            <p
+                              style={{
+                                margin: 0,
+                                color: "#64748b",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Notes
+                            </p>
+                            <p style={{ margin: "8px 0 0", color: "#0f172a", lineHeight: 1.6 }}>{quote.notes}</p>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                  ) : null}
+                  </div>
                 </article>
               );
             })
