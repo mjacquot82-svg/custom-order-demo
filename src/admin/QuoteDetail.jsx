@@ -31,6 +31,77 @@ function DetailItem({ label, value }) {
   );
 }
 
+function StatusPill({ children, tone = "default" }) {
+  const tones = {
+    default: { background: "#f8fafc", border: "#e2e8f0", color: "#0f172a" },
+    warning: { background: "#fff7ed", border: "#fed7aa", color: "#9a3412" },
+    success: { background: "#ecfdf5", border: "#bbf7d0", color: "#166534" },
+  };
+  const palette = tones[tone] || tones.default;
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        borderRadius: "999px",
+        padding: "8px 12px",
+        background: palette.background,
+        color: palette.color,
+        border: `1px solid ${palette.border}`,
+        fontWeight: 800,
+        fontSize: "12px",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function buildDepositStatus(order, financials) {
+  const depositTarget = Number(financials?.deposit_amount || 0);
+  const totalPaid = Number(financials?.total_paid || 0);
+  const depositStatus = String(order?.deposit?.status || "").trim().toLowerCase();
+
+  if (depositTarget <= 0) return "No deposit";
+  if (depositStatus === "paid" || totalPaid >= depositTarget) return "Paid";
+  if (depositStatus === "pending") return "Requested";
+  if (totalPaid > 0) return "Partial";
+  return "Outstanding";
+}
+
+function buildReleaseChecks(order, financials) {
+  const approvalStatus = String(order?.approval_status || "").trim().toLowerCase();
+  const depositTarget = Number(financials?.deposit_amount || 0);
+  const totalPaid = Number(financials?.total_paid || 0);
+  const depositStatus = String(order?.deposit?.status || "").trim().toLowerCase();
+  const artworkCount = Array.isArray(order?.artwork_files) ? order.artwork_files.length : 0;
+  const artworkWaiting = String(order?.quote_status || "").trim().toLowerCase() === "awaiting artwork approval";
+
+  const checks = [
+    {
+      label: "Customer approval",
+      passed: approvalStatus.includes("approved"),
+      detail: order?.approval_status || "Not Sent",
+    },
+    {
+      label: "Deposit",
+      passed: depositTarget <= 0 || depositStatus === "paid" || totalPaid >= depositTarget,
+      detail: buildDepositStatus(order, financials),
+    },
+    {
+      label: "Artwork",
+      passed: artworkCount === 0 || !artworkWaiting,
+      detail: artworkCount ? "Artwork on file" : "No artwork blocker",
+    },
+  ];
+
+  return {
+    checks,
+    blockers: checks.filter((check) => !check.passed).length,
+  };
+}
+
 export default function QuoteDetail() {
   const { orderNumber } = useParams();
   const location = useLocation();
@@ -54,6 +125,8 @@ export default function QuoteDetail() {
         : null,
     [order, quoteSnapshot]
   );
+  const depositStatus = useMemo(() => buildDepositStatus(order, financials), [order, financials]);
+  const releaseChecks = useMemo(() => buildReleaseChecks(order, financials), [order, financials]);
 
   if (!order) {
     return (
@@ -190,6 +263,21 @@ export default function QuoteDetail() {
 
       <div style={{ display: "grid", gap: "18px" }}>
         <section style={cardStyle("#f8fafc")}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+            <StatusPill tone={isQuoteReadyForProduction(order.quote_status) ? "success" : "default"}>
+              {order.quote_status}
+            </StatusPill>
+            <StatusPill tone={depositStatus === "Paid" ? "success" : "warning"}>
+              Deposit {depositStatus}
+            </StatusPill>
+            <StatusPill tone={String(order.approval_status || "").toLowerCase().includes("approved") ? "success" : "warning"}>
+              Approval {order.approval_status || "Not Sent"}
+            </StatusPill>
+            <StatusPill tone={releaseChecks.blockers ? "warning" : "success"}>
+              {releaseChecks.blockers ? `${releaseChecks.blockers} blocker${releaseChecks.blockers === 1 ? "" : "s"}` : "Release clear"}
+            </StatusPill>
+          </div>
+
           <div
             style={{
               display: "grid",
@@ -200,9 +288,97 @@ export default function QuoteDetail() {
             <DetailItem label="Customer" value={order.customer_name} />
             <DetailItem label="Company" value={order.customer_company} />
             <DetailItem label="Quote Status" value={order.quote_status} />
+            <DetailItem label="Deposit Status" value={depositStatus} />
+            <DetailItem label="Approval" value={order.approval_status || "Not Sent"} />
             <DetailItem label="Source" value={order.source} />
             <DetailItem label="Due Date" value={order.due_date} />
             <DetailItem label="Artwork Required" value={order.artwork_files?.length ? "Attached" : "Pending"} />
+          </div>
+        </section>
+
+        <section
+          style={cardStyle(releaseChecks.blockers ? "#fff7ed" : "#ecfdf5")}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "12px",
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginBottom: "14px",
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  margin: 0,
+                  color: releaseChecks.blockers ? "#9a3412" : "#166534",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Release Rules
+              </p>
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  color: releaseChecks.blockers ? "#7c2d12" : "#166534",
+                  lineHeight: 1.6,
+                  fontWeight: 700,
+                }}
+              >
+                A quote can move into production only after approval, deposit confirmation, and artwork sign-off where required.
+              </p>
+            </div>
+            <StatusPill tone={releaseChecks.blockers ? "warning" : "success"}>
+              {releaseChecks.blockers ? `${releaseChecks.blockers} blocker${releaseChecks.blockers === 1 ? "" : "s"}` : "Ready for release"}
+            </StatusPill>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "12px",
+            }}
+          >
+            {releaseChecks.checks.map((check) => (
+              <div
+                key={check.label}
+                style={{
+                  borderRadius: "14px",
+                  padding: "14px",
+                  border: `1px solid ${check.passed ? "#bbf7d0" : "#fed7aa"}`,
+                  background: check.passed ? "#f0fdf4" : "#fffaf0",
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    color: check.passed ? "#166534" : "#9a3412",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {check.label}
+                </p>
+                <strong
+                  style={{
+                    display: "block",
+                    marginTop: "6px",
+                    color: check.passed ? "#166534" : "#7c2d12",
+                  }}
+                >
+                  {check.passed ? "Clear" : "Blocked"}
+                </strong>
+                <p style={{ margin: "4px 0 0", color: "#475569" }}>{check.detail}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -251,12 +427,6 @@ export default function QuoteDetail() {
           )}
         </section>
 
-        <section style={cardStyle("#fff7ed")}>
-          <h2 style={{ marginTop: 0 }}>Production Release Rule</h2>
-          <p style={{ margin: 0, color: "#7c2d12", lineHeight: 1.6 }}>
-            A quote becomes a production order only after approval, deposit confirmation, and artwork approval where required. This page keeps that operational boundary explicit.
-          </p>
-        </section>
       </div>
     </div>
   );
