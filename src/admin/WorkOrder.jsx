@@ -26,7 +26,7 @@ export default function WorkOrder() {
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px" }}>
         <h1>Work Order Not Found</h1>
         <p>This production packet could not be loaded.</p>
-        <Link to="/admin/queue">Back to Production Queue</Link>
+        <Link to="/admin/orders">Back to Production Orders</Link>
       </div>
     );
   }

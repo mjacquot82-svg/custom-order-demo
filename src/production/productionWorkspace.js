@@ -1,0 +1,276 @@
+import { normalizeProductionType } from "../constants/productionTypes";
+import { formatShortDate } from "../lib/dateFormatting";
+import {
+  isCompletedOperationalStatus,
+  normalizeOperationalStatus,
+} from "../orders/orderWorkflow";
+import { buildQueuePriority } from "../queue/buildQueuePriority";
+
+export const PRODUCTION_STATUS_FILTERS = [
+  { key: "active", label: "Active" },
+  { key: "awaiting-production", label: "Awaiting Production" },
+  { key: "in-production", label: "In Production" },
+  { key: "qc", label: "QC" },
+  { key: "ready-for-pickup", label: "Ready For Pickup" },
+  { key: "completed", label: "Completed" },
+  { key: "unassigned", label: "Unassigned" },
+  { key: "urgent", label: "Urgent" },
+];
+
+export const PRODUCTION_METHOD_FILTERS = [
+  { key: "all", label: "All Workflows" },
+  { key: "dtf", label: "DTF" },
+  { key: "embroidery", label: "Embroidery" },
+  { key: "screen", label: "Screen Print" },
+];
+
+export const PRODUCTION_DATE_FILTERS = [
+  { key: "all", label: "Any Date" },
+  { key: "today", label: "Today" },
+  { key: "week", label: "This Week" },
+  { key: "month", label: "This Month" },
+  { key: "custom", label: "Custom Range" },
+];
+
+export const PRODUCTION_VIEW_MODES = [
+  { key: "table", label: "Table View" },
+  { key: "queue", label: "Queue View" },
+];
+
+export function normalizeLookup(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+export function normalizeProductionOrder(order) {
+  return {
+    ...order,
+    customer_name: order.customer_name || "Walk-in Customer",
+    garment: order.garment || order.item || "Custom garment",
+    assigned_to_staff_name: order.assigned_to_staff_name || "Unassigned",
+    decoration_type: normalizeProductionType(order.decoration_type),
+    status: normalizeOperationalStatus(order.status || "New"),
+  };
+}
+
+function getOrderArtworkLabel(order) {
+  return (order.artwork_files || [])
+    .map((file) => file?.file_name || file?.name || "")
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function getOrderSearchText(order) {
+  return normalizeLookup(
+    [
+      order.order_number,
+      order.customer_name,
+      order.garment,
+      order.decoration_type,
+      order.assigned_to_staff_name,
+      order.status,
+      order.due_date,
+      order.created_at,
+      getOrderArtworkLabel(order),
+    ].join(" ")
+  );
+}
+
+export function getOrderFilterDate(order) {
+  if (order.due_date) {
+    return new Date(`${order.due_date}T00:00:00`);
+  }
+
+  if (order.created_at) {
+    const createdAt = new Date(order.created_at);
+    createdAt.setHours(0, 0, 0, 0);
+    return createdAt;
+  }
+
+  return null;
+}
+
+function buildWeekStart(today) {
+  const start = new Date(today);
+  start.setDate(today.getDate() - today.getDay());
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function buildWeekEnd(today) {
+  const end = buildWeekStart(today);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+function buildMonthEnd(today) {
+  return new Date(
+    today.getFullYear(),
+    today.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999
+  );
+}
+
+export function matchesDateFilter(order, dateFilter, customStart, customEnd) {
+  if (dateFilter === "all") return true;
+
+  const orderDate = getOrderFilterDate(order);
+  if (!orderDate) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (dateFilter === "today") {
+    return orderDate.getTime() === today.getTime();
+  }
+
+  if (dateFilter === "week") {
+    return orderDate >= buildWeekStart(today) && orderDate <= buildWeekEnd(today);
+  }
+
+  if (dateFilter === "month") {
+    return (
+      orderDate >= new Date(today.getFullYear(), today.getMonth(), 1) &&
+      orderDate <= buildMonthEnd(today)
+    );
+  }
+
+  if (dateFilter === "custom") {
+    const start = customStart ? new Date(`${customStart}T00:00:00`) : null;
+    const end = customEnd ? new Date(`${customEnd}T23:59:59`) : null;
+
+    if (start && orderDate < start) return false;
+    if (end && orderDate > end) return false;
+    return true;
+  }
+
+  return true;
+}
+
+export function matchesProductionMethod(order, activeMethod) {
+  if (activeMethod === "all") return true;
+
+  const normalizedDecorationType = normalizeLookup(order.decoration_type);
+
+  if (activeMethod === "dtf") {
+    return normalizedDecorationType === "dtf";
+  }
+
+  if (activeMethod === "embroidery") {
+    return normalizedDecorationType === "embroidery";
+  }
+
+  if (activeMethod === "screen") {
+    return normalizedDecorationType.includes("screen");
+  }
+
+  return true;
+}
+
+export function matchesProductionStatus(order, activeStatus) {
+  const normalizedStatus = normalizeOperationalStatus(order.status);
+  const queuePriority = buildQueuePriority(order);
+
+  if (activeStatus === "active") {
+    return order.operational_visible !== false && !isCompletedOperationalStatus(normalizedStatus);
+  }
+
+  if (activeStatus === "awaiting-production") {
+    return normalizedStatus === "Awaiting Production";
+  }
+
+  if (activeStatus === "in-production") {
+    return normalizedStatus === "In Production";
+  }
+
+  if (activeStatus === "qc") {
+    const compactStatus = normalizeLookup(normalizedStatus);
+    return compactStatus === "qc" || compactStatus.includes("quality control");
+  }
+
+  if (activeStatus === "ready-for-pickup") {
+    return normalizedStatus === "Ready for Pickup";
+  }
+
+  if (activeStatus === "completed") {
+    return isCompletedOperationalStatus(normalizedStatus);
+  }
+
+  if (activeStatus === "unassigned") {
+    return order.needs_assignment || !order.assigned_to_staff_id;
+  }
+
+  if (activeStatus === "urgent") {
+    return queuePriority.overdue || queuePriority.dueSoon;
+  }
+
+  return true;
+}
+
+export function matchesSearch(order, searchTerm) {
+  if (!searchTerm) return true;
+  return getOrderSearchText(order).includes(normalizeLookup(searchTerm));
+}
+
+export function matchesCustomer(order, customerFilter) {
+  if (!customerFilter) return true;
+  return normalizeLookup(order.customer_name) === normalizeLookup(customerFilter);
+}
+
+export function getProductionStatusCounts(orders = []) {
+  return PRODUCTION_STATUS_FILTERS.reduce((counts, filter) => {
+    counts[filter.key] = orders.filter((order) =>
+      matchesProductionStatus(order, filter.key)
+    ).length;
+    return counts;
+  }, {});
+}
+
+export function getProductionMethodCounts(orders = []) {
+  return PRODUCTION_METHOD_FILTERS.reduce((counts, filter) => {
+    counts[filter.key] = orders.filter((order) =>
+      matchesProductionMethod(order, filter.key)
+    ).length;
+    return counts;
+  }, {});
+}
+
+export function buildProductionWorkspaceSummary(orders = []) {
+  const urgentOrders = orders.filter((order) =>
+    matchesProductionStatus(order, "urgent")
+  );
+  const unassignedOrders = orders.filter((order) =>
+    matchesProductionStatus(order, "unassigned")
+  );
+  const activeOrders = orders.filter((order) =>
+    matchesProductionStatus(order, "active")
+  );
+  const completedOrders = orders.filter((order) =>
+    matchesProductionStatus(order, "completed")
+  );
+
+  return {
+    activeOrders: activeOrders.length,
+    urgentOrders: urgentOrders.length,
+    unassignedOrders: unassignedOrders.length,
+    completedOrders: completedOrders.length,
+  };
+}
+
+export function buildResultsLabel(count, activeStatus) {
+  const activeFilter = PRODUCTION_STATUS_FILTERS.find(
+    (filter) => filter.key === activeStatus
+  );
+  const label = activeFilter?.label || "Results";
+  return `${count} ${label.toLowerCase()}${count === 1 ? " job" : " jobs"}`;
+}
+
+export function formatOrderDateRange(order) {
+  const createdLabel = formatShortDate(order.created_at);
+  const dueLabel = order.due_date ? formatShortDate(order.due_date) : "—";
+  return { createdLabel, dueLabel };
+}

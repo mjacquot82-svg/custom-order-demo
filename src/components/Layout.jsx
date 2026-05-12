@@ -44,9 +44,6 @@ function getSidebarCounts(orders = []) {
 
   return {
     productionOrders: activeOrders.length,
-    productionQueue: activeOrders.filter(
-      (order) => order.production_ready || order.needs_assignment
-    ).length,
     assignments: activeOrders.filter(
       (order) =>
         order.needs_assignment || !order.assigned_to_staff_id
@@ -77,16 +74,10 @@ function getAdminSections(role) {
       title: "Production",
       links: [
         {
-          to: "/admin/orders?filter=production",
+          to: "/admin/orders",
           label: "Production Orders",
           navKey: "productionOrders",
           badgeKey: "productionOrders",
-        },
-        {
-          to: "/admin/queue",
-          label: "Production Queue",
-          navKey: "productionQueue",
-          badgeKey: "productionQueue",
         },
         {
           to: "/admin/assignments",
@@ -112,7 +103,6 @@ function getActiveSidebarLink(pathname, search) {
   const orderFilter = new URLSearchParams(search).get("filter");
 
   if (pathname.startsWith("/admin/assignments")) return "assignments";
-  if (pathname.startsWith("/admin/queue")) return "productionQueue";
   if (pathname.startsWith("/admin/products")) return "products";
   if (pathname.startsWith("/admin/customers")) return "customers";
   if (pathname.startsWith("/admin/staff-users")) return "staffUsers";

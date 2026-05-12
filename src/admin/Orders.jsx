@@ -1,180 +1,33 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { normalizeProductionType } from "../constants/productionTypes";
-import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
-import { formatShortDate } from "../lib/dateFormatting";
-import StatusBadge from "../components/StatusBadge";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
+import StatusBadge from "../components/StatusBadge";
+import { formatShortDate } from "../lib/dateFormatting";
+import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import {
   canAdvanceOperationalStatus,
   getNextOperationalStatus,
-  isCompletedOperationalStatus,
   isReadyForProductionStatus,
-  normalizeOperationalStatus,
   sortOrdersByOperationalStatus,
 } from "../orders/orderWorkflow";
-
-function normalizeLookup(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function normalizeOrder(order) {
-  return {
-    ...order,
-    customer_name: order.customer_name || "Walk-in Customer",
-    garment: order.garment || order.item || "Custom garment",
-    assigned_to_staff_name: order.assigned_to_staff_name || "Unassigned",
-    decoration_type: normalizeProductionType(order.decoration_type),
-    status: normalizeOperationalStatus(order.status || "New"),
-  };
-}
-
-const workflowTabs = [
-  { key: "all", label: "All Workflow" },
-  { key: "production", label: "Production" },
-  { key: "assignments", label: "Unassigned" },
-  { key: "dtf", label: "DTF" },
-  { key: "embroidery", label: "Embroidery" },
-  { key: "screen", label: "Screen Print" },
-];
-
-const orderScopeTabs = [
-  { key: "active", label: "Active Orders" },
-  { key: "completed", label: "Completed Orders" },
-  { key: "all", label: "All Orders" },
-];
-
-const dateFilterTabs = [
-  { key: "all", label: "Any Date" },
-  { key: "today", label: "Today" },
-  { key: "week", label: "This Week" },
-  { key: "month", label: "This Month" },
-  { key: "custom", label: "Custom Range" },
-];
-
-function getOrderArtworkLabel(order) {
-  return (order.artwork_files || [])
-    .map((file) => file?.file_name || file?.name || "")
-    .filter(Boolean)
-    .join(" ");
-}
-
-function getOrderSearchText(order) {
-  return normalizeLookup([
-    order.order_number,
-    order.customer_name,
-    order.garment,
-    order.decoration_type,
-    order.assigned_to_staff_name,
-    order.status,
-    order.due_date,
-    order.created_at,
-    getOrderArtworkLabel(order),
-  ].join(" "));
-}
-
-function getOrderFilterDate(order) {
-  if (order.due_date) {
-    return new Date(`${order.due_date}T00:00:00`);
-  }
-
-  if (order.created_at) {
-    const createdAt = new Date(order.created_at);
-    createdAt.setHours(0, 0, 0, 0);
-    return createdAt;
-  }
-
-  return null;
-}
-
-function buildWeekStart(today) {
-  const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay());
-  start.setHours(0, 0, 0, 0);
-  return start;
-}
-
-function buildWeekEnd(today) {
-  const end = buildWeekStart(today);
-  end.setDate(end.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-  return end;
-}
-
-function buildMonthEnd(today) {
-  return new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-function matchesDateFilter(order, dateFilter, customStart, customEnd) {
-  if (dateFilter === "all") return true;
-
-  const orderDate = getOrderFilterDate(order);
-  if (!orderDate) return false;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (dateFilter === "today") {
-    return orderDate.getTime() === today.getTime();
-  }
-
-  if (dateFilter === "week") {
-    return orderDate >= buildWeekStart(today) && orderDate <= buildWeekEnd(today);
-  }
-
-  if (dateFilter === "month") {
-    return orderDate >= new Date(today.getFullYear(), today.getMonth(), 1) && orderDate <= buildMonthEnd(today);
-  }
-
-  if (dateFilter === "custom") {
-    const start = customStart ? new Date(`${customStart}T00:00:00`) : null;
-    const end = customEnd ? new Date(`${customEnd}T23:59:59`) : null;
-
-    if (start && orderDate < start) return false;
-    if (end && orderDate > end) return false;
-    return true;
-  }
-
-  return true;
-}
-
-function tabMatchesOrder(order, activeTab) {
-  if (activeTab === "all") return true;
-
-  if (activeTab === "assignments") {
-    return order.needs_assignment || !order.assigned_to_staff_id;
-  }
-
-  const normalizedDecorationType = normalizeLookup(order.decoration_type);
-
-  if (activeTab === "dtf") {
-    return normalizedDecorationType === "dtf";
-  }
-
-  if (activeTab === "embroidery") {
-    return normalizedDecorationType === "embroidery";
-  }
-
-  if (activeTab === "screen") {
-    return normalizedDecorationType.includes("screen");
-  }
-
-  if (activeTab === "production") {
-    return order.operational_visible !== false && !isCompletedOperationalStatus(order.status);
-  }
-
-  return true;
-}
-
-function matchesSearch(order, searchTerm) {
-  if (!searchTerm) return true;
-  return getOrderSearchText(order).includes(normalizeLookup(searchTerm));
-}
-
-function matchesCustomer(order, customerFilter) {
-  if (!customerFilter) return true;
-  return normalizeLookup(order.customer_name) === normalizeLookup(customerFilter);
-}
+import ProductionQueueBoard from "../production/ProductionQueueBoard";
+import {
+  buildProductionWorkspaceSummary,
+  buildResultsLabel,
+  getProductionMethodCounts,
+  getProductionStatusCounts,
+  matchesCustomer,
+  matchesDateFilter,
+  matchesProductionMethod,
+  matchesProductionStatus,
+  matchesSearch,
+  normalizeLookup,
+  normalizeProductionOrder,
+  PRODUCTION_DATE_FILTERS,
+  PRODUCTION_METHOD_FILTERS,
+  PRODUCTION_STATUS_FILTERS,
+  PRODUCTION_VIEW_MODES,
+} from "../production/productionWorkspace";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -190,19 +43,19 @@ function getPaymentSummary(order) {
   return order.payment_status === "Paid in Full" ? "Paid" : "No balance due";
 }
 
-function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus }) {
+function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
   return (
     <div
       style={{
         overflowX: "auto",
-        border: subdued ? "1px solid #e7e5e4" : "1px solid #e2e8f0",
+        border: "1px solid #e2e8f0",
         borderRadius: "16px",
-        background: subdued ? "#fafaf9" : "#ffffff",
+        background: "#ffffff",
       }}
     >
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
-          <tr style={{ borderBottom: subdued ? "1px solid #e7e5e4" : "1px solid #e2e8f0" }}>
+          <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Order</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Customer</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Garment</th>
@@ -218,10 +71,7 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
 
         <tbody>
           {orders.map((order) => (
-            <tr
-              key={order.order_number}
-              style={{ borderBottom: subdued ? "1px solid #ece7e1" : "1px solid #e2e8f0" }}
-            >
+            <tr key={order.order_number} style={{ borderBottom: "1px solid #e2e8f0" }}>
               <td style={{ padding: "14px 8px" }}>
                 <Link
                   to={`/admin/orders/${order.order_number}`}
@@ -328,48 +178,131 @@ function OrdersTable({ orders, emptyMessage, subdued = false, onAdvanceStatus })
   );
 }
 
-function FilterPill({ active, children, onClick }) {
+function FilterPill({ active, children, count, tone = "default", onClick }) {
+  const activeBackground =
+    tone === "warning" ? "#9a3412" : tone === "success" ? "#166534" : "#171717";
+
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        border: active ? "1px solid #171717" : "1px solid #d6d3d1",
-        background: active ? "#171717" : "#ffffff",
+        border: active ? `1px solid ${activeBackground}` : "1px solid #d6d3d1",
+        background: active ? activeBackground : "#ffffff",
         color: active ? "#ffffff" : "#171717",
         borderRadius: "999px",
         padding: "9px 13px",
         fontWeight: 700,
         cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "8px",
       }}
     >
-      {children}
+      <span>{children}</span>
+      <span
+        style={{
+          minWidth: "20px",
+          height: "20px",
+          padding: "0 6px",
+          borderRadius: "999px",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "12px",
+          background: active ? "rgba(255,255,255,0.18)" : "#f5f5f4",
+          color: active ? "#ffffff" : "#57534e",
+        }}
+      >
+        {count}
+      </span>
     </button>
   );
 }
 
+function FilterGroup({ label, children }) {
+  return (
+    <section
+      style={{
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        borderRadius: "18px",
+        padding: "16px",
+        display: "grid",
+        gap: "12px",
+      }}
+    >
+      <div>
+        <p
+          style={{
+            margin: 0,
+            color: "#64748b",
+            fontSize: "12px",
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SummaryCard({ label, value, tone = "default" }) {
+  const background =
+    tone === "warning" ? "#fff7ed" : tone === "danger" ? "#fef2f2" : tone === "success" ? "#ecfdf5" : "#ffffff";
+  const border =
+    tone === "warning" ? "#fdba74" : tone === "danger" ? "#fecaca" : tone === "success" ? "#bbf7d0" : "#e2e8f0";
+  const color =
+    tone === "warning" ? "#c2410c" : tone === "danger" ? "#b91c1c" : tone === "success" ? "#166534" : "#0f172a";
+
+  return (
+    <div
+      style={{
+        background,
+        border: `1px solid ${border}`,
+        borderRadius: "18px",
+        padding: "16px",
+      }}
+    >
+      <p style={{ margin: 0, color, fontWeight: 800 }}>{label}</p>
+      <h2 style={{ margin: "10px 0 0", fontSize: "32px" }}>{value}</h2>
+    </div>
+  );
+}
+
 export default function Orders() {
+  const storedOrders = useStoredOrders();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeWorkflowFilter = searchParams.get("filter") || "all";
-  const activeScope = searchParams.get("scope") || "active";
+  const activeStatusFilter = searchParams.get("status") || "active";
+  const activeMethodFilter = searchParams.get("workflow") || "all";
   const activeDateFilter = searchParams.get("date") || "all";
+  const activeViewMode = searchParams.get("view") || "table";
   const searchTerm = searchParams.get("q") || "";
   const activeCustomerFilter = searchParams.get("customer") || "";
   const customStart = searchParams.get("start") || "";
   const customEnd = searchParams.get("end") || "";
   const [customerInput, setCustomerInput] = useState(activeCustomerFilter);
   const [isCustomerMenuOpen, setIsCustomerMenuOpen] = useState(false);
-  const hasActiveFilters = (
-    activeWorkflowFilter !== "all" ||
-    activeScope !== "active" ||
+
+  const hasActiveFilters =
+    activeStatusFilter !== "active" ||
+    activeMethodFilter !== "all" ||
     activeDateFilter !== "all" ||
+    activeViewMode !== "table" ||
     Boolean(activeCustomerFilter) ||
     Boolean(searchTerm) ||
     Boolean(customStart) ||
-    Boolean(customEnd)
+    Boolean(customEnd);
+
+  const orders = useMemo(
+    () => sortOrdersByOperationalStatus(storedOrders.map(normalizeProductionOrder)),
+    [storedOrders]
   );
 
-  const orders = sortOrdersByOperationalStatus(useStoredOrders().map(normalizeOrder));
   const customerOptions = useMemo(() => {
     const uniqueCustomers = new Map();
 
@@ -384,6 +317,7 @@ export default function Orders() {
       .map(([normalizedName, name]) => ({ normalizedName, name }))
       .sort((left, right) => left.name.localeCompare(right.name));
   }, [orders]);
+
   const customerSuggestions = useMemo(() => {
     const normalizedInput = normalizeLookup(customerInput);
     if (!normalizedInput) return customerOptions;
@@ -393,29 +327,56 @@ export default function Orders() {
     );
   }, [customerInput, customerOptions]);
 
-  const filteredOrders = orders.filter(
-    (order) =>
-      tabMatchesOrder(order, activeWorkflowFilter) &&
-      matchesDateFilter(order, activeDateFilter, customStart, customEnd) &&
-      matchesCustomer(order, activeCustomerFilter) &&
-      matchesSearch(order, searchTerm)
+  const statusCounts = useMemo(() => getProductionStatusCounts(orders), [orders]);
+  const methodCounts = useMemo(() => getProductionMethodCounts(orders), [orders]);
+  const workspaceSummary = useMemo(
+    () => buildProductionWorkspaceSummary(orders),
+    [orders]
   );
 
-  const activeOrders = filteredOrders.filter((order) => !isCompletedOperationalStatus(order.status));
-  const completedOrders = filteredOrders.filter((order) => isCompletedOperationalStatus(order.status));
+  const filteredOrders = useMemo(
+    () =>
+      orders.filter(
+        (order) =>
+          matchesProductionStatus(order, activeStatusFilter) &&
+          matchesProductionMethod(order, activeMethodFilter) &&
+          matchesDateFilter(order, activeDateFilter, customStart, customEnd) &&
+          matchesCustomer(order, activeCustomerFilter) &&
+          matchesSearch(order, searchTerm)
+      ),
+    [
+      orders,
+      activeStatusFilter,
+      activeMethodFilter,
+      activeDateFilter,
+      customStart,
+      customEnd,
+      activeCustomerFilter,
+      searchTerm,
+    ]
+  );
 
   function updateFilters(nextValues) {
     const nextParams = new URLSearchParams(searchParams);
 
     Object.entries(nextValues).forEach(([key, value]) => {
-      if (!value || (key === "filter" && value === "all") || (key === "scope" && value === "active") || (key === "date" && value === "all")) {
+      if (
+        !value ||
+        (key === "status" && value === "active") ||
+        (key === "workflow" && value === "all") ||
+        (key === "date" && value === "all") ||
+        (key === "view" && value === "table")
+      ) {
         nextParams.delete(key);
       } else {
         nextParams.set(key, value);
       }
     });
 
-    if ((nextValues.date && nextValues.date !== "custom") || (activeDateFilter !== "custom" && !nextValues.date)) {
+    if (
+      (nextValues.date && nextValues.date !== "custom") ||
+      (activeDateFilter !== "custom" && !nextValues.date)
+    ) {
       nextParams.delete("start");
       nextParams.delete("end");
     }
@@ -483,28 +444,42 @@ export default function Orders() {
   }
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "24px" }}>
+    <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div
         style={{
           background: "#ffffff",
-          borderRadius: "20px",
+          borderRadius: "24px",
           padding: "24px",
+          border: "1px solid #e2e8f0",
+          display: "grid",
+          gap: "20px",
         }}
       >
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "20px",
+            alignItems: "flex-start",
             gap: "16px",
             flexWrap: "wrap",
           }}
         >
           <div>
-            <h1 style={{ margin: 0 }}>Production Orders</h1>
-            <p style={{ margin: "6px 0 0", color: "#64748b" }}>
-              Active work stays front-and-center while completed jobs remain searchable and separated below.
+            <p
+              style={{
+                margin: 0,
+                color: "#64748b",
+                fontSize: "12px",
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              Production Workspace
+            </p>
+            <h1 style={{ margin: "8px 0 6px" }}>Production Orders</h1>
+            <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
+              One operational workspace for production visibility, queue management, and status progression.
             </p>
           </div>
 
@@ -539,236 +514,281 @@ export default function Orders() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gap: "14px", marginBottom: "18px" }}>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {orderScopeTabs.map((tab) => (
-              <FilterPill
-                key={tab.key}
-                active={activeScope === tab.key}
-                onClick={() => updateFilters({ scope: tab.key })}
-              >
-                {tab.label}
-              </FilterPill>
-            ))}
-          </div>
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "12px",
+          }}
+        >
+          <SummaryCard label="Active Jobs" value={workspaceSummary.activeOrders} />
+          <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
+          <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
+          <SummaryCard label="Completed" value={workspaceSummary.completedOrders} tone="success" />
+        </section>
 
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {workflowTabs.map((tab) => (
-              <FilterPill
-                key={tab.key}
-                active={activeWorkflowFilter === tab.key}
-                onClick={() => updateFilters({ filter: tab.key })}
-              >
-                {tab.label}
-              </FilterPill>
-            ))}
-          </div>
-
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {dateFilterTabs.map((tab) => (
-              <FilterPill
-                key={tab.key}
-                active={activeDateFilter === tab.key}
-                onClick={() => updateFilters({ date: tab.key })}
-              >
-                {tab.label}
-              </FilterPill>
-            ))}
-          </div>
-
-          {activeDateFilter === "custom" ? (
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <label style={{ display: "grid", gap: "6px", color: "#475569", fontWeight: 700 }}>
-                Start Date
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(event) => updateFilters({ date: "custom", start: event.target.value })}
-                  style={{
-                    border: "1px solid #cbd5e1",
-                    borderRadius: "12px",
-                    padding: "10px 12px",
-                  }}
-                />
-              </label>
-
-              <label style={{ display: "grid", gap: "6px", color: "#475569", fontWeight: 700 }}>
-                End Date
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(event) => updateFilters({ date: "custom", end: event.target.value })}
-                  style={{
-                    border: "1px solid #cbd5e1",
-                    borderRadius: "12px",
-                    padding: "10px 12px",
-                  }}
-                />
-              </label>
+        <div style={{ display: "grid", gap: "14px" }}>
+          <FilterGroup label="Queue Views">
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {PRODUCTION_STATUS_FILTERS.map((filter) => (
+                <FilterPill
+                  key={filter.key}
+                  active={activeStatusFilter === filter.key}
+                  count={statusCounts[filter.key] || 0}
+                  tone={filter.key === "urgent" ? "warning" : filter.key === "completed" ? "success" : "default"}
+                  onClick={() => updateFilters({ status: filter.key })}
+                >
+                  {filter.label}
+                </FilterPill>
+              ))}
             </div>
-          ) : null}
+          </FilterGroup>
 
           <div
             style={{
-              display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
-              alignItems: "center",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "14px",
             }}
           >
-            <div
-              style={{
-                position: "relative",
-                flex: "1 1 240px",
-                minWidth: 0,
-              }}
-            >
-              <input
-                type="search"
-                value={customerInput}
-                onChange={handleCustomerInputChange}
-                onFocus={() => setIsCustomerMenuOpen(true)}
-                onBlur={handleCustomerInputBlur}
-                placeholder="Filter by customer"
-                style={{
-                  width: "100%",
-                  minWidth: 0,
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "14px",
-                  padding: "12px 14px",
-                  boxSizing: "border-box",
-                  fontSize: "15px",
-                }}
-              />
+            <FilterGroup label="Production Workflow">
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {PRODUCTION_METHOD_FILTERS.map((filter) => (
+                  <FilterPill
+                    key={filter.key}
+                    active={activeMethodFilter === filter.key}
+                    count={methodCounts[filter.key] || 0}
+                    onClick={() => updateFilters({ workflow: filter.key })}
+                  >
+                    {filter.label}
+                  </FilterPill>
+                ))}
+              </div>
+            </FilterGroup>
 
-              {isCustomerMenuOpen && customerSuggestions.length > 0 ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 6px)",
-                    left: 0,
-                    right: 0,
-                    zIndex: 20,
-                    background: "#ffffff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "12px",
-                    boxShadow: "0 12px 24px rgba(15, 23, 42, 0.12)",
-                    overflow: "hidden",
-                    maxHeight: "240px",
-                    overflowY: "auto",
-                  }}
-                >
-                  {customerSuggestions.slice(0, 8).map((customer) => (
-                    <button
-                      key={customer.normalizedName}
-                      type="button"
-                      onMouseDown={() => selectCustomerFilter(customer.name)}
+            <FilterGroup label="View Mode">
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {PRODUCTION_VIEW_MODES.map((mode) => (
+                  <FilterPill
+                    key={mode.key}
+                    active={activeViewMode === mode.key}
+                    count={filteredOrders.length}
+                    onClick={() => updateFilters({ view: mode.key })}
+                  >
+                    {mode.label}
+                  </FilterPill>
+                ))}
+              </div>
+              <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
+                Queue View keeps the production board inside this page so future drag-and-drop stage work can layer onto the same data model.
+              </p>
+            </FilterGroup>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "14px",
+            }}
+          >
+            <FilterGroup label="Date Window">
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {PRODUCTION_DATE_FILTERS.map((tab) => (
+                  <FilterPill
+                    key={tab.key}
+                    active={activeDateFilter === tab.key}
+                    count={filteredOrders.length}
+                    onClick={() => updateFilters({ date: tab.key })}
+                  >
+                    {tab.label}
+                  </FilterPill>
+                ))}
+              </div>
+
+              {activeDateFilter === "custom" ? (
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  <label style={{ display: "grid", gap: "6px", color: "#475569", fontWeight: 700 }}>
+                    Start Date
+                    <input
+                      type="date"
+                      value={customStart}
+                      onChange={(event) =>
+                        updateFilters({ date: "custom", start: event.target.value })
+                      }
                       style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "11px 12px",
-                        background:
-                          normalizeLookup(activeCustomerFilter) === customer.normalizedName
-                            ? "#f8fafc"
-                            : "#ffffff",
-                        border: "none",
-                        borderBottom: "1px solid #f1f5f9",
-                        textAlign: "left",
-                        cursor: "pointer",
-                        color: "#292524",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: "12px",
+                        padding: "10px 12px",
                       }}
-                    >
-                      <strong>{customer.name}</strong>
-                    </button>
-                  ))}
+                    />
+                  </label>
+
+                  <label style={{ display: "grid", gap: "6px", color: "#475569", fontWeight: 700 }}>
+                    End Date
+                    <input
+                      type="date"
+                      value={customEnd}
+                      onChange={(event) =>
+                        updateFilters({ date: "custom", end: event.target.value })
+                      }
+                      style={{
+                        border: "1px solid #cbd5e1",
+                        borderRadius: "12px",
+                        padding: "10px 12px",
+                      }}
+                    />
+                  </label>
                 </div>
               ) : null}
-            </div>
+            </FilterGroup>
 
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(event) => updateFilters({ q: event.target.value })}
-              placeholder="Search order, customer, garment, worker, or artwork filename"
-              style={{
-                flex: "1 1 320px",
-                minWidth: 0,
-                border: "1px solid #cbd5e1",
-                borderRadius: "14px",
-                padding: "12px 14px",
-                boxSizing: "border-box",
-                fontSize: "15px",
-              }}
-            />
+            <FilterGroup label="Search And Filters">
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <div
+                  style={{
+                    position: "relative",
+                    flex: "1 1 220px",
+                    minWidth: 0,
+                  }}
+                >
+                  <input
+                    type="search"
+                    value={customerInput}
+                    onChange={handleCustomerInputChange}
+                    onFocus={() => setIsCustomerMenuOpen(true)}
+                    onBlur={handleCustomerInputBlur}
+                    placeholder="Filter by customer"
+                    style={{
+                      width: "100%",
+                      minWidth: 0,
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "14px",
+                      padding: "12px 14px",
+                      boxSizing: "border-box",
+                      fontSize: "15px",
+                    }}
+                  />
 
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              disabled={!hasActiveFilters}
-              style={{
-                border: "1px solid #d6d3d1",
-                background: hasActiveFilters ? "#ffffff" : "#f5f5f4",
-                color: hasActiveFilters ? "#171717" : "#a8a29e",
-                borderRadius: "14px",
-                padding: "12px 14px",
-                fontWeight: 700,
-                cursor: hasActiveFilters ? "pointer" : "not-allowed",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Reset Filters
-            </button>
+                  {isCustomerMenuOpen && customerSuggestions.length > 0 ? (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 6px)",
+                        left: 0,
+                        right: 0,
+                        zIndex: 20,
+                        background: "#ffffff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "12px",
+                        boxShadow: "0 12px 24px rgba(15, 23, 42, 0.12)",
+                        overflow: "hidden",
+                        maxHeight: "240px",
+                        overflowY: "auto",
+                      }}
+                    >
+                      {customerSuggestions.slice(0, 8).map((customer) => (
+                        <button
+                          key={customer.normalizedName}
+                          type="button"
+                          onMouseDown={() => selectCustomerFilter(customer.name)}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            padding: "11px 12px",
+                            background:
+                              normalizeLookup(activeCustomerFilter) === customer.normalizedName
+                                ? "#f8fafc"
+                                : "#ffffff",
+                            border: "none",
+                            borderBottom: "1px solid #f1f5f9",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            color: "#292524",
+                          }}
+                        >
+                          <strong>{customer.name}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => updateFilters({ q: event.target.value })}
+                  placeholder="Search order, garment, worker, or artwork filename"
+                  style={{
+                    flex: "1 1 300px",
+                    minWidth: 0,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "14px",
+                    padding: "12px 14px",
+                    boxSizing: "border-box",
+                    fontSize: "15px",
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  disabled={!hasActiveFilters}
+                  style={{
+                    border: "1px solid #d6d3d1",
+                    background: hasActiveFilters ? "#ffffff" : "#f5f5f4",
+                    color: hasActiveFilters ? "#171717" : "#a8a29e",
+                    borderRadius: "14px",
+                    padding: "12px 14px",
+                    fontWeight: 700,
+                    cursor: hasActiveFilters ? "pointer" : "not-allowed",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </FilterGroup>
           </div>
         </div>
 
-        {(activeScope === "active" || activeScope === "all") ? (
-          <section style={{ marginBottom: activeScope === "all" ? "20px" : 0 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "10px",
-                flexWrap: "wrap",
-                marginBottom: "10px",
-              }}
-            >
-              <h2 style={{ margin: 0, fontSize: "18px" }}>Active Orders</h2>
-              <span style={{ color: "#57534e", fontWeight: 700 }}>{activeOrders.length} active jobs</span>
+        <section style={{ display: "grid", gap: "12px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <h2 style={{ margin: 0, fontSize: "18px" }}>
+                {activeViewMode === "table" ? "Order Table" : "Queue Board"}
+              </h2>
+              <p style={{ margin: "4px 0 0", color: "#64748b" }}>
+                {buildResultsLabel(filteredOrders.length, activeStatusFilter)}
+              </p>
             </div>
+          </div>
 
+          {activeViewMode === "table" ? (
             <OrdersTable
-              orders={activeOrders}
-              emptyMessage="No active orders match this workflow view yet."
+              orders={filteredOrders}
+              emptyMessage="No production orders match the current workspace filters."
               onAdvanceStatus={handleAdvanceStatus}
             />
-          </section>
-        ) : null}
-
-        {(activeScope === "completed" || activeScope === "all") ? (
-          <section>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "10px",
-                flexWrap: "wrap",
-                marginBottom: "10px",
-              }}
-            >
-              <h2 style={{ margin: 0, fontSize: "18px" }}>Completed Orders</h2>
-              <span style={{ color: "#57534e", fontWeight: 700 }}>{completedOrders.length} completed jobs</span>
-            </div>
-
-            <OrdersTable
-              orders={completedOrders}
-              emptyMessage="No completed orders match the current search and date filters."
-              subdued
-              onAdvanceStatus={handleAdvanceStatus}
-            />
-          </section>
-        ) : null}
+          ) : (
+            <ProductionQueueBoard orders={filteredOrders} />
+          )}
+        </section>
       </div>
     </div>
   );
