@@ -10,7 +10,6 @@ import {
   isReadyForProductionStatus,
   sortOrdersByOperationalStatus,
 } from "../orders/orderWorkflow";
-import ProductionQueueBoard from "../production/ProductionQueueBoard";
 import {
   buildProductionWorkspaceSummary,
   buildResultsLabel,
@@ -26,7 +25,6 @@ import {
   PRODUCTION_DATE_FILTERS,
   PRODUCTION_METHOD_FILTERS,
   PRODUCTION_STATUS_FILTERS,
-  PRODUCTION_VIEW_MODES,
 } from "../production/productionWorkspace";
 
 function money(value) {
@@ -180,23 +178,25 @@ function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
 
 function FilterPill({ active, children, count, tone = "default", onClick }) {
   const activeBackground =
-    tone === "warning" ? "#9a3412" : tone === "success" ? "#166534" : "#171717";
+    tone === "warning" ? "#9a3412" : tone === "success" ? "#166534" : "#111827";
 
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        border: active ? `1px solid ${activeBackground}` : "1px solid #d6d3d1",
-        background: active ? activeBackground : "#ffffff",
-        color: active ? "#ffffff" : "#171717",
+        border: active ? `1px solid ${activeBackground}` : "1px solid #d6dbe4",
+        background: active ? activeBackground : tone === "warning" ? "#fff7ed" : "#ffffff",
+        color: active ? "#ffffff" : "#111827",
         borderRadius: "999px",
-        padding: "9px 13px",
+        padding: tone === "warning" || tone === "success" ? "8px 11px" : "10px 14px",
         fontWeight: 700,
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
         gap: "8px",
+        whiteSpace: "nowrap",
+        boxShadow: active ? "0 8px 18px rgba(15, 23, 42, 0.08)" : "none",
       }}
     >
       <span>{children}</span>
@@ -210,8 +210,8 @@ function FilterPill({ active, children, count, tone = "default", onClick }) {
           alignItems: "center",
           justifyContent: "center",
           fontSize: "12px",
-          background: active ? "rgba(255,255,255,0.18)" : "#f5f5f4",
-          color: active ? "#ffffff" : "#57534e",
+          background: active ? "rgba(255,255,255,0.16)" : "#f1f5f9",
+          color: active ? "#ffffff" : "#475569",
         }}
       >
         {count}
@@ -220,56 +220,36 @@ function FilterPill({ active, children, count, tone = "default", onClick }) {
   );
 }
 
-function FilterGroup({ label, children }) {
-  return (
-    <section
-      style={{
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
-        borderRadius: "18px",
-        padding: "16px",
-        display: "grid",
-        gap: "12px",
-      }}
-    >
-      <div>
-        <p
-          style={{
-            margin: 0,
-            color: "#64748b",
-            fontSize: "12px",
-            fontWeight: 800,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-          }}
-        >
-          {label}
-        </p>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function SummaryCard({ label, value, tone = "default" }) {
   const background =
-    tone === "warning" ? "#fff7ed" : tone === "danger" ? "#fef2f2" : tone === "success" ? "#ecfdf5" : "#ffffff";
+    tone === "warning" ? "#fff7ed" : tone === "danger" ? "#fef2f2" : "#f8fafc";
   const border =
-    tone === "warning" ? "#fdba74" : tone === "danger" ? "#fecaca" : tone === "success" ? "#bbf7d0" : "#e2e8f0";
+    tone === "warning" ? "#fdba74" : tone === "danger" ? "#fecaca" : "#dbe4ee";
   const color =
-    tone === "warning" ? "#c2410c" : tone === "danger" ? "#b91c1c" : tone === "success" ? "#166534" : "#0f172a";
+    tone === "warning" ? "#c2410c" : tone === "danger" ? "#b91c1c" : "#475569";
 
   return (
     <div
       style={{
         background,
         border: `1px solid ${border}`,
-        borderRadius: "18px",
-        padding: "16px",
+        borderRadius: "14px",
+        padding: "12px 14px",
       }}
     >
-      <p style={{ margin: 0, color, fontWeight: 800 }}>{label}</p>
-      <h2 style={{ margin: "10px 0 0", fontSize: "32px" }}>{value}</h2>
+      <p
+        style={{
+          margin: 0,
+          color,
+          fontWeight: 800,
+          fontSize: "12px",
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </p>
+      <h2 style={{ margin: "6px 0 0", fontSize: "26px", lineHeight: 1.1 }}>{value}</h2>
     </div>
   );
 }
@@ -280,7 +260,6 @@ export default function Orders() {
   const activeStatusFilter = searchParams.get("status") || "active";
   const activeMethodFilter = searchParams.get("workflow") || "all";
   const activeDateFilter = searchParams.get("date") || "all";
-  const activeViewMode = searchParams.get("view") || "table";
   const searchTerm = searchParams.get("q") || "";
   const activeCustomerFilter = searchParams.get("customer") || "";
   const customStart = searchParams.get("start") || "";
@@ -292,7 +271,6 @@ export default function Orders() {
     activeStatusFilter !== "active" ||
     activeMethodFilter !== "all" ||
     activeDateFilter !== "all" ||
-    activeViewMode !== "table" ||
     Boolean(activeCustomerFilter) ||
     Boolean(searchTerm) ||
     Boolean(customStart) ||
@@ -364,8 +342,7 @@ export default function Orders() {
         !value ||
         (key === "status" && value === "active") ||
         (key === "workflow" && value === "all") ||
-        (key === "date" && value === "all") ||
-        (key === "view" && value === "table")
+        (key === "date" && value === "all")
       ) {
         nextParams.delete(key);
       } else {
@@ -450,9 +427,9 @@ export default function Orders() {
           background: "#ffffff",
           borderRadius: "24px",
           padding: "24px",
-          border: "1px solid #e2e8f0",
+          border: "1px solid #e8edf3",
           display: "grid",
-          gap: "20px",
+          gap: "24px",
         }}
       >
         <div
@@ -479,7 +456,7 @@ export default function Orders() {
             </p>
             <h1 style={{ margin: "8px 0 6px" }}>Production Orders</h1>
             <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-              One operational workspace for production visibility, queue management, and status progression.
+              Production-first workspace for active jobs, stage flow, and fast order handling.
             </p>
           </div>
 
@@ -502,7 +479,7 @@ export default function Orders() {
               style={{
                 background: "#ffffff",
                 color: "#171717",
-                border: "1px solid #d6d3d1",
+                border: "1px solid #d6dbe4",
                 borderRadius: "12px",
                 padding: "12px 16px",
                 textDecoration: "none",
@@ -517,247 +494,266 @@ export default function Orders() {
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "12px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: "10px",
           }}
         >
           <SummaryCard label="Active Jobs" value={workspaceSummary.activeOrders} />
-          <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
           <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
-          <SummaryCard label="Completed" value={workspaceSummary.completedOrders} tone="success" />
+          <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
         </section>
 
-        <div style={{ display: "grid", gap: "14px" }}>
-          <FilterGroup label="Queue Views">
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {PRODUCTION_STATUS_FILTERS.map((filter) => (
+        <section style={{ display: "grid", gap: "16px" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+            {PRODUCTION_STATUS_FILTERS.filter(
+              (filter) => !["unassigned", "urgent"].includes(filter.key)
+            ).map((filter) => (
+              <FilterPill
+                key={filter.key}
+                active={activeStatusFilter === filter.key}
+                count={statusCounts[filter.key] || 0}
+                tone={filter.key === "completed" ? "success" : "default"}
+                onClick={() => updateFilters({ status: filter.key })}
+              >
+                {filter.label}
+              </FilterPill>
+            ))}
+
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+              {PRODUCTION_STATUS_FILTERS.filter((filter) =>
+                ["unassigned", "urgent"].includes(filter.key)
+              ).map((filter) => (
                 <FilterPill
                   key={filter.key}
                   active={activeStatusFilter === filter.key}
                   count={statusCounts[filter.key] || 0}
-                  tone={filter.key === "urgent" ? "warning" : filter.key === "completed" ? "success" : "default"}
+                  tone="warning"
                   onClick={() => updateFilters({ status: filter.key })}
                 >
                   {filter.label}
                 </FilterPill>
               ))}
             </div>
-          </FilterGroup>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: "14px",
-            }}
-          >
-            <FilterGroup label="Production Workflow">
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {PRODUCTION_METHOD_FILTERS.map((filter) => (
-                  <FilterPill
-                    key={filter.key}
-                    active={activeMethodFilter === filter.key}
-                    count={methodCounts[filter.key] || 0}
-                    onClick={() => updateFilters({ workflow: filter.key })}
-                  >
-                    {filter.label}
-                  </FilterPill>
-                ))}
-              </div>
-            </FilterGroup>
-
-            <FilterGroup label="View Mode">
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {PRODUCTION_VIEW_MODES.map((mode) => (
-                  <FilterPill
-                    key={mode.key}
-                    active={activeViewMode === mode.key}
-                    count={filteredOrders.length}
-                    onClick={() => updateFilters({ view: mode.key })}
-                  >
-                    {mode.label}
-                  </FilterPill>
-                ))}
-              </div>
-              <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
-                Queue View keeps the production board inside this page so future drag-and-drop stage work can layer onto the same data model.
-              </p>
-            </FilterGroup>
           </div>
 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: "14px",
+              gap: "12px",
+              paddingTop: "14px",
+              borderTop: "1px solid #eef2f7",
             }}
           >
-            <FilterGroup label="Date Window">
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {PRODUCTION_DATE_FILTERS.map((tab) => (
-                  <FilterPill
-                    key={tab.key}
-                    active={activeDateFilter === tab.key}
-                    count={filteredOrders.length}
-                    onClick={() => updateFilters({ date: tab.key })}
-                  >
-                    {tab.label}
-                  </FilterPill>
-                ))}
-              </div>
-
-              {activeDateFilter === "custom" ? (
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                  <label style={{ display: "grid", gap: "6px", color: "#475569", fontWeight: 700 }}>
-                    Start Date
-                    <input
-                      type="date"
-                      value={customStart}
-                      onChange={(event) =>
-                        updateFilters({ date: "custom", start: event.target.value })
-                      }
-                      style={{
-                        border: "1px solid #cbd5e1",
-                        borderRadius: "12px",
-                        padding: "10px 12px",
-                      }}
-                    />
-                  </label>
-
-                  <label style={{ display: "grid", gap: "6px", color: "#475569", fontWeight: 700 }}>
-                    End Date
-                    <input
-                      type="date"
-                      value={customEnd}
-                      onChange={(event) =>
-                        updateFilters({ date: "custom", end: event.target.value })
-                      }
-                      style={{
-                        border: "1px solid #cbd5e1",
-                        borderRadius: "12px",
-                        padding: "10px 12px",
-                      }}
-                    />
-                  </label>
-                </div>
-              ) : null}
-            </FilterGroup>
-
-            <FilterGroup label="Search And Filters">
-              <div
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "12px",
+                flexWrap: "wrap",
+              }}
+            >
+              <p
                 style={{
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
-                  alignItems: "center",
+                  margin: 0,
+                  color: "#64748b",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
                 }}
               >
-                <div
-                  style={{
-                    position: "relative",
-                    flex: "1 1 220px",
-                    minWidth: 0,
-                  }}
-                >
-                  <input
-                    type="search"
-                    value={customerInput}
-                    onChange={handleCustomerInputChange}
-                    onFocus={() => setIsCustomerMenuOpen(true)}
-                    onBlur={handleCustomerInputBlur}
-                    placeholder="Filter by customer"
-                    style={{
-                      width: "100%",
-                      minWidth: 0,
-                      border: "1px solid #cbd5e1",
-                      borderRadius: "14px",
-                      padding: "12px 14px",
-                      boxSizing: "border-box",
-                      fontSize: "15px",
-                    }}
-                  />
+                Search And Filters
+              </p>
 
-                  {isCustomerMenuOpen && customerSuggestions.length > 0 ? (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "calc(100% + 6px)",
-                        left: 0,
-                        right: 0,
-                        zIndex: 20,
-                        background: "#ffffff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "12px",
-                        boxShadow: "0 12px 24px rgba(15, 23, 42, 0.12)",
-                        overflow: "hidden",
-                        maxHeight: "240px",
-                        overflowY: "auto",
-                      }}
-                    >
-                      {customerSuggestions.slice(0, 8).map((customer) => (
-                        <button
-                          key={customer.normalizedName}
-                          type="button"
-                          onMouseDown={() => selectCustomerFilter(customer.name)}
-                          style={{
-                            display: "block",
-                            width: "100%",
-                            padding: "11px 12px",
-                            background:
-                              normalizeLookup(activeCustomerFilter) === customer.normalizedName
-                                ? "#f8fafc"
-                                : "#ffffff",
-                            border: "none",
-                            borderBottom: "1px solid #f1f5f9",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            color: "#292524",
-                          }}
-                        >
-                          <strong>{customer.name}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                disabled={!hasActiveFilters}
+                style={{
+                  border: "1px solid #d6dbe4",
+                  background: hasActiveFilters ? "#ffffff" : "#f8fafc",
+                  color: hasActiveFilters ? "#171717" : "#94a3b8",
+                  borderRadius: "12px",
+                  padding: "10px 12px",
+                  fontWeight: 700,
+                  cursor: hasActiveFilters ? "pointer" : "not-allowed",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Reset Filters
+              </button>
+            </div>
 
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(220px, 1.6fr) minmax(180px, 1fr) repeat(2, minmax(160px, 0.8fr))",
+                gap: "10px",
+              }}
+            >
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => updateFilters({ q: event.target.value })}
+                placeholder="Search order, garment, worker, or artwork"
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "12px",
+                  padding: "12px 14px",
+                  boxSizing: "border-box",
+                  fontSize: "15px",
+                }}
+              />
+
+              <div style={{ position: "relative", minWidth: 0 }}>
                 <input
                   type="search"
-                  value={searchTerm}
-                  onChange={(event) => updateFilters({ q: event.target.value })}
-                  placeholder="Search order, garment, worker, or artwork filename"
+                  value={customerInput}
+                  onChange={handleCustomerInputChange}
+                  onFocus={() => setIsCustomerMenuOpen(true)}
+                  onBlur={handleCustomerInputBlur}
+                  placeholder="Customer"
                   style={{
-                    flex: "1 1 300px",
+                    width: "100%",
                     minWidth: 0,
                     border: "1px solid #cbd5e1",
-                    borderRadius: "14px",
+                    borderRadius: "12px",
                     padding: "12px 14px",
                     boxSizing: "border-box",
                     fontSize: "15px",
                   }}
                 />
 
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  disabled={!hasActiveFilters}
-                  style={{
-                    border: "1px solid #d6d3d1",
-                    background: hasActiveFilters ? "#ffffff" : "#f5f5f4",
-                    color: hasActiveFilters ? "#171717" : "#a8a29e",
-                    borderRadius: "14px",
-                    padding: "12px 14px",
-                    fontWeight: 700,
-                    cursor: hasActiveFilters ? "pointer" : "not-allowed",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Reset Filters
-                </button>
+                {isCustomerMenuOpen && customerSuggestions.length > 0 ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      left: 0,
+                      right: 0,
+                      zIndex: 20,
+                      background: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "12px",
+                      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.12)",
+                      overflow: "hidden",
+                      maxHeight: "240px",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {customerSuggestions.slice(0, 8).map((customer) => (
+                      <button
+                        key={customer.normalizedName}
+                        type="button"
+                        onMouseDown={() => selectCustomerFilter(customer.name)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          padding: "11px 12px",
+                          background:
+                            normalizeLookup(activeCustomerFilter) === customer.normalizedName
+                              ? "#f8fafc"
+                              : "#ffffff",
+                          border: "none",
+                          borderBottom: "1px solid #f1f5f9",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          color: "#292524",
+                        }}
+                      >
+                        <strong>{customer.name}</strong>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            </FilterGroup>
+
+              <select
+                value={activeMethodFilter}
+                onChange={(event) => updateFilters({ workflow: event.target.value })}
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "12px",
+                  padding: "12px 14px",
+                  boxSizing: "border-box",
+                  fontSize: "15px",
+                  background: "#ffffff",
+                }}
+              >
+                {PRODUCTION_METHOD_FILTERS.map((filter) => (
+                  <option key={filter.key} value={filter.key}>
+                    {filter.label}
+                    {filter.key !== "all" ? ` (${methodCounts[filter.key] || 0})` : ""}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={activeDateFilter}
+                onChange={(event) => updateFilters({ date: event.target.value })}
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "12px",
+                  padding: "12px 14px",
+                  boxSizing: "border-box",
+                  fontSize: "15px",
+                  background: "#ffffff",
+                }}
+              >
+                {PRODUCTION_DATE_FILTERS.map((filter) => (
+                  <option key={filter.key} value={filter.key}>
+                    {filter.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {activeDateFilter === "custom" ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 220px))",
+                  gap: "10px",
+                }}
+              >
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(event) =>
+                    updateFilters({ date: "custom", start: event.target.value })
+                  }
+                  aria-label="Start date"
+                  style={{
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "12px",
+                    padding: "11px 12px",
+                  }}
+                />
+
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(event) =>
+                    updateFilters({ date: "custom", end: event.target.value })
+                  }
+                  aria-label="End date"
+                  style={{
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "12px",
+                    padding: "11px 12px",
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
-        </div>
+        </section>
 
         <section style={{ display: "grid", gap: "12px" }}>
           <div
@@ -770,24 +766,18 @@ export default function Orders() {
             }}
           >
             <div>
-              <h2 style={{ margin: 0, fontSize: "18px" }}>
-                {activeViewMode === "table" ? "Order Table" : "Queue Board"}
-              </h2>
+              <h2 style={{ margin: 0, fontSize: "18px" }}>Order Table</h2>
               <p style={{ margin: "4px 0 0", color: "#64748b" }}>
                 {buildResultsLabel(filteredOrders.length, activeStatusFilter)}
               </p>
             </div>
           </div>
 
-          {activeViewMode === "table" ? (
-            <OrdersTable
-              orders={filteredOrders}
-              emptyMessage="No production orders match the current workspace filters."
-              onAdvanceStatus={handleAdvanceStatus}
-            />
-          ) : (
-            <ProductionQueueBoard orders={filteredOrders} />
-          )}
+          <OrdersTable
+            orders={filteredOrders}
+            emptyMessage="No production orders match the current workspace filters."
+            onAdvanceStatus={handleAdvanceStatus}
+          />
         </section>
       </div>
     </div>
