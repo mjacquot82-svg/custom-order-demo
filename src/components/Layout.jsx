@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
+import { isActiveOperationalStatus } from "../orders/orderWorkflow";
 import {
   clearActiveStaffSession,
   getActiveStaffUser,
@@ -39,7 +40,8 @@ function InstagramIcon() {
 
 function getSidebarCounts(orders = []) {
   const activeOrders = orders.filter(
-    (order) => order.operational_visible !== false
+    (order) =>
+      order.operational_visible !== false && isActiveOperationalStatus(order.status)
   );
 
   return {
@@ -99,24 +101,20 @@ function getAdminSections(role) {
   ];
 }
 
-function getActiveSidebarLink(pathname, search) {
-  const orderFilter = new URLSearchParams(search).get("filter");
-
+function getActiveSidebarLink(pathname) {
   if (pathname.startsWith("/admin/assignments")) return "assignments";
   if (pathname.startsWith("/admin/products")) return "products";
   if (pathname.startsWith("/admin/customers")) return "customers";
   if (pathname.startsWith("/admin/staff-users")) return "staffUsers";
   if (pathname === "/admin/orders/new") return "newOrder";
   if (pathname === "/admin/sales/new") return "quickSale";
-  if (pathname === "/admin/orders") {
-    return orderFilter === "production" ? "productionOrders" : "orders";
-  }
+  if (pathname === "/admin/orders") return "productionOrders";
   if (pathname.startsWith("/admin/orders/")) return "productionOrders";
   if (pathname === "/admin") return "dashboard";
   return "";
 }
 
-function AttentionBadge({ count }) {
+function AttentionBadge({ count, active = false }) {
   if (!count) return null;
 
   return (
@@ -129,9 +127,9 @@ function AttentionBadge({ count }) {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#fff7ed",
-        color: "#c2410c",
-        border: "1px solid #fed7aa",
+        background: active ? "rgba(255,255,255,0.16)" : "#fff7ed",
+        color: active ? "#ffffff" : "#c2410c",
+        border: active ? "1px solid rgba(255,255,255,0.2)" : "1px solid #fed7aa",
         fontSize: "12px",
         fontWeight: 900,
       }}
@@ -182,10 +180,10 @@ function SocialLinks({ compact = false }) {
   );
 }
 
-function AdminSidebar({ pathname, search, staffUser }) {
+function AdminSidebar({ pathname, staffUser }) {
   const orders = useStoredOrders();
   const badgeCounts = getSidebarCounts(orders);
-  const activeLink = getActiveSidebarLink(pathname, search);
+  const activeLink = getActiveSidebarLink(pathname);
   const role = staffUser?.role || "Staff";
   const adminSections = getAdminSections(role);
 
@@ -293,31 +291,53 @@ function AdminSidebar({ pathname, search, staffUser }) {
           <div style={{ display: "grid", gap: "6px" }}>
             {section.links.map((link) => {
               const active = activeLink === (link.navKey || link.to);
+              const navItemStyle = {
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: active ? "12px 13px" : "11px 12px",
+                borderRadius: "14px",
+                background: active
+                  ? "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)"
+                  : "#ffffff",
+                color: active ? "#ffffff" : "#171717",
+                textDecoration: "none",
+                border: active
+                  ? "1px solid #0f172a"
+                  : "1px solid #e2e8f0",
+                fontWeight: active ? 800 : 700,
+                boxShadow: active
+                  ? "inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 28px rgba(15, 23, 42, 0.16)"
+                  : "none",
+                cursor: active ? "default" : "pointer",
+                pointerEvents: active ? "none" : "auto",
+              };
 
-              return (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "11px 12px",
-                    borderRadius: "12px",
-                    background: active ? "#171717" : "#ffffff",
-                    color: active ? "#ffffff" : "#171717",
-                    textDecoration: "none",
-                    border: active
-                      ? "1px solid #171717"
-                      : "1px solid #e2e8f0",
-                    fontWeight: 700,
-                  }}
-                >
+              const content = (
+                <>
                   <span>{link.label}</span>
-
                   <AttentionBadge
                     count={badgeCounts[link.badgeKey]}
+                    active={active}
                   />
+                </>
+              );
+
+              if (active) {
+                return (
+                  <div
+                    key={link.to}
+                    aria-current="page"
+                    style={navItemStyle}
+                  >
+                    {content}
+                  </div>
+                );
+              }
+
+              return (
+                <Link key={link.to} to={link.to} style={navItemStyle}>
+                  {content}
                 </Link>
               );
             })}
@@ -602,22 +622,17 @@ function AdminWorkspaceHeader({ staffUser }) {
 export default function Layout() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
-  const [activeStaffUser, setActiveStaffUser] = useState(() =>
-    isAdmin ? getActiveStaffUser() : null
-  );
+  const [activeStaffUser, setActiveStaffUser] = useState(() => getActiveStaffUser());
 
   useEffect(() => {
-    if (!isAdmin) {
-      setActiveStaffUser(null);
-      return undefined;
-    }
-
-    setActiveStaffUser(getActiveStaffUser());
+    if (!isAdmin) return undefined;
 
     return subscribeToActiveStaffUser((nextStaffUser) => {
       setActiveStaffUser(nextStaffUser);
     });
   }, [isAdmin]);
+
+  const visibleStaffUser = isAdmin ? activeStaffUser : null;
 
   return (
     <div>
@@ -626,11 +641,11 @@ export default function Layout() {
           <AdminSidebar
             pathname={location.pathname}
             search={location.search}
-            staffUser={activeStaffUser}
+            staffUser={visibleStaffUser}
           />
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <AdminWorkspaceHeader staffUser={activeStaffUser} />
+            <AdminWorkspaceHeader staffUser={visibleStaffUser} />
 
             <main style={{ minWidth: 0 }}>
               <Outlet />

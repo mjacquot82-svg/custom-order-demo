@@ -10,7 +10,6 @@ export const PRODUCTION_STATUS_FILTERS = [
   { key: "active", label: "Active" },
   { key: "awaiting-production", label: "Awaiting Production" },
   { key: "in-production", label: "In Production" },
-  { key: "qc", label: "QC" },
   { key: "ready-for-pickup", label: "Ready For Pickup" },
   { key: "completed", label: "Completed" },
   { key: "unassigned", label: "Unassigned" },
@@ -185,11 +184,6 @@ export function matchesProductionStatus(order, activeStatus) {
 
   if (activeStatus === "in-production") {
     return normalizedStatus === "In Production";
-  }
-
-  if (activeStatus === "qc") {
-    const compactStatus = normalizeLookup(normalizedStatus);
-    return compactStatus === "qc" || compactStatus.includes("quality control");
   }
 
   if (activeStatus === "ready-for-pickup") {
