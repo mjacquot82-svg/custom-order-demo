@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
 import PricingSummary from "../components/PricingSummary";
+import { getOrderArtworkNames } from "../lib/orderArtwork";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
@@ -16,6 +17,16 @@ import {
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function formatValue(value, fallback = "—") {
+  const normalized = String(value || "").trim();
+  return normalized || fallback;
+}
+
+function formatList(values = [], fallback = "—") {
+  const items = Array.from(new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean)));
+  return items.length ? items.join(", ") : fallback;
 }
 
 function cardStyle(background = "#ffffff") {
@@ -63,6 +74,30 @@ function StatusPill({ children, tone = "default" }) {
   );
 }
 
+function WorkspaceCard({ eyebrow, title, description, children, background = "#ffffff" }) {
+  return (
+    <section style={cardStyle(background)}>
+      <div style={{ marginBottom: "16px" }}>
+        <p
+          style={{
+            margin: 0,
+            color: "#64748b",
+            fontSize: "11px",
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}
+        >
+          {eyebrow}
+        </p>
+        <h2 style={{ margin: "6px 0 4px", color: "#0f172a", fontSize: "20px" }}>{title}</h2>
+        {description ? <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>{description}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export default function QuoteDetail() {
   const { orderNumber } = useParams();
   const location = useLocation();
@@ -92,6 +127,15 @@ export default function QuoteDetail() {
     () => buildProductionReadiness(order, financials),
     [order, financials]
   );
+  const artworkNames = useMemo(() => getOrderArtworkNames(order), [order]);
+  const readinessSummary = productionReadiness.ready
+    ? "Ready for production"
+    : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`;
+  const nextStep = canAdvanceQuoteStatus(order?.quote_status)
+    ? `Mark ${getNextQuoteStatus(order.quote_status)}`
+    : isQuoteReadyForProduction(order?.quote_status)
+    ? "Release to Production"
+    : "Await remaining quote requirements";
 
   if (!order) {
     return (
@@ -166,11 +210,11 @@ export default function QuoteDetail() {
               textTransform: "uppercase",
             }}
           >
-            Quote Workflow
+            Quote Detail Workspace
           </p>
           <h1 style={{ margin: "6px 0" }}>Quote {order.order_number}</h1>
           <p style={{ margin: 0, color: "#475569", maxWidth: "760px" }}>
-            Sales-stage workspace for approvals, artwork confirmation, and deposit readiness before production release.
+            Focused operational workspace for approvals, readiness, pricing, artwork, and production release.
           </p>
         </div>
 
@@ -227,7 +271,12 @@ export default function QuoteDetail() {
       </div>
 
       <div style={{ display: "grid", gap: "18px" }}>
-        <section style={cardStyle("#f8fafc")}>
+        <WorkspaceCard
+          eyebrow="Workspace Focus"
+          title="Operational quote management"
+          description="This route keeps quote-critical decisions visible at all times. It does not collapse like the list view."
+          background="#f8fafc"
+        >
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
             <StatusPill tone={isQuoteReadyForProduction(order.quote_status) ? "success" : "default"}>
               {order.quote_status}
@@ -239,9 +288,7 @@ export default function QuoteDetail() {
               {approvalStatus}
             </StatusPill>
             <StatusPill tone={productionReadiness.ready ? "success" : "warning"}>
-              {productionReadiness.ready
-                ? "Ready for production"
-                : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`}
+              {readinessSummary}
             </StatusPill>
           </div>
 
@@ -255,7 +302,7 @@ export default function QuoteDetail() {
             <DetailItem label="Customer" value={order.customer_name} />
             <DetailItem label="Company" value={order.customer_company} />
             <DetailItem label="Quote Status" value={order.quote_status} />
-            <DetailItem label="Production Readiness" value={productionReadiness.ready ? "Ready for production" : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`} />
+            <DetailItem label="Production Readiness" value={readinessSummary} />
             <DetailItem label="Customer Approval" value={approvalStatus} />
             <DetailItem label="Deposit" value={depositStatus} />
             <DetailItem label="Source" value={order.source} />
@@ -264,12 +311,27 @@ export default function QuoteDetail() {
               label="Artwork"
               value={productionReadiness.checks.find((check) => check.label === "Artwork")?.detail || "No artwork required"}
             />
+            <DetailItem label="Next workflow step" value={nextStep} />
           </div>
-        </section>
+        </WorkspaceCard>
 
-        <section
-          style={cardStyle(productionReadiness.ready ? "#ecfdf5" : "#fff7ed")}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.9fr)",
+            gap: "18px",
+          }}
         >
+          <WorkspaceCard
+            eyebrow="Readiness"
+            title="Production release requirements"
+            description={
+              productionReadiness.ready
+                ? "All release requirements are satisfied."
+                : "Resolve the remaining requirements below before moving this quote into production."
+            }
+            background={productionReadiness.ready ? "#ecfdf5" : "#fff7ed"}
+          >
           <div
             style={{
               display: "flex",
@@ -307,9 +369,7 @@ export default function QuoteDetail() {
               </p>
             </div>
             <StatusPill tone={productionReadiness.ready ? "success" : "warning"}>
-              {productionReadiness.ready
-                ? "Ready for production"
-                : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`}
+              {readinessSummary}
             </StatusPill>
           </div>
 
@@ -354,9 +414,74 @@ export default function QuoteDetail() {
               </div>
             ))}
           </div>
-        </section>
+          </WorkspaceCard>
 
-        <section style={cardStyle()}>
+          <WorkspaceCard
+            eyebrow="Release Workflow"
+            title="Move the quote forward"
+            description="Production release actions stay visible here instead of being hidden behind an accordion preview."
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "14px",
+                marginBottom: "18px",
+              }}
+            >
+              <DetailItem label="Approval status" value={approvalStatus} />
+              <DetailItem label="Deposit status" value={depositStatus} />
+              <DetailItem label="Next action" value={nextStep} />
+              <DetailItem
+                label="Release gate"
+                value={productionReadiness.ready ? "Eligible for production release" : "Blocked by requirements"}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {canAdvanceQuoteStatus(order.quote_status) ? (
+                <button
+                  type="button"
+                  onClick={handleAdvanceQuote}
+                  style={{
+                    border: "none",
+                    background: "#0f172a",
+                    color: "#ffffff",
+                    borderRadius: "12px",
+                    padding: "11px 14px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Mark {getNextQuoteStatus(order.quote_status)}
+                </button>
+              ) : null}
+              {isQuoteReadyForProduction(order.quote_status) ? (
+                <button
+                  type="button"
+                  onClick={handleReleaseToProduction}
+                  style={{
+                    border: "none",
+                    background: "#166534",
+                    color: "#ffffff",
+                    borderRadius: "12px",
+                    padding: "11px 14px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Release to Production
+                </button>
+              ) : null}
+            </div>
+          </WorkspaceCard>
+        </div>
+
+        <WorkspaceCard
+          eyebrow="Approvals And Artwork"
+          title="Customer sign-off and art visibility"
+          description="Artwork, placements, and customer-facing details remain visible while you manage the quote."
+        >
           <div
             style={{
               display: "grid",
@@ -364,10 +489,23 @@ export default function QuoteDetail() {
               gap: "14px",
             }}
           >
-            <DetailItem label="Garment" value={order.garment} />
-            <DetailItem label="Decoration Type" value={order.decoration_type} />
-            <DetailItem label="Quantity" value={order.qty} />
-            <DetailItem label="Placements" value={(order.placements || []).map((entry) => entry.placement).join(", ")} />
+            <DetailItem label="Customer" value={formatValue(order.customer_name, "Walk-in Customer")} />
+            <DetailItem label="Garment" value={formatValue(order.garment, "Custom garment")} />
+            <DetailItem label="Decoration Type" value={formatValue(order.decoration_type)} />
+            <DetailItem label="Quantity" value={formatValue(order.qty, "0")} />
+            <DetailItem
+              label="Placements"
+              value={formatList((order.placements || []).map((entry) => entry.placement))}
+            />
+            <DetailItem
+              label="Artwork files"
+              value={formatList(artworkNames, "No artwork uploaded")}
+            />
+            <DetailItem label="Artwork approval" value={approvalStatus} />
+            <DetailItem
+              label="Artwork readiness"
+              value={productionReadiness.checks.find((check) => check.label === "Artwork")?.detail || "No artwork required"}
+            />
           </div>
           {order.notes ? (
             <div style={{ marginTop: "16px" }}>
@@ -375,9 +513,13 @@ export default function QuoteDetail() {
               <p style={{ margin: "6px 0 0", color: "#171717" }}>{order.notes}</p>
             </div>
           ) : null}
-        </section>
+        </WorkspaceCard>
 
-        <section style={cardStyle()}>
+        <WorkspaceCard
+          eyebrow="Pricing"
+          title="Pricing and payment position"
+          description="Financial visibility stays persistent in the detail workspace so quote decisions are made with current pricing context."
+        >
           <div
             style={{
               display: "grid",
@@ -399,7 +541,7 @@ export default function QuoteDetail() {
               Quote pricing snapshot will appear here once pricing data is available.
             </p>
           )}
-        </section>
+        </WorkspaceCard>
 
       </div>
     </div>

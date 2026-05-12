@@ -196,6 +196,26 @@ function buildReadinessSummary(readiness) {
   return `${readiness.remainingRequirements} requirement${readiness.remainingRequirements === 1 ? "" : "s"} remaining`;
 }
 
+function getCollapsedSummaryFields(quote, summary) {
+  return [
+    { label: "Quote #", value: formatValue(quote.order_number) },
+    { label: "Customer", value: formatValue(quote.customer_name, "Walk-in Customer") },
+    { label: "Status", value: formatValue(quote.quote_status, "Draft") },
+    {
+      label: "Production readiness",
+      value: buildReadinessSummary(summary.readiness),
+      tone: summary.readiness.ready ? "success" : "warning",
+    },
+    {
+      label: "Deposit status",
+      value: summary.depositStatus,
+      tone: summary.depositStatus === "Deposit received" ? "success" : "warning",
+    },
+    { label: "Due date", value: summary.dueDate },
+    { label: "Total", value: money(summary.total) },
+  ];
+}
+
 export default function Quotes() {
   const orders = useStoredOrders();
   const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
@@ -307,6 +327,7 @@ export default function Quotes() {
               const summary = buildQuoteSummary(quote);
               const isExpanded = Boolean(expandedQuotes[quote.order_number]);
               const readinessTone = summary.readiness.ready ? "success" : "warning";
+              const collapsedFields = getCollapsedSummaryFields(quote, summary);
 
               return (
                 <article
@@ -364,14 +385,14 @@ export default function Quotes() {
                               color: "#64748b",
                               fontSize: "11px",
                               fontWeight: 800,
-                              letterSpacing: "0.06em",
+                              letterSpacing: "0.08em",
                               textTransform: "uppercase",
                             }}
                           >
-                            Quote {quote.order_number}
+                            Quotes List View
                           </p>
                           <p style={{ margin: "6px 0 0", color: "#0f172a", fontSize: "16px", fontWeight: 800 }}>
-                            {formatValue(quote.customer_name, "Walk-in Customer")}
+                            Compact scan summary
                           </p>
                         </div>
                         <span
@@ -388,21 +409,17 @@ export default function Quotes() {
                         </span>
                       </div>
 
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <StatusPill tone={isQuoteReadyForProduction(quote.quote_status) ? "success" : "default"}>
-                          {formatValue(quote.quote_status, "Draft")}
-                        </StatusPill>
-                        <StatusPill tone={summary.depositStatus === "Deposit received" ? "success" : "warning"}>
-                          {summary.depositStatus}
-                        </StatusPill>
-                        <StatusPill tone={readinessTone}>
-                          {buildReadinessSummary(summary.readiness)}
-                        </StatusPill>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                          gap: "14px",
+                        }}
+                      >
+                        {collapsedFields.map((field) => (
+                          <Field key={field.label} label={field.label} value={field.value} tone={field.tone} />
+                        ))}
                       </div>
-
-                      <p style={{ margin: 0, color: "#475569", fontSize: "13px" }}>
-                        Review pricing, customer approval, deposit, artwork, and next production step.
-                      </p>
                     </button>
 
                     <Link
@@ -421,35 +438,8 @@ export default function Quotes() {
                         minHeight: "100%",
                       }}
                     >
-                      Open Quote
+                      Open Workspace
                     </Link>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-                      gap: "14px",
-                    }}
-                  >
-                    <Field label="Status" value={formatValue(quote.quote_status, "Draft")} />
-                    <Field
-                      label="Production Readiness"
-                      value={buildReadinessSummary(summary.readiness)}
-                      tone={readinessTone}
-                    />
-                    <Field
-                      label="Customer Approval"
-                      value={summary.approvalStatus}
-                      tone={summary.approvalStatus === "Approved" ? "success" : "warning"}
-                    />
-                    <Field
-                      label="Deposit"
-                      value={summary.depositStatus}
-                      tone={summary.depositStatus === "Deposit received" ? "success" : "warning"}
-                    />
-                    <Field label="Due Date" value={summary.dueDate} />
-                    <Field label="Total" value={money(summary.total)} />
                   </div>
 
                   <div
@@ -471,6 +461,45 @@ export default function Quotes() {
                           pointerEvents: isExpanded ? "auto" : "none",
                         }}
                       >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: "12px",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div>
+                            <p
+                              style={{
+                                margin: 0,
+                                color: "#64748b",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Expanded Preview
+                            </p>
+                            <p style={{ margin: "4px 0 0", color: "#475569", fontSize: "13px" }}>
+                              Preview garments, placements, artwork, readiness, and pricing before opening the full workspace.
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                            <StatusPill tone={summary.approvalStatus === "Approved" ? "success" : "warning"}>
+                              {summary.approvalStatus}
+                            </StatusPill>
+                            <StatusPill tone={summary.depositStatus === "Deposit received" ? "success" : "warning"}>
+                              {summary.depositStatus}
+                            </StatusPill>
+                            <StatusPill tone={readinessTone}>
+                              {buildReadinessSummary(summary.readiness)}
+                            </StatusPill>
+                          </div>
+                        </div>
+
                         <section
                           style={{
                             borderRadius: "16px",
