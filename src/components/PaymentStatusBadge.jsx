@@ -14,9 +14,21 @@ function badgeStyle(background, color) {
 }
 
 function getPaymentStatusStyle(status) {
-  if (status === "Paid in Full") return badgeStyle("#dcfce7", "#166534");
-  if (status === "Partial" || status === "Deposit Paid") {
+  if (status === "Paid" || status === "Paid in Full") return badgeStyle("#dcfce7", "#166534");
+  if (status === "Partial Payment" || status === "Partial" || status === "Deposit Applied" || status === "Deposit Paid") {
     return badgeStyle("#fef3c7", "#92400e");
+  }
+  if (status === "Awaiting Deposit" || status === "Overdue") {
+    return badgeStyle("#fef2f2", "#b91c1c");
+  }
+  if (status === "Sent" || status === "Awaiting Payment" || status === "Awaiting Final Payment") {
+    return badgeStyle("#dbeafe", "#1d4ed8");
+  }
+  if (status === "Draft") {
+    return badgeStyle("#f1f5f9", "#475569");
+  }
+  if (status === "Refunded" || status === "Void") {
+    return badgeStyle("#ede9fe", "#6d28d9");
   }
 
   return badgeStyle("#e2e8f0", "#334155");

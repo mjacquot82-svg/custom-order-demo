@@ -723,7 +723,10 @@ export default function Quotes() {
                           <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
                             <Field label="Pricing" value={`Deposit ${money(summary.depositTarget)} • Balance ${money(summary.balance)}`} />
                             <div style={{ marginTop: "12px" }}>
-                              <Field label="Payment State" value={formatValue(summary.financials.payment_status, "Unpaid")} />
+                              <Field label="Invoice State" value={formatValue(summary.financials.invoice_status, "Draft")} />
+                            </div>
+                            <div style={{ marginTop: "12px" }}>
+                              <Field label="Collection Step" value={formatValue(summary.financials.payment_collection_state, "Awaiting Payment")} />
                             </div>
                           </div>
 

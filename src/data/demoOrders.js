@@ -12,6 +12,7 @@ export const demoOrders = [
     deposit_amount: 120,
     created_at: "2026-05-06T14:42:00.000Z",
     updated_at: "2026-05-06T14:42:00.000Z",
+    due_date: "2026-05-10",
     pickup_status: "Pending",
   },
   {
@@ -27,6 +28,7 @@ export const demoOrders = [
     deposit_amount: 300,
     created_at: "2026-05-07T15:10:00.000Z",
     updated_at: "2026-05-08T15:30:00.000Z",
+    due_date: "2026-05-14",
     payment_history: [
       {
         id: "payment-tc-1002-deposit",
@@ -52,6 +54,7 @@ export const demoOrders = [
     deposit_amount: 200,
     created_at: "2026-05-07T12:15:00.000Z",
     updated_at: "2026-05-09T18:05:00.000Z",
+    due_date: "2026-05-16",
     payment_history: [
       {
         id: "payment-tc-1003-deposit",

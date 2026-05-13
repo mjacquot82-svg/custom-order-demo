@@ -488,7 +488,7 @@ export default function OrderDetail() {
         />
 
         <ActivityTimeline
-          events={order.activity_log || []}
+          events={normalizedOrder?.connected_timeline || order.activity_log || []}
           compact
         />
       </div>

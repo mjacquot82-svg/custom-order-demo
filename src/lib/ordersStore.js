@@ -540,7 +540,7 @@ export function recordStoredOrderPayment(orderNumber, paymentInput = {}, options
   );
   const paymentNote = paymentEntry.note ? ` Note: ${paymentEntry.note}` : "";
   const statusNote =
-    nextFinancials.payment_status === "Paid in Full"
+    nextFinancials.payment_status === "Paid"
       ? " Order is now paid in full."
       : ` Remaining balance: ${money(nextFinancials.balance_due)}.`;
 

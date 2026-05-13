@@ -1,8 +1,20 @@
 export const PAYMENT_STATUS_OPTIONS = [
-  "Unpaid",
-  "Deposit Paid",
-  "Partial",
-  "Paid in Full",
+  "Draft",
+  "Awaiting Payment",
+  "Awaiting Deposit",
+  "Deposit Applied",
+  "Partial Payment",
+  "Paid",
+];
+
+export const INVOICE_WORKFLOW_STATUS_OPTIONS = [
+  "Draft",
+  "Sent",
+  "Partial Payment",
+  "Paid",
+  "Overdue",
+  "Refunded",
+  "Void",
 ];
 
 export const PICKUP_STATUS_OPTIONS = [
@@ -79,6 +91,25 @@ function normalizeText(value, fallback = "") {
 
 function normalizePaymentMethod(method) {
   return PAYMENT_METHOD_OPTIONS.includes(method) ? method : "Other";
+}
+
+function normalizeLower(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function normalizeInvoiceWorkflowStatus(status) {
+  const normalized = normalizeLower(status);
+
+  if (!normalized) return "";
+  if (normalized.includes("void")) return "Void";
+  if (normalized.includes("refund")) return "Refunded";
+  if (normalized.includes("overdue") || normalized.includes("past due")) return "Overdue";
+  if (normalized.includes("partial")) return "Partial Payment";
+  if (normalized.includes("paid")) return "Paid";
+  if (normalized.includes("sent")) return "Sent";
+  if (normalized.includes("draft")) return "Draft";
+
+  return "";
 }
 
 function resolveCurrency(...values) {
@@ -342,6 +373,272 @@ function buildLegacyDepositPayment(order) {
   };
 }
 
+function buildSyntheticActivityEvent({
+  id,
+  type,
+  note,
+  timestamp,
+  tone = "default",
+  amount = null,
+}) {
+  return {
+    id,
+    type,
+    note,
+    tone,
+    amount,
+    synthetic: true,
+    staff_name: "Financial System",
+    staff_role: "Lifecycle",
+    created_at: timestamp,
+  };
+}
+
+function sortTimelineEvents(events = []) {
+  return [...events].sort(
+    (left, right) => new Date(right?.created_at || 0).getTime() - new Date(left?.created_at || 0).getTime()
+  );
+}
+
+function dedupeTimelineEvents(events = []) {
+  const seen = new Set();
+
+  return events.filter((event, index) => {
+    const key = `${event?.type || "event"}|${event?.created_at || "unknown"}|${event?.note || index}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function hasActivityType(activityLog = [], types = []) {
+  const expectedTypes = new Set(types.map((type) => normalizeLower(type)));
+  return activityLog.some((event) => expectedTypes.has(normalizeLower(event?.type)));
+}
+
+function resolveInvoiceDueDate(order = {}) {
+  return (
+    order.invoice?.due_date ||
+    order.invoice_due_date ||
+    order.payment_due_date ||
+    order.due_date ||
+    ""
+  );
+}
+
+function isDraftFinancialRecord(order = {}) {
+  const explicitInvoiceStatus = normalizeInvoiceWorkflowStatus(
+    order.invoice?.status || order.invoice_status
+  );
+  const quoteStatus = normalizeLower(order.quote_status);
+
+  if (explicitInvoiceStatus === "Draft") return true;
+  if (["Sent", "Partial Payment", "Paid", "Overdue", "Refunded", "Void"].includes(explicitInvoiceStatus)) {
+    return false;
+  }
+
+  return quoteStatus === "draft";
+}
+
+function isPaymentOverdue(order = {}, balanceDue = 0, invoiceStatus = "") {
+  if (balanceDue <= 0 || invoiceStatus === "Void" || invoiceStatus === "Refunded") {
+    return false;
+  }
+
+  const dueDate = resolveInvoiceDueDate(order);
+
+  if (!dueDate) return false;
+
+  const dueTimestamp = new Date(dueDate).getTime();
+  if (Number.isNaN(dueTimestamp)) return false;
+
+  return Date.now() > dueTimestamp;
+}
+
+function buildPaymentCollectionState({ totalAmount, totalPaid, depositAmount, balanceDue }) {
+  if (totalAmount <= 0) return "Draft";
+  if (balanceDue <= 0 && totalPaid > 0) return "Paid";
+  if (depositAmount > 0 && totalPaid < depositAmount) return "Awaiting Deposit";
+  if (depositAmount > 0 && totalPaid >= depositAmount && balanceDue > 0) {
+    return "Awaiting Final Payment";
+  }
+
+  return totalPaid > 0 ? "Awaiting Final Payment" : "Awaiting Payment";
+}
+
+function buildInvoiceWorkflowStatus(order, { totalAmount, totalPaid, balanceDue }) {
+  const explicitStatus = normalizeInvoiceWorkflowStatus(
+    order.invoice?.status || order.invoice_status
+  );
+
+  if (explicitStatus === "Void" || explicitStatus === "Refunded") {
+    return explicitStatus;
+  }
+
+  if (totalAmount <= 0 || isDraftFinancialRecord(order)) {
+    return "Draft";
+  }
+
+  if (balanceDue <= 0 && totalPaid > 0) {
+    return "Paid";
+  }
+
+  if (isPaymentOverdue(order, balanceDue, explicitStatus)) {
+    return "Overdue";
+  }
+
+  if (totalPaid > 0) {
+    return "Partial Payment";
+  }
+
+  if (explicitStatus === "Draft") {
+    return "Draft";
+  }
+
+  return "Sent";
+}
+
+function buildConnectedFinancialHistory(order = {}, financialSummary = {}) {
+  const activityLog = Array.isArray(order.activity_log) ? order.activity_log : [];
+  const paymentHistory = Array.isArray(financialSummary.payment_history)
+    ? [...financialSummary.payment_history].sort(
+        (left, right) =>
+          new Date(left?.timestamp || 0).getTime() - new Date(right?.timestamp || 0).getTime()
+      )
+    : [];
+  const totalAmount = Number(financialSummary.total_amount || 0);
+  const balanceDue = Number(financialSummary.balance_due || 0);
+  const depositAmount = Number(financialSummary.deposit_amount || 0);
+  const depositApplied = Number(financialSummary.deposit_applied || 0);
+  const invoiceStatus = financialSummary.invoice_status || "Draft";
+  const dueDate = financialSummary.invoice_due_date;
+  const createdAt = order.invoice?.created_at || order.invoice_created_at || order.created_at;
+  const sentAt =
+    order.invoice?.sent_at ||
+    order.invoice_sent_at ||
+    (invoiceStatus !== "Draft" ? createdAt || order.updated_at : "");
+  const history = [];
+  const hasLoggedPayment = hasActivityType(activityLog, ["payment"]);
+  const hasLoggedDepositRequest = hasActivityType(activityLog, ["deposit_request"]);
+
+  if (createdAt && totalAmount > 0) {
+    history.push(
+      buildSyntheticActivityEvent({
+        id: `invoice-created-${order.order_number || "order"}`,
+        type: "invoice_created",
+        note: `Invoice created for ${money(totalAmount)}.`,
+        timestamp: createdAt,
+      })
+    );
+  }
+
+  if (sentAt && invoiceStatus !== "Draft") {
+    history.push(
+      buildSyntheticActivityEvent({
+        id: `invoice-sent-${order.order_number || "order"}`,
+        type: "invoice_sent",
+        note: `Invoice sent${dueDate ? ` with payment due ${dueDate}.` : "."}`,
+        timestamp: sentAt,
+      })
+    );
+  }
+
+  if (depositAmount > 0 && !hasLoggedDepositRequest) {
+    history.push(
+      buildSyntheticActivityEvent({
+        id: `deposit-requested-${order.order_number || "order"}`,
+        type: "deposit_requested",
+        note: `Deposit requested for ${money(depositAmount)}.`,
+        timestamp: order.deposit?.requested_at || sentAt || createdAt || order.updated_at,
+        tone: "warning",
+      })
+    );
+  }
+
+  if (!hasLoggedPayment && paymentHistory.length) {
+    paymentHistory.forEach((payment, index) => {
+      history.push(
+        buildSyntheticActivityEvent({
+          id: payment.id || `payment-history-${order.order_number || "order"}-${index}`,
+          type: "payment_received",
+          note: `Payment received: ${money(payment.amount)} via ${payment.method}.`,
+          timestamp: payment.timestamp,
+          tone: "success",
+          amount: payment.amount,
+        })
+      );
+    });
+  }
+
+  if (depositApplied > 0 && !hasLoggedPayment) {
+    const depositMilestonePayment = paymentHistory.find((payment) => Number(payment.amount || 0) > 0);
+
+    history.push(
+      buildSyntheticActivityEvent({
+        id: `deposit-received-${order.order_number || "order"}`,
+        type: "deposit_received",
+        note: `Deposit received and credited: ${money(depositApplied)}.`,
+        timestamp:
+          order.deposit?.paid_at ||
+          order.deposit?.updated_at ||
+          depositMilestonePayment?.timestamp ||
+          sentAt ||
+          createdAt ||
+          order.updated_at,
+        tone: "success",
+        amount: depositApplied,
+      })
+    );
+  }
+
+  if (!hasLoggedPayment && Number(financialSummary.total_paid || 0) > 0 && balanceDue > 0) {
+    history.push(
+      buildSyntheticActivityEvent({
+        id: `partial-payment-${order.order_number || "order"}`,
+        type: "partial_payment_recorded",
+        note: `Partial payment recorded. Paid to date ${money(financialSummary.total_paid)} with ${money(balanceDue)} remaining.`,
+        timestamp: paymentHistory[paymentHistory.length - 1]?.timestamp || order.updated_at,
+        tone: "warning",
+      })
+    );
+  }
+
+  if (!hasLoggedPayment && invoiceStatus === "Paid" && paymentHistory.length) {
+    history.push(
+      buildSyntheticActivityEvent({
+        id: `balance-complete-${order.order_number || "order"}`,
+        type: "balance_completed",
+        note: "Balance completed and invoice marked paid.",
+        timestamp: paymentHistory[paymentHistory.length - 1]?.timestamp || order.updated_at,
+        tone: "success",
+      })
+    );
+  }
+
+  if (invoiceStatus === "Overdue") {
+    history.push(
+      buildSyntheticActivityEvent({
+        id: `invoice-overdue-${order.order_number || "order"}`,
+        type: "invoice_overdue",
+        note: `Invoice is overdue with ${money(balanceDue)} outstanding.`,
+        timestamp: dueDate || order.updated_at,
+        tone: "danger",
+      })
+    );
+  }
+
+  const connectedTimeline = sortTimelineEvents(dedupeTimelineEvents([...activityLog, ...history]));
+
+  return {
+    financial_history: sortTimelineEvents(dedupeTimelineEvents(history)),
+    connected_timeline: connectedTimeline,
+  };
+}
+
 export function normalizePaymentHistory(history, order = {}) {
   const normalizedHistory = Array.isArray(history)
     ? history
@@ -420,17 +717,46 @@ export function deriveOrderFinancials(order = {}, options = {}) {
         ) ?? historyPaid
   );
   const balanceDue = normalizeCurrency(Math.max(totalAmount - totalPaid, 0));
-
-  let paymentStatus = "Unpaid";
-  if (totalPaid > 0) {
-    if (totalAmount > 0 && balanceDue <= 0) {
-      paymentStatus = "Paid in Full";
-    } else if (depositAmount > 0 && totalPaid <= depositAmount) {
-      paymentStatus = "Deposit Paid";
-    } else {
-      paymentStatus = "Partial";
-    }
-  }
+  const depositApplied = normalizeCurrency(Math.min(totalPaid, depositAmount));
+  const depositOutstanding = normalizeCurrency(Math.max(depositAmount - depositApplied, 0));
+  const invoiceDueDate = resolveInvoiceDueDate(order);
+  const invoiceStatus = buildInvoiceWorkflowStatus(order, {
+    totalAmount,
+    totalPaid,
+    balanceDue,
+  });
+  const paymentStatus =
+    totalAmount <= 0
+      ? "Draft"
+      : balanceDue <= 0 && totalPaid > 0
+      ? "Paid"
+      : totalPaid <= 0
+      ? depositAmount > 0
+        ? "Awaiting Deposit"
+        : "Awaiting Payment"
+      : depositAmount > 0 && totalPaid < depositAmount
+      ? "Awaiting Deposit"
+      : depositAmount > 0 && depositApplied > 0 && totalPaid <= depositAmount
+      ? "Deposit Applied"
+      : "Partial Payment";
+  const paymentCollectionState = buildPaymentCollectionState({
+    totalAmount,
+    totalPaid,
+    depositAmount,
+    balanceDue,
+  });
+  const amountDueNow =
+    paymentCollectionState === "Awaiting Deposit"
+      ? normalizeCurrency(depositOutstanding || depositAmount || balanceDue)
+      : balanceDue;
+  const depositCreditedMessage =
+    depositApplied > 0
+      ? `${money(depositApplied)} deposit credited toward invoice.`
+      : depositAmount > 0
+      ? `Awaiting ${money(depositAmount)} deposit before final collection.`
+      : "No deposit applied.";
+  const balanceSummary =
+    balanceDue > 0 ? `${money(balanceDue)} remaining.` : "Balance complete.";
 
   let pickupStatus = PICKUP_STATUS_OPTIONS.includes(order.pickup_status)
     ? order.pickup_status
@@ -442,16 +768,40 @@ export function deriveOrderFinancials(order = {}, options = {}) {
     pickupStatus = "Ready for Pickup";
   }
 
+  const connectedHistory = buildConnectedFinancialHistory(order, {
+    total_amount: totalAmount,
+    deposit_amount: depositAmount,
+    total_paid: totalPaid,
+    balance_due: balanceDue,
+    deposit_applied: depositApplied,
+    invoice_status: invoiceStatus,
+    invoice_due_date: invoiceDueDate,
+    payment_history: paymentHistory,
+  });
+
   return {
     subtotal,
     tax_amount: taxAmount,
     total_amount: totalAmount,
     deposit_amount: depositAmount,
+    deposit_applied: depositApplied,
+    deposit_outstanding: depositOutstanding,
     total_paid: totalPaid,
+    paid_to_date: totalPaid,
     balance_due: balanceDue,
+    remaining_balance: balanceDue,
+    amount_due_now: amountDueNow,
     payment_status: paymentStatus,
+    payment_collection_state: paymentCollectionState,
+    invoice_status: invoiceStatus,
+    invoice_due_date: invoiceDueDate,
+    is_payment_overdue: invoiceStatus === "Overdue",
+    deposit_credited_message: depositCreditedMessage,
+    balance_summary: balanceSummary,
     pickup_status: pickupStatus,
     payment_history: paymentHistory,
+    financial_history: connectedHistory.financial_history,
+    connected_timeline: connectedHistory.connected_timeline,
   };
 }
 

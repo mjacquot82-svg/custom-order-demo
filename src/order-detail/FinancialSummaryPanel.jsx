@@ -251,6 +251,46 @@ export default function FinancialSummaryPanel({
           marginBottom: "18px",
         }}
       >
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            border: "1px solid #e2e8f0",
+            borderRadius: "16px",
+            padding: "14px 16px",
+            background: "#f8fafc",
+            display: "grid",
+            gap: "10px",
+          }}
+        >
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <div style={{ display: "grid", gap: "6px" }}>
+              <span style={rowLabelStyle}>Invoice Status</span>
+              <PaymentStatusBadge status={order.invoice_status} />
+            </div>
+
+            <div style={{ display: "grid", gap: "6px" }}>
+              <span style={rowLabelStyle}>Payment Status</span>
+              <PaymentStatusBadge status={order.payment_status} />
+            </div>
+
+            <div style={{ display: "grid", gap: "6px" }}>
+              <span style={rowLabelStyle}>Collection Step</span>
+              <span style={{ color: "#334155", fontWeight: 700 }}>
+                {order.payment_collection_state}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <p style={{ margin: 0, color: "#0f172a", fontWeight: 700 }}>
+              {order.deposit_credited_message}
+            </p>
+            <p style={{ margin: "6px 0 0", color: "#64748b" }}>
+              {order.balance_summary}
+            </p>
+          </div>
+        </div>
+
         <div style={{ display: "grid", gap: "4px" }}>
           <span style={rowLabelStyle}>Subtotal</span>
           <span style={rowValueStyle}>{money(order.subtotal)}</span>
@@ -272,7 +312,12 @@ export default function FinancialSummaryPanel({
         </div>
 
         <div style={{ display: "grid", gap: "4px" }}>
-          <span style={rowLabelStyle}>Amount Paid</span>
+          <span style={rowLabelStyle}>Deposit Applied</span>
+          <span style={rowValueStyle}>{money(order.deposit_applied)}</span>
+        </div>
+
+        <div style={{ display: "grid", gap: "4px" }}>
+          <span style={rowLabelStyle}>Paid To Date</span>
           <span style={rowValueStyle}>{money(order.total_paid)}</span>
         </div>
 
@@ -280,6 +325,13 @@ export default function FinancialSummaryPanel({
           <span style={rowLabelStyle}>Remaining Balance</span>
           <span style={{ ...rowValueStyle, color: order.balance_due > 0 ? "#991b1b" : "#166534" }}>
             {money(order.balance_due)}
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gap: "4px" }}>
+          <span style={rowLabelStyle}>Amount Due Now</span>
+          <span style={{ ...rowValueStyle, color: order.amount_due_now > 0 ? "#9a3412" : "#166534" }}>
+            {money(order.amount_due_now)}
           </span>
         </div>
       </div>
@@ -293,19 +345,14 @@ export default function FinancialSummaryPanel({
         }}
       >
         <div style={{ display: "grid", gap: "6px" }}>
-          <span style={rowLabelStyle}>Payment Status</span>
-          <PaymentStatusBadge status={order.payment_status} />
-        </div>
-
-        <div style={{ display: "grid", gap: "6px" }}>
           <span style={rowLabelStyle}>Pickup Status</span>
           <span style={getPickupStatusStyle(order.pickup_status)}>{order.pickup_status}</span>
         </div>
 
         <div style={{ display: "grid", gap: "6px" }}>
           <span style={rowLabelStyle}>Due Date</span>
-          <span style={{ color: "#334155", fontWeight: 700 }}>
-            {order.due_date ? formatShortDate(order.due_date) : "—"}
+          <span style={{ color: order.is_payment_overdue ? "#b91c1c" : "#334155", fontWeight: 700 }}>
+            {order.invoice_due_date ? formatShortDate(order.invoice_due_date) : "—"}
           </span>
         </div>
       </div>
@@ -525,7 +572,7 @@ export default function FinancialSummaryPanel({
         <div>
           <h3 style={{ margin: "0 0 4px", fontSize: "16px" }}>Payment History</h3>
           <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>
-            Recorded payments for this order.
+            Deposit receipts and payments already credited against this invoice.
           </p>
         </div>
 

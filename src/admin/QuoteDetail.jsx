@@ -330,7 +330,10 @@ export default function QuoteDetail() {
   });
   const archived = isQuoteArchived(order);
   const archivedAt = archived ? formatDateTime(order.quote_archived_at, " • ") : "—";
-  const historyEvents = useMemo(() => buildTimelineEvents(order), [order]);
+  const historyEvents = useMemo(
+    () => financials?.connected_timeline || buildTimelineEvents(order),
+    [financials, order]
+  );
   const readinessSummary = productionReadiness.ready
     ? "Ready for production"
     : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`;
@@ -1159,6 +1162,18 @@ export default function QuoteDetail() {
           title="Pricing and payment position"
           description="Financial visibility stays persistent in the detail workspace so quote decisions are made with current pricing context."
         >
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "18px" }}>
+            <StatusPill tone={financials?.invoice_status === "Paid" ? "success" : financials?.invoice_status === "Overdue" ? "warning" : "default"}>
+              Invoice {formatValue(financials?.invoice_status)}
+            </StatusPill>
+            <StatusPill tone={financials?.payment_status === "Paid" ? "success" : financials?.payment_collection_state === "Awaiting Deposit" ? "warning" : "default"}>
+              {formatValue(financials?.payment_status)}
+            </StatusPill>
+            <StatusPill tone={financials?.payment_collection_state === "Paid" ? "success" : "default"}>
+              {formatValue(financials?.payment_collection_state)}
+            </StatusPill>
+          </div>
+
           <div
             style={{
               display: "grid",
@@ -1169,8 +1184,28 @@ export default function QuoteDetail() {
           >
             <DetailItem label="Quote Total" value={money(financials?.total_amount)} />
             <DetailItem label="Deposit Target" value={money(financials?.deposit_amount)} />
-            <DetailItem label="Paid To Date" value={money(financials?.amount_paid)} />
+            <DetailItem label="Deposit Applied" value={money(financials?.deposit_applied)} />
+            <DetailItem label="Paid To Date" value={money(financials?.total_paid)} />
             <DetailItem label="Balance Owing" value={money(financials?.balance_due)} />
+            <DetailItem label="Amount Due Now" value={money(financials?.amount_due_now)} />
+            <DetailItem label="Collection Step" value={formatValue(financials?.payment_collection_state)} />
+          </div>
+
+          <div
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: "14px",
+              padding: "14px",
+              background: "#f8fafc",
+              marginBottom: "18px",
+            }}
+          >
+            <p style={{ margin: 0, color: "#0f172a", fontWeight: 700 }}>
+              {formatValue(financials?.deposit_credited_message)}
+            </p>
+            <p style={{ margin: "6px 0 0", color: "#64748b" }}>
+              {formatValue(financials?.balance_summary)}
+            </p>
           </div>
 
           {quoteSnapshot ? (

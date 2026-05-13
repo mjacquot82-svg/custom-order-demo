@@ -35,10 +35,10 @@ function getPaymentSummary(order) {
   const balanceDue = Number(order.balance_due || 0);
 
   if (balanceDue > 0) {
-    return `Owes ${money(balanceDue)}`;
+    return `${order.payment_collection_state || "Awaiting Payment"} • ${money(balanceDue)} due`;
   }
 
-  return order.payment_status === "Paid in Full" ? "Paid" : "No balance due";
+  return order.payment_status === "Paid" ? "Paid" : "No balance due";
 }
 
 function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
