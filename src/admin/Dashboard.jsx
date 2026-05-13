@@ -1,6 +1,12 @@
 import { useStoredOrders } from "../lib/ordersStore";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
 import { buildOperationalMetrics } from "../operations/buildOperationalMetrics";
+import { buildProductionReadiness } from "../quotes/productionReadiness";
+import { normalizeQuoteStatus } from "../quotes/quoteWorkflow";
+import {
+  isCompletedOperationalStatus,
+  normalizeOperationalStatus,
+} from "../orders/orderWorkflow";
 
 function Section({ title, children }) {
   return (
@@ -11,16 +17,63 @@ function Section({ title, children }) {
   );
 }
 
+function buildWorkflowSnapshotCards(orders = []) {
+  const snapshot = {
+    awaitingApproval: 0,
+    awaitingDeposit: 0,
+    artworkNeeded: 0,
+    readyForProduction: 0,
+    blockedJobs: 0,
+  };
+
+  orders.forEach((order) => {
+    const quoteStatus = normalizeQuoteStatus(order.quote_status);
+
+    if (order.operational_visible !== true) {
+      const readiness = buildProductionReadiness(order, order);
+      const unmetChecks = readiness.checks.filter((check) => !check.passed);
+
+      if (quoteStatus === "Awaiting Approval") {
+        snapshot.awaitingApproval += 1;
+      }
+
+      if (quoteStatus === "Awaiting Deposit" || unmetChecks.some((check) => check.label === "Deposit")) {
+        snapshot.awaitingDeposit += 1;
+      }
+
+      if (quoteStatus === "Awaiting Artwork Approval" || unmetChecks.some((check) => check.label === "Artwork")) {
+        snapshot.artworkNeeded += 1;
+      }
+
+      if (readiness.ready || quoteStatus === "Ready For Production") {
+        snapshot.readyForProduction += 1;
+      }
+
+      return;
+    }
+
+    const operationalStatus = normalizeOperationalStatus(order.status);
+    const isBlockedByAssignment = order.needs_assignment || !order.assigned_to_staff_name;
+    const isBlockedAtIntake = operationalStatus === "New";
+
+    if (!isCompletedOperationalStatus(operationalStatus) && (isBlockedByAssignment || isBlockedAtIntake)) {
+      snapshot.blockedJobs += 1;
+    }
+  });
+
+  return [
+    { label: "Awaiting Approval", value: snapshot.awaitingApproval, tone: "warning" },
+    { label: "Awaiting Deposit", value: snapshot.awaitingDeposit, tone: "warning" },
+    { label: "Artwork Needed", value: snapshot.artworkNeeded, tone: "warning" },
+    { label: "Ready For Production", value: snapshot.readyForProduction, tone: "success" },
+    { label: "Blocked Jobs", value: snapshot.blockedJobs, tone: "default" },
+  ];
+}
+
 export default function Dashboard() {
   const orders = useStoredOrders();
   const metrics = buildOperationalMetrics(orders);
-  const operationsSnapshotCards = [
-    { label: "Active Quotes", value: metrics.activeQuotes, tone: "default" },
-    { label: "Awaiting Deposit", value: metrics.awaitingDeposit, tone: "warning" },
-    { label: "Active Production Jobs", value: metrics.activeProduction, tone: "success" },
-    { label: "Unassigned Jobs", value: metrics.needsAssignment, tone: "warning" },
-    { label: "Outstanding Payments", value: metrics.outstandingPayments, tone: "default" },
-  ];
+  const operationsSnapshotCards = buildWorkflowSnapshotCards(orders);
   const productionTypes = Object.entries(metrics.productionTypes).filter(([, total]) => total > 0);
   const workerLoad = Object.entries(metrics.workerLoad).sort((left, right) => right[1] - left[1]);
 
@@ -43,6 +96,10 @@ export default function Dashboard() {
       </div>
 
       <Section title="Operations Snapshot">
+        <p style={{ margin: "0 0 16px", color: "#64748b", maxWidth: "760px", lineHeight: 1.6 }}>
+          Workflow visibility stays separate from the KPI row here. Use this section to spot what is still waiting on approval,
+          deposit, artwork, production release, or assignment before work can move.
+        </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
           {operationsSnapshotCards.map((card) => {
             const palette = toneStyles[card.tone] || toneStyles.default;
