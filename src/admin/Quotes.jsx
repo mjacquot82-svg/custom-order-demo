@@ -223,6 +223,7 @@ export default function Quotes() {
   const orders = useStoredOrders();
   const cardRefs = useRef({});
   const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
+  const [flashTitle, setFlashTitle] = useState(() => location.state?.flashTitle || "Quote Created Successfully");
   const [flashMessage, setFlashMessage] = useState(() => location.state?.flashMessage || "");
   const [flashTone, setFlashTone] = useState(() => location.state?.flashTone || "default");
   const [highlightedQuote, setHighlightedQuote] = useState(
@@ -258,6 +259,7 @@ export default function Quotes() {
     if (!location.state?.createdOrderNumber && !location.state?.flashMessage) return;
 
     if (location.state?.flashMessage) {
+      setFlashTitle(location.state.flashTitle || "Quote Created Successfully");
       setFlashMessage(location.state.flashMessage);
       setFlashTone(location.state.flashTone || "default");
     }
@@ -340,6 +342,9 @@ export default function Quotes() {
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
             Intake, approvals, artwork sign-off, and deposit readiness stay here until work is released into production.
           </p>
+          <p style={{ margin: "8px 0 0", color: "#94a3b8", maxWidth: "760px", fontSize: "14px", fontWeight: 600 }}>
+            Archived quotes are intentionally removed from this active workflow view.
+          </p>
         </div>
 
         <Link
@@ -385,7 +390,7 @@ export default function Quotes() {
             gap: "4px",
           }}
         >
-          <strong style={{ fontSize: "14px" }}>Quote Created Successfully</strong>
+          <strong style={{ fontSize: "14px" }}>{flashTitle}</strong>
           <span style={{ fontWeight: 600 }}>{flashMessage}</span>
         </section>
       ) : null}
@@ -776,7 +781,7 @@ export default function Quotes() {
                 color: "#64748b",
               }}
             >
-              No active quotes yet. New intake created from this area will stay in sales workflow until released for production.
+              No active quotes yet. New intake created from this area will stay in sales workflow until released for production. Archived quotes are removed from this queue.
             </div>
           )}
         </div>

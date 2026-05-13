@@ -1,6 +1,7 @@
-import { Link, useLocation, useParams } from "react-router-dom";
-import { useMemo } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
 import PricingSummary from "../components/PricingSummary";
+import { formatDateTime } from "../lib/dateFormatting";
 import { getOrderArtworkNames } from "../lib/orderArtwork";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
@@ -102,6 +103,7 @@ function WorkspaceCard({ eyebrow, title, description, children, background = "#f
 export default function QuoteDetail() {
   const { orderNumber } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const orders = useStoredOrders();
   const savedOrder = location.state?.savedOrder || null;
   const order = useMemo(
@@ -129,7 +131,9 @@ export default function QuoteDetail() {
     [order, financials]
   );
   const artworkNames = useMemo(() => getOrderArtworkNames(order), [order]);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const archived = isQuoteArchived(order);
+  const archivedAt = archived ? formatDateTime(order.quote_archived_at, " • ") : "—";
   const readinessSummary = productionReadiness.ready
     ? "Ready for production"
     : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`;
@@ -178,7 +182,6 @@ export default function QuoteDetail() {
 
   function handleArchiveQuote() {
     if (archived) return;
-    if (!window.confirm("Archive this quote from active workflow?")) return;
 
     updateStoredOrder(order.order_number, {
       quote_archived: true,
@@ -187,6 +190,15 @@ export default function QuoteDetail() {
       production_ready: false,
       activity_type: "quote_archive",
       activity_note: "Quote archived from active workflow.",
+    });
+
+    setShowArchiveConfirm(false);
+    navigate("/admin/quotes", {
+      state: {
+        flashTitle: "Quote Archived",
+        flashMessage: `Quote ${order.order_number} was removed from active workflow.`,
+        flashTone: "success",
+      },
     });
   }
 
@@ -251,7 +263,7 @@ export default function QuoteDetail() {
               fontWeight: 700,
             }}
           >
-            Back to Quotes
+            {archived ? "Back to Active Quotes" : "Back to Quotes"}
           </Link>
           {canAdvanceQuoteStatus(order.quote_status) ? (
             <button
@@ -294,22 +306,47 @@ export default function QuoteDetail() {
           {!archived ? (
             <button
               type="button"
-              onClick={handleArchiveQuote}
+              onClick={() => setShowArchiveConfirm((current) => !current)}
               style={{
                 border: "1px solid #d6dbe4",
-                background: "#ffffff",
-                color: "#334155",
+                background: "#f8fafc",
+                color: "#0f172a",
                 borderRadius: "12px",
                 padding: "11px 14px",
                 fontWeight: 700,
                 cursor: "pointer",
               }}
             >
-              Archive Quote
+              Archive from Active Workflow
             </button>
           ) : null}
         </div>
       </div>
+
+      {archived ? (
+        <section
+          aria-live="polite"
+          style={{
+            marginBottom: "20px",
+            borderRadius: "18px",
+            padding: "18px 20px",
+            border: "1px solid #cbd5e1",
+            background: "#f8fafc",
+            color: "#334155",
+            display: "grid",
+            gap: "8px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <StatusPill>Archived</StatusPill>
+            <strong style={{ color: "#0f172a" }}>This quote has been removed from active workflow.</strong>
+          </div>
+          <p style={{ margin: 0, lineHeight: 1.6 }}>
+            It no longer appears as active operational work or in quote workflow queues.
+          </p>
+          <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>Archived {archivedAt}</p>
+        </section>
+      ) : null}
 
       <div style={{ display: "grid", gap: "18px" }}>
         <WorkspaceCard
@@ -351,13 +388,148 @@ export default function QuoteDetail() {
             <DetailItem label="Due Date" value={order.due_date} />
             <DetailItem
               label="Workflow Visibility"
-              value={archived ? "Archived from active workflow" : "Active"}
+              value={archived ? "Removed from active workflow" : "Active operational workflow"}
             />
+            {archived ? <DetailItem label="Archived At" value={archivedAt} /> : null}
             <DetailItem
               label="Artwork"
               value={productionReadiness.checks.find((check) => check.label === "Artwork")?.detail || "No artwork required"}
             />
             <DetailItem label="Next workflow step" value={nextStep} />
+          </div>
+        </WorkspaceCard>
+
+        <WorkspaceCard
+          eyebrow="Workflow Visibility"
+          title={archived ? "Archived record" : "Active quote workflow control"}
+          description={
+            archived
+              ? "This record is preserved for reference, but it is no longer treated as active operational work."
+              : "Archive completed quotes out of active workflow once they should no longer appear in operational queues."
+          }
+          background={archived ? "#f8fafc" : "#ffffff"}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.2fr) minmax(260px, 0.8fr)",
+              gap: "16px",
+              alignItems: "start",
+            }}
+          >
+            <div style={{ display: "grid", gap: "12px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <StatusPill>{archived ? "Archived" : "Active workflow"}</StatusPill>
+                {!archived ? <StatusPill tone="warning">Visible in active quote queue</StatusPill> : null}
+              </div>
+              <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+                {archived
+                  ? "Archived quotes stay viewable here while remaining out of active workflow and operational queue views."
+                  : "Archiving removes this quote from the active quote workflow and operational queue visibility without changing the underlying record."}
+              </p>
+              {archived ? (
+                <p style={{ margin: 0, color: "#64748b", fontWeight: 600 }}>Archived {archivedAt}</p>
+              ) : null}
+            </div>
+
+            {archived ? (
+              <div
+                style={{
+                  borderRadius: "16px",
+                  border: "1px solid #e2e8f0",
+                  background: "#ffffff",
+                  padding: "16px",
+                  display: "grid",
+                  gap: "8px",
+                }}
+              >
+                <strong style={{ color: "#0f172a" }}>Removed from active work</strong>
+                <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+                  This quote is archived and no longer appears as active operational work.
+                </p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  borderRadius: "16px",
+                  border: `1px solid ${showArchiveConfirm ? "#cbd5e1" : "#e2e8f0"}`,
+                  background: showArchiveConfirm ? "#f8fafc" : "#ffffff",
+                  padding: "16px",
+                  display: "grid",
+                  gap: "10px",
+                }}
+              >
+                <strong style={{ color: "#0f172a" }}>Archive from active workflow</strong>
+                <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+                  Move this quote out of active operational workflow while keeping the full record available.
+                </p>
+                {showArchiveConfirm ? (
+                  <>
+                    <div
+                      style={{
+                        borderRadius: "12px",
+                        border: "1px solid #d6dbe4",
+                        background: "#ffffff",
+                        padding: "12px 14px",
+                        color: "#334155",
+                        fontWeight: 600,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Archive this quote from active workflow?
+                    </div>
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={handleArchiveQuote}
+                        style={{
+                          border: "none",
+                          background: "#0f172a",
+                          color: "#ffffff",
+                          borderRadius: "12px",
+                          padding: "11px 14px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Confirm Archive
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowArchiveConfirm(false)}
+                        style={{
+                          border: "1px solid #d6dbe4",
+                          background: "#ffffff",
+                          color: "#334155",
+                          borderRadius: "12px",
+                          padding: "11px 14px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Keep Active
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowArchiveConfirm(true)}
+                    style={{
+                      border: "1px solid #d6dbe4",
+                      background: "#ffffff",
+                      color: "#334155",
+                      borderRadius: "12px",
+                      padding: "11px 14px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Archive Quote
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </WorkspaceCard>
 
@@ -484,7 +656,7 @@ export default function QuoteDetail() {
               />
             </div>
 
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
               {canAdvanceQuoteStatus(order.quote_status) ? (
                 <button
                   type="button"
@@ -523,23 +695,13 @@ export default function QuoteDetail() {
                   Release to Production
                 </button>
               ) : null}
-              {!archived ? (
-                <button
-                  type="button"
-                  onClick={handleArchiveQuote}
-                  style={{
-                    border: "1px solid #d6dbe4",
-                    background: "#ffffff",
-                    color: "#334155",
-                    borderRadius: "12px",
-                    padding: "11px 14px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Archive Quote
-                </button>
-              ) : null}
+              {archived ? (
+                <StatusPill>Archived record</StatusPill>
+              ) : (
+                <span style={{ color: "#64748b", fontSize: "14px", fontWeight: 600 }}>
+                  Archive control stays in Workflow Visibility so it remains deliberate and easy to find.
+                </span>
+              )}
             </div>
           </WorkspaceCard>
         </div>
