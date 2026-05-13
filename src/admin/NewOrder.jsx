@@ -161,6 +161,15 @@ export default function NewOrder() {
   const [validationMessages, setValidationMessages] = useState([]);
   const [validationFields, setValidationFields] = useState({});
 
+  function returnToQuoteWorkflow(state) {
+    if (state) {
+      navigate("/admin/quotes", { state });
+      return;
+    }
+
+    navigate("/admin/quotes");
+  }
+
   const selectedProduct = useMemo(() => {
     return products.find((product) => product.id === selectedProductId);
   }, [products, selectedProductId]);
@@ -514,12 +523,10 @@ export default function NewOrder() {
       linkOrderToCustomer(customerId, order.order_number);
       setSubmitState("success");
       setSubmitMessage(`Quote ${order.order_number} saved. Moving into quote workflow…`);
-      navigate(`/admin/quotes`, {
-        state: {
-          flashMessage: `Quote ${order.order_number} created successfully and added to workflow.`,
-          flashTone: "success",
-          createdOrderNumber: order.order_number,
-        },
+      returnToQuoteWorkflow({
+        flashMessage: `Quote ${order.order_number} created successfully and added to workflow.`,
+        flashTone: "success",
+        createdOrderNumber: order.order_number,
       });
     } catch (error) {
       console.error("Unable to save quote", error);
@@ -972,7 +979,7 @@ export default function NewOrder() {
         </section>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
-          <button type="button" onClick={() => navigate("/admin/quotes")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "13px 18px", cursor: "pointer", fontWeight: 600 }}>
+          <button type="button" onClick={() => returnToQuoteWorkflow()} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "13px 18px", cursor: "pointer", fontWeight: 600 }}>
             Cancel
           </button>
           <button
