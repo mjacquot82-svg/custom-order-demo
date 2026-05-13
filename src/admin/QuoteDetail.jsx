@@ -193,9 +193,8 @@ export default function QuoteDetail() {
     });
 
     setShowArchiveConfirm(false);
-    navigate("/admin/quotes", {
+    navigate("/admin/quotes/archived", {
       state: {
-        flashTitle: "Quote Archived",
         flashMessage: `Quote ${order.order_number} was removed from active workflow.`,
         flashTone: "success",
       },
@@ -252,7 +251,7 @@ export default function QuoteDetail() {
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <Link
-            to="/admin/quotes"
+            to={archived ? "/admin/quotes/archived" : "/admin/quotes"}
             style={{
               background: "#ffffff",
               color: "#171717",
@@ -263,7 +262,7 @@ export default function QuoteDetail() {
               fontWeight: 700,
             }}
           >
-            {archived ? "Back to Active Quotes" : "Back to Quotes"}
+            {archived ? "Back to Archived Quotes" : "Back to Quotes"}
           </Link>
           {canAdvanceQuoteStatus(order.quote_status) ? (
             <button

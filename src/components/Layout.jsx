@@ -109,6 +109,11 @@ function getAdminSections(role) {
         ...(canManageCatalog
           ? [{ to: "/admin/products", label: "Products", navKey: "products" }]
           : []),
+        {
+          to: "/admin/quotes/archived",
+          label: "Archived Quotes",
+          navKey: "archivedQuotes",
+        },
       ],
     },
   ];
@@ -119,6 +124,7 @@ function getActiveSidebarLink(pathname) {
   if (pathname.startsWith("/admin/products")) return "products";
   if (pathname.startsWith("/admin/customers")) return "customers";
   if (pathname.startsWith("/admin/staff-users")) return "staffUsers";
+  if (pathname === "/admin/quotes/archived") return "archivedQuotes";
   if (pathname === "/admin/quotes") return "quotes";
   if (pathname.startsWith("/admin/quotes/")) return pathname === "/admin/quotes/new" ? "newQuote" : "quotes";
   if (pathname === "/admin/financial") return "financial";
