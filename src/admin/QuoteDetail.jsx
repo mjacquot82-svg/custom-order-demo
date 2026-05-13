@@ -76,6 +76,77 @@ function StatusPill({ children, tone = "default" }) {
   );
 }
 
+function buildTimelineEvents(order = {}) {
+  return [...(order.activity_log || [])].sort((left, right) =>
+    String(right?.created_at || "").localeCompare(String(left?.created_at || ""))
+  );
+}
+
+function ReferenceTimeline({ events = [] }) {
+  return (
+    <section
+      style={{
+        ...cardStyle("#fcfcfb"),
+        border: "1px solid #d6d3d1",
+      }}
+    >
+      <div style={{ marginBottom: "16px" }}>
+        <p
+          style={{
+            margin: 0,
+            color: "#78716c",
+            fontSize: "11px",
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}
+        >
+          Record History
+        </p>
+        <h2 style={{ margin: "6px 0 4px", color: "#292524", fontSize: "20px" }}>Timeline</h2>
+        <p style={{ margin: 0, color: "#57534e", lineHeight: 1.6 }}>
+          Preserved quote history for reference, including workflow changes and archival events.
+        </p>
+      </div>
+
+      {!events.length ? (
+        <p style={{ margin: 0, color: "#78716c" }}>No recorded activity for this quote yet.</p>
+      ) : (
+        <div style={{ display: "grid", gap: "10px" }}>
+          {events.map((event, index) => (
+            <article
+              key={event.id || index}
+              style={{
+                borderLeft: "3px solid #d6d3d1",
+                borderRadius: "14px",
+                background: "#f5f5f4",
+                padding: "14px 16px",
+              }}
+            >
+              <strong style={{ color: "#1c1917", display: "block" }}>
+                {event.note || "Quote activity recorded."}
+              </strong>
+              <span
+                style={{
+                  display: "block",
+                  marginTop: "6px",
+                  color: "#78716c",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                }}
+              >
+                {event.staff_name || "Unknown Staff"}
+                {event.staff_role ? ` (${event.staff_role})` : ""}
+                {event.created_at ? ` • ${formatDateTime(event.created_at)}` : ""}
+              </span>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WorkspaceCard({ eyebrow, title, description, children, background = "#ffffff" }) {
   return (
     <section style={cardStyle(background)}>
@@ -134,6 +205,7 @@ export default function QuoteDetail() {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const archived = isQuoteArchived(order);
   const archivedAt = archived ? formatDateTime(order.quote_archived_at, " • ") : "—";
+  const historyEvents = useMemo(() => buildTimelineEvents(order), [order]);
   const readinessSummary = productionReadiness.ready
     ? "Ready for production"
     : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`;
@@ -201,6 +273,25 @@ export default function QuoteDetail() {
     });
   }
 
+  function handleRestoreQuote() {
+    if (!archived) return;
+
+    updateStoredOrder(order.order_number, {
+      quote_archived: false,
+      quote_archived_at: null,
+      activity_type: "quote_restore",
+      activity_note: "Quote restored to active workflow.",
+    });
+
+    navigate(`/admin/quotes/${order.order_number}`, {
+      replace: true,
+      state: {
+        flashMessage: `Quote ${order.order_number} was restored to active workflow.`,
+        flashTone: "success",
+      },
+    });
+  }
+
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       {flashMessage ? (
@@ -241,11 +332,13 @@ export default function QuoteDetail() {
               textTransform: "uppercase",
             }}
           >
-            Quote Detail Workspace
+            {archived ? "Archived Quote Record" : "Quote Detail Workspace"}
           </p>
           <h1 style={{ margin: "6px 0" }}>Quote {order.order_number}</h1>
           <p style={{ margin: 0, color: "#475569", maxWidth: "760px" }}>
-            Focused operational workspace for approvals, readiness, pricing, artwork, and production release.
+            {archived
+              ? "Historical quote record for reference, context, and recovery back into the active quote workflow."
+              : "Focused operational workspace for approvals, readiness, pricing, artwork, and production release."}
           </p>
         </div>
 
@@ -264,11 +357,10 @@ export default function QuoteDetail() {
           >
             {archived ? "Back to Archived Quotes" : "Back to Quotes"}
           </Link>
-          {canAdvanceQuoteStatus(order.quote_status) ? (
+          {!archived && canAdvanceQuoteStatus(order.quote_status) ? (
             <button
               type="button"
               onClick={handleAdvanceQuote}
-              disabled={archived}
               style={{
                 border: "none",
                 background: "#0f172a",
@@ -276,18 +368,16 @@ export default function QuoteDetail() {
                 borderRadius: "12px",
                 padding: "11px 14px",
                 fontWeight: 700,
-                cursor: archived ? "not-allowed" : "pointer",
-                opacity: archived ? 0.55 : 1,
+                cursor: "pointer",
               }}
             >
               Mark {getNextQuoteStatus(order.quote_status)}
             </button>
           ) : null}
-          {isQuoteReadyForProduction(order.quote_status) ? (
+          {!archived && isQuoteReadyForProduction(order.quote_status) ? (
             <button
               type="button"
               onClick={handleReleaseToProduction}
-              disabled={archived}
               style={{
                 border: "none",
                 background: "#166534",
@@ -295,8 +385,7 @@ export default function QuoteDetail() {
                 borderRadius: "12px",
                 padding: "11px 14px",
                 fontWeight: 700,
-                cursor: archived ? "not-allowed" : "pointer",
-                opacity: archived ? 0.55 : 1,
+                cursor: "pointer",
               }}
             >
               Release to Production
@@ -330,24 +419,158 @@ export default function QuoteDetail() {
             borderRadius: "18px",
             padding: "18px 20px",
             border: "1px solid #cbd5e1",
-            background: "#f8fafc",
-            color: "#334155",
+            background: "#f5f5f4",
+            color: "#44403c",
             display: "grid",
-            gap: "8px",
+            gap: "10px",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
             <StatusPill>Archived</StatusPill>
-            <strong style={{ color: "#0f172a" }}>This quote has been removed from active workflow.</strong>
+            <strong style={{ color: "#292524" }}>This quote is preserved as a historical record.</strong>
           </div>
           <p style={{ margin: 0, lineHeight: 1.6 }}>
-            It no longer appears as active operational work or in quote workflow queues.
+            It no longer appears in the active quote workflow and remains available here for historical reference.
           </p>
-          <p style={{ margin: 0, color: "#64748b", fontSize: "14px" }}>Archived {archivedAt}</p>
+          <p style={{ margin: 0, color: "#78716c", fontSize: "14px" }}>Archived {archivedAt}</p>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleRestoreQuote}
+              style={{
+                border: "1px solid #d6d3d1",
+                background: "#ffffff",
+                color: "#292524",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Restore Quote
+            </button>
+          </div>
         </section>
       ) : null}
 
-      <div style={{ display: "grid", gap: "18px" }}>
+      {archived ? (
+        <div style={{ display: "grid", gap: "18px" }}>
+          <WorkspaceCard
+            eyebrow="Reference Summary"
+            title="Archived quote snapshot"
+            description="Key quote details remain visible here without the active release and movement controls."
+            background="#fcfcfb"
+          >
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+              <StatusPill>{order.quote_status || "Archived"}</StatusPill>
+              <StatusPill>Archived</StatusPill>
+              <StatusPill tone={approvalStatus === "Approved" ? "success" : "default"}>
+                {approvalStatus}
+              </StatusPill>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "14px",
+              }}
+            >
+              <DetailItem label="Archived Date" value={archivedAt} />
+              <DetailItem label="Customer" value={order.customer_name} />
+              <DetailItem label="Company" value={order.customer_company} />
+              <DetailItem label="Quote Total" value={money(financials?.total_amount)} />
+              <DetailItem label="Quote Status" value={order.quote_status} />
+              <DetailItem label="Archive Status" value="Archived historical record" />
+              <DetailItem label="Source" value={order.source} />
+              <DetailItem label="Due Date" value={order.due_date} />
+              <DetailItem label="Quantity" value={formatValue(order.qty, "0")} />
+              <DetailItem label="Garment" value={formatValue(order.garment, "Custom garment")} />
+              <DetailItem label="Decoration Type" value={formatValue(order.decoration_type)} />
+              <DetailItem
+                label="Placements"
+                value={formatList((order.placements || []).map((entry) => entry.placement))}
+              />
+            </div>
+          </WorkspaceCard>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.1fr) minmax(300px, 0.9fr)",
+              gap: "18px",
+            }}
+          >
+            <WorkspaceCard
+              eyebrow="Original Quote"
+              title="Quote details"
+              description="Original customer, artwork, and pricing context stays visible for reference."
+              background="#fcfcfb"
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "14px",
+                  marginBottom: quoteSnapshot ? "18px" : 0,
+                }}
+              >
+                <DetailItem label="Customer Approval" value={approvalStatus} />
+                <DetailItem
+                  label="Artwork Files"
+                  value={formatList(artworkNames, "No artwork uploaded")}
+                />
+                <DetailItem
+                  label="Artwork Readiness"
+                  value={
+                    productionReadiness.checks.find((check) => check.label === "Artwork")?.detail ||
+                    "No artwork required"
+                  }
+                />
+                <DetailItem label="Deposit Status" value={depositStatus} />
+              </div>
+
+              {quoteSnapshot ? (
+                <PricingSummary quote={quoteSnapshot} quantity={order.qty} />
+              ) : (
+                <p style={{ margin: 0, color: "#78716c" }}>
+                  Quote pricing snapshot will appear here once pricing data is available.
+                </p>
+              )}
+
+              {order.notes ? (
+                <div style={{ marginTop: "16px" }}>
+                  <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800 }}>Notes</p>
+                  <p style={{ margin: "6px 0 0", color: "#292524", lineHeight: 1.6 }}>{order.notes}</p>
+                </div>
+              ) : null}
+            </WorkspaceCard>
+
+            <WorkspaceCard
+              eyebrow="Record State"
+              title="Archive context"
+              description="This workspace is intentionally quieter and excludes active movement controls until the quote is restored."
+              background="#f5f5f4"
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr",
+                  gap: "14px",
+                }}
+              >
+                <DetailItem label="Workflow Visibility" value="Removed from active workflow" />
+                <DetailItem label="Production Readiness" value="Reference only while archived" />
+                <DetailItem label="Release Workflow" value="Hidden until quote is restored" />
+                <DetailItem label="Deposit Actions" value="Hidden until quote is restored" />
+              </div>
+            </WorkspaceCard>
+          </div>
+
+          <ReferenceTimeline events={historyEvents} />
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: "18px" }}>
         <WorkspaceCard
           eyebrow="Workspace Focus"
           title="Operational quote management"
@@ -770,8 +993,8 @@ export default function QuoteDetail() {
             </p>
           )}
         </WorkspaceCard>
-
-      </div>
+        </div>
+      )}
     </div>
   );
 }
