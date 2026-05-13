@@ -50,6 +50,14 @@ export function isQuoteReadyForProduction(status) {
   return normalizeQuoteStatus(status) === "Ready For Production";
 }
 
+export function isQuoteArchived(order) {
+  return order?.quote_archived === true;
+}
+
+export function isActiveQuoteWorkflowOrder(order) {
+  return order?.operational_visible !== true && !isQuoteArchived(order);
+}
+
 export function sortQuotesByStatus(quotes = []) {
   return [...quotes].sort((left, right) => {
     const leftIndex = getQuoteStatusIndex(left.quote_status);

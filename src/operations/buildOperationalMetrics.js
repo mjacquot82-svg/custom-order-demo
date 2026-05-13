@@ -6,6 +6,7 @@ import {
   isCompletedOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
+import { isActiveQuoteWorkflowOrder } from "../quotes/quoteWorkflow";
 
 export function buildOperationalMetrics(orders = []) {
   const today = new Date();
@@ -27,7 +28,7 @@ export function buildOperationalMetrics(orders = []) {
   const workerLoad = {};
 
   orders.forEach((order) => {
-    if (order.operational_visible !== true) {
+    if (isActiveQuoteWorkflowOrder(order)) {
       activeQuotes += 1;
 
       if (order.quote_status === "Awaiting Deposit") {

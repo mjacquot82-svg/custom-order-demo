@@ -2,7 +2,7 @@ import { useStoredOrders } from "../lib/ordersStore";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
 import { buildOperationalMetrics } from "../operations/buildOperationalMetrics";
 import { buildProductionReadiness } from "../quotes/productionReadiness";
-import { normalizeQuoteStatus } from "../quotes/quoteWorkflow";
+import { isActiveQuoteWorkflowOrder, normalizeQuoteStatus } from "../quotes/quoteWorkflow";
 import {
   isCompletedOperationalStatus,
   normalizeOperationalStatus,
@@ -29,7 +29,7 @@ function buildWorkflowSnapshotCards(orders = []) {
   orders.forEach((order) => {
     const quoteStatus = normalizeQuoteStatus(order.quote_status);
 
-    if (order.operational_visible !== true) {
+    if (isActiveQuoteWorkflowOrder(order)) {
       const readiness = buildProductionReadiness(order, order);
       const unmetChecks = readiness.checks.filter((check) => !check.passed);
 

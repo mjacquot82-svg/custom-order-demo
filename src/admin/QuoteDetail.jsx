@@ -7,6 +7,7 @@ import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
   canAdvanceQuoteStatus,
   getNextQuoteStatus,
+  isQuoteArchived,
   isQuoteReadyForProduction,
 } from "../quotes/quoteWorkflow";
 import {
@@ -128,10 +129,13 @@ export default function QuoteDetail() {
     [order, financials]
   );
   const artworkNames = useMemo(() => getOrderArtworkNames(order), [order]);
+  const archived = isQuoteArchived(order);
   const readinessSummary = productionReadiness.ready
     ? "Ready for production"
     : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`;
-  const nextStep = canAdvanceQuoteStatus(order?.quote_status)
+  const nextStep = archived
+    ? "Archived from active workflow"
+    : canAdvanceQuoteStatus(order?.quote_status)
     ? `Mark ${getNextQuoteStatus(order.quote_status)}`
     : isQuoteReadyForProduction(order?.quote_status)
     ? "Release to Production"
@@ -147,6 +151,7 @@ export default function QuoteDetail() {
   }
 
   function handleAdvanceQuote() {
+    if (archived) return;
     if (!canAdvanceQuoteStatus(order.quote_status)) return;
 
     const nextQuoteStatus = getNextQuoteStatus(order.quote_status);
@@ -158,6 +163,7 @@ export default function QuoteDetail() {
   }
 
   function handleReleaseToProduction() {
+    if (archived) return;
     if (!isQuoteReadyForProduction(order.quote_status)) return;
 
     updateStoredOrder(order.order_number, {
@@ -167,6 +173,20 @@ export default function QuoteDetail() {
       production_ready: true,
       activity_type: "release_to_production",
       activity_note: "Quote released into Production Orders.",
+    });
+  }
+
+  function handleArchiveQuote() {
+    if (archived) return;
+    if (!window.confirm("Archive this quote from active workflow?")) return;
+
+    updateStoredOrder(order.order_number, {
+      quote_archived: true,
+      quote_archived_at: new Date().toISOString(),
+      operational_visible: false,
+      production_ready: false,
+      activity_type: "quote_archive",
+      activity_note: "Quote archived from active workflow.",
     });
   }
 
@@ -237,6 +257,7 @@ export default function QuoteDetail() {
             <button
               type="button"
               onClick={handleAdvanceQuote}
+              disabled={archived}
               style={{
                 border: "none",
                 background: "#0f172a",
@@ -244,7 +265,8 @@ export default function QuoteDetail() {
                 borderRadius: "12px",
                 padding: "11px 14px",
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: archived ? "not-allowed" : "pointer",
+                opacity: archived ? 0.55 : 1,
               }}
             >
               Mark {getNextQuoteStatus(order.quote_status)}
@@ -254,6 +276,7 @@ export default function QuoteDetail() {
             <button
               type="button"
               onClick={handleReleaseToProduction}
+              disabled={archived}
               style={{
                 border: "none",
                 background: "#166534",
@@ -261,10 +284,28 @@ export default function QuoteDetail() {
                 borderRadius: "12px",
                 padding: "11px 14px",
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: archived ? "not-allowed" : "pointer",
+                opacity: archived ? 0.55 : 1,
               }}
             >
               Release to Production
+            </button>
+          ) : null}
+          {!archived ? (
+            <button
+              type="button"
+              onClick={handleArchiveQuote}
+              style={{
+                border: "1px solid #d6dbe4",
+                background: "#ffffff",
+                color: "#334155",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Archive Quote
             </button>
           ) : null}
         </div>
@@ -281,6 +322,7 @@ export default function QuoteDetail() {
             <StatusPill tone={isQuoteReadyForProduction(order.quote_status) ? "success" : "default"}>
               {order.quote_status}
             </StatusPill>
+            {archived ? <StatusPill>Archived</StatusPill> : null}
             <StatusPill tone={depositStatus === "Deposit received" ? "success" : "warning"}>
               {depositStatus}
             </StatusPill>
@@ -307,6 +349,10 @@ export default function QuoteDetail() {
             <DetailItem label="Deposit" value={depositStatus} />
             <DetailItem label="Source" value={order.source} />
             <DetailItem label="Due Date" value={order.due_date} />
+            <DetailItem
+              label="Workflow Visibility"
+              value={archived ? "Archived from active workflow" : "Active"}
+            />
             <DetailItem
               label="Artwork"
               value={productionReadiness.checks.find((check) => check.label === "Artwork")?.detail || "No artwork required"}
@@ -443,6 +489,7 @@ export default function QuoteDetail() {
                 <button
                   type="button"
                   onClick={handleAdvanceQuote}
+                  disabled={archived}
                   style={{
                     border: "none",
                     background: "#0f172a",
@@ -450,7 +497,8 @@ export default function QuoteDetail() {
                     borderRadius: "12px",
                     padding: "11px 14px",
                     fontWeight: 700,
-                    cursor: "pointer",
+                    cursor: archived ? "not-allowed" : "pointer",
+                    opacity: archived ? 0.55 : 1,
                   }}
                 >
                   Mark {getNextQuoteStatus(order.quote_status)}
@@ -460,6 +508,7 @@ export default function QuoteDetail() {
                 <button
                   type="button"
                   onClick={handleReleaseToProduction}
+                  disabled={archived}
                   style={{
                     border: "none",
                     background: "#166534",
@@ -467,10 +516,28 @@ export default function QuoteDetail() {
                     borderRadius: "12px",
                     padding: "11px 14px",
                     fontWeight: 700,
-                    cursor: "pointer",
+                    cursor: archived ? "not-allowed" : "pointer",
+                    opacity: archived ? 0.55 : 1,
                   }}
                 >
                   Release to Production
+                </button>
+              ) : null}
+              {!archived ? (
+                <button
+                  type="button"
+                  onClick={handleArchiveQuote}
+                  style={{
+                    border: "1px solid #d6dbe4",
+                    background: "#ffffff",
+                    color: "#334155",
+                    borderRadius: "12px",
+                    padding: "11px 14px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Archive Quote
                 </button>
               ) : null}
             </div>

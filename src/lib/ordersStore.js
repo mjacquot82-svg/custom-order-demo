@@ -296,6 +296,9 @@ function buildWorkflowDerivedUpdates(currentOrder, updates) {
     updates.quote_status || currentOrder.quote_status
   );
   const shouldDeriveStatus = Object.prototype.hasOwnProperty.call(updates, "status");
+  const isArchived = Object.prototype.hasOwnProperty.call(updates, "quote_archived")
+    ? updates.quote_archived === true
+    : currentOrder.quote_archived === true;
 
   return {
     ...updates,
@@ -311,11 +314,20 @@ function buildWorkflowDerivedUpdates(currentOrder, updates) {
       : Object.prototype.hasOwnProperty.call(updates, "operational_visible")
       ? updates.operational_visible
       : currentOrder.operational_visible,
+    quote_archived: isArchived,
+    quote_archived_at:
+      Object.prototype.hasOwnProperty.call(updates, "quote_archived_at")
+        ? updates.quote_archived_at
+        : isArchived
+        ? currentOrder.quote_archived_at || new Date().toISOString()
+        : null,
   };
 }
 
 function describeOrderUpdate(updates) {
   if (updates.activity_note) return updates.activity_note;
+  if (updates.quote_archived === true) return "Quote archived from active workflow.";
+  if (updates.quote_archived === false) return "Quote restored to active workflow.";
   if (updates.status) return `Status changed to ${updates.status}.`;
   if (updates.pickup_status === "Picked Up") return "Order marked as picked up.";
   if (updates.pickup_status === "Ready for Pickup") return "Order marked ready for pickup.";
@@ -332,6 +344,7 @@ function describeOrderUpdate(updates) {
 
 function describeActivityType(updates) {
   if (updates.activity_type) return updates.activity_type;
+  if (Object.prototype.hasOwnProperty.call(updates, "quote_archived")) return "quote_archive";
   if (updates.status) return "status_change";
   if (updates.pickup_status) return "pickup";
   if (updates.payment_history) return "payment";

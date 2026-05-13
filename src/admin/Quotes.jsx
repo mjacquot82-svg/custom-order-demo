@@ -7,6 +7,7 @@ import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
   canAdvanceQuoteStatus,
   getNextQuoteStatus,
+  isActiveQuoteWorkflowOrder,
   isQuoteReadyForProduction,
   sortQuotesByStatus,
 } from "../quotes/quoteWorkflow";
@@ -228,8 +229,7 @@ export default function Quotes() {
     () => location.state?.createdOrderNumber || ""
   );
   const quotes = useMemo(
-    () =>
-      sortQuotesByStatus(orders.filter((order) => order.operational_visible !== true)),
+    () => sortQuotesByStatus(orders.filter((order) => isActiveQuoteWorkflowOrder(order))),
     [orders]
   );
   const statusCounts = useMemo(() => buildStatusCountMap(quotes), [quotes]);
