@@ -513,15 +513,12 @@ export default function NewOrder() {
 
       linkOrderToCustomer(customerId, order.order_number);
       setSubmitState("success");
-      setSubmitMessage(`Quote ${order.order_number} saved. Opening quote workspace…`);
-      navigate(`/admin/quotes/${order.order_number}`, {
+      setSubmitMessage(`Quote ${order.order_number} saved. Moving into quote workflow…`);
+      navigate(`/admin/quotes`, {
         state: {
-          flashMessage: `Quote ${order.order_number} saved successfully.`,
+          flashMessage: `Quote ${order.order_number} created successfully and added to workflow.`,
           flashTone: "success",
-          savedOrder: {
-            ...order,
-            quote,
-          },
+          createdOrderNumber: order.order_number,
         },
       });
     } catch (error) {

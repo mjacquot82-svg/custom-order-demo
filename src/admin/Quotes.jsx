@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getOrderArtworkNames } from "../lib/orderArtwork";
 import { getJsonStorageItem, setJsonStorageItem } from "../lib/browserStorage";
 import { useStoredOrders } from "../lib/ordersStore";
@@ -217,8 +217,16 @@ function getCollapsedSummaryFields(quote, summary) {
 }
 
 export default function Quotes() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const orders = useStoredOrders();
+  const cardRefs = useRef({});
   const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
+  const [flashMessage, setFlashMessage] = useState(() => location.state?.flashMessage || "");
+  const [flashTone, setFlashTone] = useState(() => location.state?.flashTone || "default");
+  const [highlightedQuote, setHighlightedQuote] = useState(
+    () => location.state?.createdOrderNumber || ""
+  );
   const quotes = useMemo(
     () =>
       sortQuotesByStatus(orders.filter((order) => order.operational_visible !== true)),
@@ -245,6 +253,56 @@ export default function Quotes() {
   useEffect(() => {
     setJsonStorageItem(EXPANDED_QUOTES_STORAGE_KEY, expandedQuotes);
   }, [expandedQuotes]);
+
+  useEffect(() => {
+    if (!location.state?.createdOrderNumber && !location.state?.flashMessage) return;
+
+    if (location.state?.flashMessage) {
+      setFlashMessage(location.state.flashMessage);
+      setFlashTone(location.state.flashTone || "default");
+    }
+
+    if (location.state?.createdOrderNumber) {
+      setHighlightedQuote(location.state.createdOrderNumber);
+    }
+
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (!highlightedQuote) return;
+    if (!quotes.some((quote) => quote.order_number === highlightedQuote)) return;
+
+    setExpandedQuotes((current) => ({
+      ...current,
+      [highlightedQuote]: true,
+    }));
+
+    const scrollToQuote = () => {
+      cardRefs.current[highlightedQuote]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    };
+
+    window.requestAnimationFrame(scrollToQuote);
+
+    const highlightTimer = window.setTimeout(() => {
+      setHighlightedQuote("");
+    }, 5000);
+
+    return () => window.clearTimeout(highlightTimer);
+  }, [highlightedQuote, quotes]);
+
+  useEffect(() => {
+    if (!flashMessage) return;
+
+    const flashTimer = window.setTimeout(() => {
+      setFlashMessage("");
+    }, 5000);
+
+    return () => window.clearTimeout(flashTimer);
+  }, [flashMessage]);
 
   function toggleQuote(orderNumber) {
     setExpandedQuotes((current) => ({
@@ -313,6 +371,25 @@ export default function Quotes() {
         <SummaryCard label="Ready For Production" value={readyQuotes.length} tone="success" />
       </section>
 
+      {flashMessage ? (
+        <section
+          aria-live="polite"
+          style={{
+            marginBottom: "20px",
+            borderRadius: "18px",
+            padding: "16px 18px",
+            border: flashTone === "success" ? "1px solid #bbf7d0" : "1px solid #cbd5e1",
+            background: flashTone === "success" ? "#ecfdf5" : "#f8fafc",
+            color: flashTone === "success" ? "#166534" : "#334155",
+            display: "grid",
+            gap: "4px",
+          }}
+        >
+          <strong style={{ fontSize: "14px" }}>Quote Created Successfully</strong>
+          <span style={{ fontWeight: 600 }}>{flashMessage}</span>
+        </section>
+      ) : null}
+
       <section
         style={{
           background: "#ffffff",
@@ -326,20 +403,35 @@ export default function Quotes() {
             quotes.map((quote) => {
               const summary = buildQuoteSummary(quote);
               const isExpanded = Boolean(expandedQuotes[quote.order_number]);
+              const isHighlighted = highlightedQuote === quote.order_number;
               const readinessTone = summary.readiness.ready ? "success" : "warning";
               const collapsedFields = getCollapsedSummaryFields(quote, summary);
 
               return (
                 <article
                   key={quote.order_number}
+                  ref={(node) => {
+                    if (node) {
+                      cardRefs.current[quote.order_number] = node;
+                    } else {
+                      delete cardRefs.current[quote.order_number];
+                    }
+                  }}
                   style={{
-                    border: `1px solid ${isExpanded ? "#cbd5e1" : "#e2e8f0"}`,
+                    border: `1px solid ${
+                      isHighlighted ? "#22c55e" : isExpanded ? "#cbd5e1" : "#e2e8f0"
+                    }`,
                     borderRadius: "18px",
                     padding: "16px 18px",
                     display: "grid",
                     gap: "14px",
-                    background: isExpanded ? "#fcfdff" : "#ffffff",
-                    boxShadow: isExpanded ? "0 8px 24px rgba(15, 23, 42, 0.06)" : "none",
+                    background: isHighlighted ? "#f0fdf4" : isExpanded ? "#fcfdff" : "#ffffff",
+                    boxShadow: isHighlighted
+                      ? "0 0 0 3px rgba(34, 197, 94, 0.14), 0 14px 32px rgba(34, 197, 94, 0.12)"
+                      : isExpanded
+                      ? "0 8px 24px rgba(15, 23, 42, 0.06)"
+                      : "none",
+                    transition: "background 220ms ease, border-color 220ms ease, box-shadow 220ms ease",
                   }}
                 >
                   <div
@@ -394,6 +486,11 @@ export default function Quotes() {
                           <p style={{ margin: "6px 0 0", color: "#0f172a", fontSize: "16px", fontWeight: 800 }}>
                             Compact scan summary
                           </p>
+                          {isHighlighted ? (
+                            <p style={{ margin: "8px 0 0", color: "#166534", fontSize: "13px", fontWeight: 800 }}>
+                              Newly created quote now in workflow
+                            </p>
+                          ) : null}
                         </div>
                         <span
                           style={{
@@ -404,6 +501,9 @@ export default function Quotes() {
                             flexShrink: 0,
                           }}
                         >
+                          {isHighlighted ? (
+                            <StatusPill tone="success">Just created</StatusPill>
+                          ) : null}
                           <span>{isExpanded ? "Hide details" : "Show details"}</span>
                           <ExpandIcon open={isExpanded} />
                         </span>
