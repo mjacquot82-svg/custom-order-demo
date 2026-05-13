@@ -526,7 +526,6 @@ export default function NewOrder() {
       returnToQuoteWorkflow({
         flashMessage: `Quote ${order.order_number} created successfully and added to workflow.`,
         flashTone: "success",
-        createdOrderNumber: order.order_number,
       });
     } catch (error) {
       console.error("Unable to save quote", error);
