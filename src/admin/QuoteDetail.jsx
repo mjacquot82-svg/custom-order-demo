@@ -82,15 +82,9 @@ function buildTimelineEvents(order = {}) {
   );
 }
 
-function ReferenceTimeline({ events = [], compact = false }) {
-  return (
-    <section
-      className={compact ? "archived-quote-reference-card archived-quote-timeline-card" : undefined}
-      style={{
-        ...cardStyle("#fcfcfb", compact),
-        border: "1px solid #d6d3d1",
-      }}
-    >
+function ReferenceTimeline({ events = [], compact = false, embedded = false }) {
+  const content = (
+    <>
       <div style={{ marginBottom: compact ? "12px" : "16px" }}>
         <p
           style={{
@@ -144,6 +138,20 @@ function ReferenceTimeline({ events = [], compact = false }) {
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <section
+      className={compact ? "archived-quote-reference-card archived-quote-timeline-card" : undefined}
+      style={{
+        ...cardStyle("#fcfcfb", compact),
+        border: "1px solid #d6d3d1",
+      }}
+    >
+      {content}
     </section>
   );
 }
@@ -172,6 +180,111 @@ function WorkspaceCard({ eyebrow, title, description, children, background = "#f
         ) : null}
       </div>
       {children}
+    </section>
+  );
+}
+
+function ArchivedAccordionSection({
+  sectionKey,
+  expandedSections,
+  onToggle,
+  eyebrow,
+  title,
+  description,
+  summary,
+  children,
+  background = "#fcfcfb",
+  className,
+  compact = false,
+}) {
+  const expanded = Boolean(expandedSections[sectionKey]);
+
+  return (
+    <section
+      className={className}
+      style={{
+        ...cardStyle(background, compact),
+        padding: 0,
+        overflow: "hidden",
+        border: "1px solid #e7e5e4",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => onToggle(sectionKey)}
+        aria-expanded={expanded}
+        style={{
+          width: "100%",
+          border: "none",
+          background: "transparent",
+          padding: compact ? "16px 18px" : "18px 20px",
+          display: "grid",
+          gap: "10px",
+          textAlign: "left",
+          cursor: "pointer",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "12px",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <p
+              style={{
+                margin: 0,
+                color: "#78716c",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              {eyebrow}
+            </p>
+            <h2 style={{ margin: "6px 0 0", color: "#292524", fontSize: compact ? "17px" : "19px" }}>
+              {title}
+            </h2>
+          </div>
+
+          <span
+            style={{
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              borderRadius: "999px",
+              border: "1px solid #d6d3d1",
+              background: "#ffffff",
+              color: "#57534e",
+              padding: "8px 12px",
+              fontSize: "12px",
+              fontWeight: 800,
+            }}
+          >
+            {expanded ? "Collapse" : "Expand"}
+            <span aria-hidden="true">{expanded ? "−" : "+"}</span>
+          </span>
+        </div>
+
+        <p style={{ margin: 0, color: "#57534e", lineHeight: 1.55, fontSize: compact ? "13px" : "14px" }}>
+          {expanded ? description : summary || description}
+        </p>
+      </button>
+
+      {expanded ? (
+        <div
+          style={{
+            padding: compact ? "0 18px 18px" : "0 20px 20px",
+            borderTop: "1px solid #e7e5e4",
+          }}
+        >
+          <div style={{ paddingTop: compact ? "14px" : "16px" }}>{children}</div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -208,6 +321,13 @@ export default function QuoteDetail() {
   );
   const artworkNames = useMemo(() => getOrderArtworkNames(order), [order]);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archivedSections, setArchivedSections] = useState({
+    quoteDetails: false,
+    artworkApproval: false,
+    pricing: false,
+    context: false,
+    timeline: false,
+  });
   const archived = isQuoteArchived(order);
   const archivedAt = archived ? formatDateTime(order.quote_archived_at, " • ") : "—";
   const historyEvents = useMemo(() => buildTimelineEvents(order), [order]);
@@ -295,6 +415,13 @@ export default function QuoteDetail() {
         flashTone: "success",
       },
     });
+  }
+
+  function handleToggleArchivedSection(sectionKey) {
+    setArchivedSections((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey],
+    }));
   }
 
   return (
@@ -501,18 +628,59 @@ export default function QuoteDetail() {
 
           <div className="archived-quote-layout">
             <div className="archived-quote-main-column">
-              <WorkspaceCard
-              eyebrow="Original Quote"
-              title="Quote details"
-              description="Original customer, artwork, and pricing context stays visible for reference."
-              background="#fcfcfb"
+              <ArchivedAccordionSection
+                sectionKey="quoteDetails"
+                expandedSections={archivedSections}
+                onToggle={handleToggleArchivedSection}
+                eyebrow="Original Quote"
+                title="Quote details"
+                description="Original customer and order context remain preserved for historical reference."
+                summary={`${formatValue(order.customer_name, "Walk-in Customer")} • ${formatValue(order.garment, "Custom garment")} • ${formatValue(order.qty, "0")} pcs`}
+                background="#fcfcfb"
               >
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
                     gap: "14px",
-                    marginBottom: quoteSnapshot ? "18px" : 0,
+                  }}
+                >
+                  <DetailItem label="Customer" value={formatValue(order.customer_name, "Walk-in Customer")} />
+                  <DetailItem label="Company" value={formatValue(order.customer_company)} />
+                  <DetailItem label="Source" value={formatValue(order.source)} />
+                  <DetailItem label="Due Date" value={formatValue(order.due_date)} />
+                  <DetailItem label="Quantity" value={formatValue(order.qty, "0")} />
+                  <DetailItem label="Garment" value={formatValue(order.garment, "Custom garment")} />
+                  <DetailItem label="Decoration Type" value={formatValue(order.decoration_type)} />
+                  <DetailItem
+                    label="Placements"
+                    value={formatList((order.placements || []).map((entry) => entry.placement))}
+                  />
+                </div>
+
+                {order.notes ? (
+                  <div style={{ marginTop: "16px" }}>
+                    <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800 }}>Notes</p>
+                    <p style={{ margin: "6px 0 0", color: "#292524", lineHeight: 1.6 }}>{order.notes}</p>
+                  </div>
+                ) : null}
+              </ArchivedAccordionSection>
+
+              <ArchivedAccordionSection
+                sectionKey="artworkApproval"
+                expandedSections={archivedSections}
+                onToggle={handleToggleArchivedSection}
+                eyebrow="Artwork And Approval"
+                title="Artwork and approval"
+                description="Artwork files, approval state, and readiness remain available without keeping the whole workspace open."
+                summary={`${approvalStatus} • ${artworkNames.length} artwork file${artworkNames.length === 1 ? "" : "s"} • ${productionReadiness.checks.find((check) => check.label === "Artwork")?.detail || "No artwork required"}`}
+                background="#fcfcfb"
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                    gap: "14px",
                   }}
                 >
                   <DetailItem label="Customer Approval" value={approvalStatus} />
@@ -529,7 +697,18 @@ export default function QuoteDetail() {
                   />
                   <DetailItem label="Deposit Status" value={depositStatus} />
                 </div>
+              </ArchivedAccordionSection>
 
+              <ArchivedAccordionSection
+                sectionKey="pricing"
+                expandedSections={archivedSections}
+                onToggle={handleToggleArchivedSection}
+                eyebrow="Pricing"
+                title="Pricing"
+                description="Archived pricing stays available on demand so historical records remain easy to review without dominating the page."
+                summary={`Total ${money(financials?.total_amount)} • ${depositStatus}`}
+                background="#fcfcfb"
+              >
                 {quoteSnapshot ? (
                   <PricingSummary quote={quoteSnapshot} quantity={order.qty} />
                 ) : (
@@ -537,21 +716,18 @@ export default function QuoteDetail() {
                     Quote pricing snapshot will appear here once pricing data is available.
                   </p>
                 )}
-
-                {order.notes ? (
-                  <div style={{ marginTop: "16px" }}>
-                    <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800 }}>Notes</p>
-                    <p style={{ margin: "6px 0 0", color: "#292524", lineHeight: 1.6 }}>{order.notes}</p>
-                  </div>
-                ) : null}
-              </WorkspaceCard>
+              </ArchivedAccordionSection>
             </div>
 
             <div className="archived-quote-reference-column">
-              <WorkspaceCard
+              <ArchivedAccordionSection
+                sectionKey="context"
+                expandedSections={archivedSections}
+                onToggle={handleToggleArchivedSection}
                 eyebrow="Record State"
                 title="Archived context"
                 description="Reference-only context for how this quote now sits outside the active workflow."
+                summary="Reference-only workflow state, visibility, and release context."
                 background="#f5f5f4"
                 compact
                 className="archived-quote-reference-card"
@@ -562,9 +738,22 @@ export default function QuoteDetail() {
                   <DetailItem label="Release Workflow" value="Hidden until quote is restored" />
                   <DetailItem label="Deposit Actions" value="Hidden until quote is restored" />
                 </div>
-              </WorkspaceCard>
+              </ArchivedAccordionSection>
 
-              <ReferenceTimeline events={historyEvents} compact />
+              <ArchivedAccordionSection
+                sectionKey="timeline"
+                expandedSections={archivedSections}
+                onToggle={handleToggleArchivedSection}
+                eyebrow="Record History"
+                title="Timeline"
+                description="Preserved quote history, including workflow changes and archival events."
+                summary={`${historyEvents.length} recorded event${historyEvents.length === 1 ? "" : "s"} in the archived history`}
+                background="#fcfcfb"
+                compact
+                className="archived-quote-reference-card"
+              >
+                <ReferenceTimeline events={historyEvents} compact embedded />
+              </ArchivedAccordionSection>
             </div>
           </div>
         </div>
