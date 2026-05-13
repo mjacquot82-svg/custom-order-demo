@@ -31,11 +31,11 @@ function formatList(values = [], fallback = "—") {
   return items.length ? items.join(", ") : fallback;
 }
 
-function cardStyle(background = "#ffffff") {
+function cardStyle(background = "#ffffff", compact = false) {
   return {
     background,
     borderRadius: "20px",
-    padding: "22px",
+    padding: compact ? "18px" : "22px",
     border: "1px solid #e2e8f0",
   };
 }
@@ -82,15 +82,16 @@ function buildTimelineEvents(order = {}) {
   );
 }
 
-function ReferenceTimeline({ events = [] }) {
+function ReferenceTimeline({ events = [], compact = false }) {
   return (
     <section
+      className={compact ? "archived-quote-reference-card archived-quote-timeline-card" : undefined}
       style={{
-        ...cardStyle("#fcfcfb"),
+        ...cardStyle("#fcfcfb", compact),
         border: "1px solid #d6d3d1",
       }}
     >
-      <div style={{ marginBottom: "16px" }}>
+      <div style={{ marginBottom: compact ? "12px" : "16px" }}>
         <p
           style={{
             margin: 0,
@@ -103,8 +104,8 @@ function ReferenceTimeline({ events = [] }) {
         >
           Record History
         </p>
-        <h2 style={{ margin: "6px 0 4px", color: "#292524", fontSize: "20px" }}>Timeline</h2>
-        <p style={{ margin: 0, color: "#57534e", lineHeight: 1.6 }}>
+        <h2 style={{ margin: "6px 0 4px", color: "#292524", fontSize: compact ? "18px" : "20px" }}>Timeline</h2>
+        <p style={{ margin: 0, color: "#57534e", lineHeight: 1.55, fontSize: compact ? "14px" : "16px" }}>
           Preserved quote history for reference, including workflow changes and archival events.
         </p>
       </div>
@@ -112,7 +113,7 @@ function ReferenceTimeline({ events = [] }) {
       {!events.length ? (
         <p style={{ margin: 0, color: "#78716c" }}>No recorded activity for this quote yet.</p>
       ) : (
-        <div style={{ display: "grid", gap: "10px" }}>
+        <div style={{ display: "grid", gap: compact ? "8px" : "10px" }}>
           {events.map((event, index) => (
             <article
               key={event.id || index}
@@ -120,7 +121,7 @@ function ReferenceTimeline({ events = [] }) {
                 borderLeft: "3px solid #d6d3d1",
                 borderRadius: "14px",
                 background: "#f5f5f4",
-                padding: "14px 16px",
+                padding: compact ? "12px 14px" : "14px 16px",
               }}
             >
               <strong style={{ color: "#1c1917", display: "block" }}>
@@ -131,7 +132,7 @@ function ReferenceTimeline({ events = [] }) {
                   display: "block",
                   marginTop: "6px",
                   color: "#78716c",
-                  fontSize: "13px",
+                  fontSize: compact ? "12px" : "13px",
                   fontWeight: 700,
                 }}
               >
@@ -147,10 +148,10 @@ function ReferenceTimeline({ events = [] }) {
   );
 }
 
-function WorkspaceCard({ eyebrow, title, description, children, background = "#ffffff" }) {
+function WorkspaceCard({ eyebrow, title, description, children, background = "#ffffff", compact = false, className }) {
   return (
-    <section style={cardStyle(background)}>
-      <div style={{ marginBottom: "16px" }}>
+    <section className={className} style={cardStyle(background, compact)}>
+      <div style={{ marginBottom: compact ? "12px" : "16px" }}>
         <p
           style={{
             margin: 0,
@@ -163,8 +164,12 @@ function WorkspaceCard({ eyebrow, title, description, children, background = "#f
         >
           {eyebrow}
         </p>
-        <h2 style={{ margin: "6px 0 4px", color: "#0f172a", fontSize: "20px" }}>{title}</h2>
-        {description ? <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>{description}</p> : null}
+        <h2 style={{ margin: "6px 0 4px", color: "#0f172a", fontSize: compact ? "18px" : "20px" }}>{title}</h2>
+        {description ? (
+          <p style={{ margin: 0, color: "#475569", lineHeight: 1.55, fontSize: compact ? "14px" : "16px" }}>
+            {description}
+          </p>
+        ) : null}
       </div>
       {children}
     </section>
@@ -494,80 +499,74 @@ export default function QuoteDetail() {
             </div>
           </WorkspaceCard>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1.1fr) minmax(300px, 0.9fr)",
-              gap: "18px",
-            }}
-          >
-            <WorkspaceCard
+          <div className="archived-quote-layout">
+            <div className="archived-quote-main-column">
+              <WorkspaceCard
               eyebrow="Original Quote"
               title="Quote details"
               description="Original customer, artwork, and pricing context stays visible for reference."
               background="#fcfcfb"
-            >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: "14px",
-                  marginBottom: quoteSnapshot ? "18px" : 0,
-                }}
               >
-                <DetailItem label="Customer Approval" value={approvalStatus} />
-                <DetailItem
-                  label="Artwork Files"
-                  value={formatList(artworkNames, "No artwork uploaded")}
-                />
-                <DetailItem
-                  label="Artwork Readiness"
-                  value={
-                    productionReadiness.checks.find((check) => check.label === "Artwork")?.detail ||
-                    "No artwork required"
-                  }
-                />
-                <DetailItem label="Deposit Status" value={depositStatus} />
-              </div>
-
-              {quoteSnapshot ? (
-                <PricingSummary quote={quoteSnapshot} quantity={order.qty} />
-              ) : (
-                <p style={{ margin: 0, color: "#78716c" }}>
-                  Quote pricing snapshot will appear here once pricing data is available.
-                </p>
-              )}
-
-              {order.notes ? (
-                <div style={{ marginTop: "16px" }}>
-                  <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800 }}>Notes</p>
-                  <p style={{ margin: "6px 0 0", color: "#292524", lineHeight: 1.6 }}>{order.notes}</p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                    gap: "14px",
+                    marginBottom: quoteSnapshot ? "18px" : 0,
+                  }}
+                >
+                  <DetailItem label="Customer Approval" value={approvalStatus} />
+                  <DetailItem
+                    label="Artwork Files"
+                    value={formatList(artworkNames, "No artwork uploaded")}
+                  />
+                  <DetailItem
+                    label="Artwork Readiness"
+                    value={
+                      productionReadiness.checks.find((check) => check.label === "Artwork")?.detail ||
+                      "No artwork required"
+                    }
+                  />
+                  <DetailItem label="Deposit Status" value={depositStatus} />
                 </div>
-              ) : null}
-            </WorkspaceCard>
 
-            <WorkspaceCard
-              eyebrow="Record State"
-              title="Archive context"
-              description="This workspace is intentionally quieter and excludes active movement controls until the quote is restored."
-              background="#f5f5f4"
-            >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr",
-                  gap: "14px",
-                }}
+                {quoteSnapshot ? (
+                  <PricingSummary quote={quoteSnapshot} quantity={order.qty} />
+                ) : (
+                  <p style={{ margin: 0, color: "#78716c" }}>
+                    Quote pricing snapshot will appear here once pricing data is available.
+                  </p>
+                )}
+
+                {order.notes ? (
+                  <div style={{ marginTop: "16px" }}>
+                    <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800 }}>Notes</p>
+                    <p style={{ margin: "6px 0 0", color: "#292524", lineHeight: 1.6 }}>{order.notes}</p>
+                  </div>
+                ) : null}
+              </WorkspaceCard>
+            </div>
+
+            <div className="archived-quote-reference-column">
+              <WorkspaceCard
+                eyebrow="Record State"
+                title="Archived context"
+                description="Reference-only context for how this quote now sits outside the active workflow."
+                background="#f5f5f4"
+                compact
+                className="archived-quote-reference-card"
               >
-                <DetailItem label="Workflow Visibility" value="Removed from active workflow" />
-                <DetailItem label="Production Readiness" value="Reference only while archived" />
-                <DetailItem label="Release Workflow" value="Hidden until quote is restored" />
-                <DetailItem label="Deposit Actions" value="Hidden until quote is restored" />
-              </div>
-            </WorkspaceCard>
-          </div>
+                <div className="archived-quote-context-grid">
+                  <DetailItem label="Workflow Visibility" value="Removed from active workflow" />
+                  <DetailItem label="Production Readiness" value="Reference only while archived" />
+                  <DetailItem label="Release Workflow" value="Hidden until quote is restored" />
+                  <DetailItem label="Deposit Actions" value="Hidden until quote is restored" />
+                </div>
+              </WorkspaceCard>
 
-          <ReferenceTimeline events={historyEvents} />
+              <ReferenceTimeline events={historyEvents} compact />
+            </div>
+          </div>
         </div>
       ) : (
         <div style={{ display: "grid", gap: "18px" }}>

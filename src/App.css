@@ -231,3 +231,40 @@
     background: white !important;
   }
 }
+
+.archived-quote-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.72fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.archived-quote-main-column,
+.archived-quote-reference-column {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  min-width: 0;
+}
+
+.archived-quote-reference-card {
+  align-self: start;
+}
+
+.archived-quote-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+@media (max-width: 1080px) {
+  .archived-quote-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .archived-quote-context-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
