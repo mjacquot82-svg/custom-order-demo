@@ -32,6 +32,10 @@ export const PAYMENT_METHOD_OPTIONS = [
   "Other",
 ];
 
+function money(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
 const SUBTOTAL_KEYS = ["subtotal", "sub_total", "subtotal_amount", "subtotalAmount"];
 const TAX_KEYS = [
   "tax_amount",

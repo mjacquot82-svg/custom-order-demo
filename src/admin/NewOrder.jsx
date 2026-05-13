@@ -102,6 +102,16 @@ function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function roundCurrency(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function calculateDepositTarget(totalAmount) {
+  const normalizedTotal = roundCurrency(totalAmount);
+  if (normalizedTotal <= 0) return 0;
+  return roundCurrency(normalizedTotal * 0.5);
+}
+
 function formatPrice(value, isAvailable = true) {
   if (!isAvailable) return "Price unavailable";
   return money(value);
@@ -130,6 +140,7 @@ export default function NewOrder() {
   const customerNameInputRef = useRef(null);
   const productSelectRef = useRef(null);
   const sizeSectionRef = useRef(null);
+  const depositDecisionRef = useRef(null);
   const feedbackRef = useRef(null);
   const products = useStoredProducts().filter((product) => product.status !== "Inactive");
   const [customers, setCustomers] = useState(() => getStoredCustomers());
@@ -139,6 +150,7 @@ export default function NewOrder() {
   const [selectedPlacements, setSelectedPlacements] = useState([]);
   const [artworkUpload, setArtworkUpload] = useState(null);
   const [uploadError, setUploadError] = useState("");
+  const [depositRequirement, setDepositRequirement] = useState("");
   const [form, setForm] = useState({
     customer_id: "",
     customer_name: "",
@@ -211,6 +223,19 @@ export default function NewOrder() {
       selectedProduct
     );
   }, [form, normalizedDecorationType, selectedPlacements, selectedProduct, totalQty]);
+  const financialPreview = useMemo(() => {
+    const totalAmount = roundCurrency(liveQuote?.total || 0);
+    const depositAmount =
+      depositRequirement === "required" ? calculateDepositTarget(totalAmount) : 0;
+    const balanceDue = Math.max(roundCurrency(totalAmount - depositAmount), 0);
+
+    return {
+      totalAmount,
+      depositAmount,
+      balanceDue,
+      amountDueNow: depositRequirement === "required" ? depositAmount : totalAmount,
+    };
+  }, [depositRequirement, liveQuote]);
 
   function clearSubmitFeedback() {
     setSubmitState("idle");
@@ -255,6 +280,18 @@ export default function NewOrder() {
       messages.push("Add at least one unit in the size breakdown before saving the quote.");
       fields.size_breakdown = true;
       firstInvalidRef ||= sizeSectionRef;
+    }
+
+    if (!depositRequirement) {
+      messages.push("Choose whether this quote requires a deposit before saving.");
+      fields.deposit_requirement = true;
+      firstInvalidRef ||= depositDecisionRef;
+    }
+
+    if (depositRequirement === "required" && financialPreview.depositAmount <= 0) {
+      messages.push("Deposit-required quotes need a calculated total so the deposit target can initialize correctly.");
+      fields.deposit_requirement = true;
+      firstInvalidRef ||= depositDecisionRef;
     }
 
     return { messages, fields, firstInvalidRef };
@@ -322,6 +359,11 @@ export default function NewOrder() {
     if (artworkInputRef.current) {
       artworkInputRef.current.value = "";
     }
+  }
+
+  function updateDepositRequirement(event) {
+    clearSubmitFeedback();
+    setDepositRequirement(event.target.value);
   }
 
   function selectProduct(event) {
@@ -517,6 +559,21 @@ export default function NewOrder() {
         artwork_files: artworkFiles,
         customer_artwork_id: savedArtwork?.id || "",
         customer_artwork_name: savedArtwork?.name || "",
+        deposit_requirement: depositRequirement,
+        deposit_required: depositRequirement === "required",
+        deposit_amount: financialPreview.depositAmount,
+        deposit: {
+          required: depositRequirement === "required",
+          status: depositRequirement === "required" ? "pending" : "not_required",
+          amount: financialPreview.depositAmount,
+        },
+        invoice: {
+          status: "Draft",
+        },
+        payment_history: [],
+        total_paid: 0,
+        amount_paid: 0,
+        balance_due: financialPreview.totalAmount,
         quote,
       });
 
@@ -943,7 +1000,7 @@ export default function NewOrder() {
             <section className="new-order-card">
               <div className="new-order-card-header">
                 <div>
-                  <p className="new-order-section-kicker">Step 6</p>
+                  <p className="new-order-section-kicker">Step 7</p>
                   <h2>Operational Details</h2>
                 </div>
               </div>
@@ -958,6 +1015,91 @@ export default function NewOrder() {
                   Notes
                   <textarea name="notes" value={form.notes} onChange={updateField} placeholder="Artwork notes, customer deadline, reorder details, etc." style={{ ...fieldStyle, minHeight: "120px", resize: "vertical" }} />
                 </label>
+              </div>
+            </section>
+
+            <section className="new-order-card">
+              <div className="new-order-card-header">
+                <div>
+                  <p className="new-order-section-kicker">Step 8</p>
+                  <h2>Deposit Requirement</h2>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gap: "14px",
+                  border: validationFields.deposit_requirement ? "1px solid #fecaca" : "1px solid #e2e8f0",
+                  borderRadius: "16px",
+                  padding: "16px",
+                  background: validationFields.deposit_requirement ? "#fef2f2" : "#f8fafc",
+                }}
+              >
+                <p style={{ margin: 0, color: "#475569" }}>
+                  Confirm whether this quote should enter the financial workflow with a required deposit or as a no-deposit job.
+                </p>
+
+                <div style={{ display: "grid", gap: "12px" }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      padding: "14px",
+                      border: depositRequirement === "required" ? "1px solid #0f766e" : "1px solid #cbd5e1",
+                      borderRadius: "14px",
+                      background: depositRequirement === "required" ? "#f0fdfa" : "#ffffff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      ref={depositDecisionRef}
+                      type="radio"
+                      name="deposit_requirement"
+                      value="required"
+                      checked={depositRequirement === "required"}
+                      onChange={updateDepositRequirement}
+                    />
+                    <span>
+                      <strong style={{ display: "block", color: "#0f172a" }}>Deposit Required</strong>
+                      <span style={{ display: "block", marginTop: "4px", color: "#475569" }}>
+                        Initialize this quote with a deposit target of {money(financialPreview.depositAmount)} due now and {money(financialPreview.balanceDue)} remaining after deposit.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      padding: "14px",
+                      border: depositRequirement === "not_required" ? "1px solid #0f766e" : "1px solid #cbd5e1",
+                      borderRadius: "14px",
+                      background: depositRequirement === "not_required" ? "#f0fdfa" : "#ffffff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="deposit_requirement"
+                      value="not_required"
+                      checked={depositRequirement === "not_required"}
+                      onChange={updateDepositRequirement}
+                    />
+                    <span>
+                      <strong style={{ display: "block", color: "#0f172a" }}>No Deposit Required</strong>
+                      <span style={{ display: "block", marginTop: "4px", color: "#475569" }}>
+                        Save the quote with no upfront deposit and the full {money(financialPreview.totalAmount)} staying in the final balance workflow.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                <p style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>
+                  Deposit-required quotes default to a 50% intake target so the downstream payment lifecycle can initialize with a concrete amount.
+                </p>
               </div>
             </section>
 
