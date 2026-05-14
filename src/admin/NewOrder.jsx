@@ -875,7 +875,6 @@ export default function NewOrder() {
             <section className="new-order-card new-order-inline-card">
               <div className="new-order-card-header">
                 <div>
-                  <p className="new-order-section-kicker">Step 6</p>
                   <h2>Artwork Upload</h2>
                 </div>
               </div>
@@ -926,11 +925,12 @@ export default function NewOrder() {
                 ) : null}
               </div>
             </section>
+          </div>
 
+          <div className="new-order-production-panel">
             <section className="new-order-card new-order-inline-card new-order-size-card">
               <div className="new-order-size-header">
                 <div>
-                  <p className="new-order-section-kicker">Size Breakdown</p>
                   <h2>Size Breakdown</h2>
                   <p className="new-order-size-note">
                     Size fields come directly from the selected product.
@@ -969,13 +969,10 @@ export default function NewOrder() {
                 ))}
               </div>
             </section>
-          </div>
 
-          <div className="new-order-production-panel">
             <section className="new-order-card">
               <div className="new-order-card-header">
                 <div>
-                  <p className="new-order-section-kicker">Step 5</p>
                   <h2>Logo Placements</h2>
                 </div>
                 <span className="new-order-selection-count">
@@ -1000,7 +997,6 @@ export default function NewOrder() {
             <section className="new-order-card">
               <div className="new-order-card-header">
                 <div>
-                  <p className="new-order-section-kicker">Step 7</p>
                   <h2>Operational Details</h2>
                 </div>
               </div>
@@ -1021,7 +1017,6 @@ export default function NewOrder() {
             <section className="new-order-card">
               <div className="new-order-card-header">
                 <div>
-                  <p className="new-order-section-kicker">Step 8</p>
                   <h2>Deposit Requirement</h2>
                 </div>
               </div>
