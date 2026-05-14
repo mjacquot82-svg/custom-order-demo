@@ -690,8 +690,6 @@ function AdminWorkspaceHeader({ staffUser }) {
             </p>
           </div>
 
-          <SocialLinks compact />
-
           {staffUser ? (
             <button
               type="button"
