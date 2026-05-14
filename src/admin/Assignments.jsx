@@ -16,7 +16,6 @@ import {
 } from "../orders/orderWorkflow";
 import {
   getAssignedOrdersForStaff,
-  isOwnerView,
   isStaffWorkspaceView,
 } from "./adminRoleView";
 
@@ -250,7 +249,7 @@ export default function Assignments() {
   const completedOrders = allOrders.filter((order) => isCompletedOperationalStatus(order.status));
   const overdueOrders = activeOrders.filter(isOverdue);
 
-  if (isStaffWorkspaceView(staffUser) && !isOwnerView(staffUser)) {
+  if (isStaffWorkspaceView(staffUser)) {
     return <StaffAssignments allOrders={allOrders} staffUser={staffUser} />;
   }
 

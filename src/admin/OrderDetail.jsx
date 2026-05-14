@@ -20,7 +20,7 @@ import {
   getNextOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
-import { isOwnerView, isStaffWorkspaceView } from "./adminRoleView";
+import { isAdminWorkspaceView, isStaffWorkspaceView } from "./adminRoleView";
 
 const cardStyle = {
   background: "#ffffff",
@@ -64,7 +64,7 @@ export default function OrderDetail() {
   const staffUsers = getStoredStaffUsers().filter((staffUser) => staffUser.status !== "Inactive");
   const activeStaffUser = getActiveStaffUser();
   const isStaffWorkspace = isStaffWorkspaceView(activeStaffUser);
-  const canManageAssignments = isOwnerView(activeStaffUser);
+  const canManageAssignments = isAdminWorkspaceView(activeStaffUser);
 
   const selectedProduct = useMemo(() => {
     if (!order) return null;

@@ -4,7 +4,7 @@ import { useStoredOrders } from "../lib/ordersStore";
 import { isActiveOperationalStatus } from "../orders/orderWorkflow";
 import {
   canAccessOwnerWorkspace,
-  isOwnerView,
+  isAdminWorkspaceView,
   isStaffWorkspaceView,
 } from "../admin/adminRoleView";
 import {
@@ -60,8 +60,8 @@ function getSidebarCounts(orders = [], { staffWorkspace = false } = {}) {
   };
 }
 
-function getAdminSections(role) {
-  if (role !== "Owner") {
+function getAdminSections(staffUser) {
+  if (!isAdminWorkspaceView(staffUser)) {
     return [
       {
         title: "My Workspace",
@@ -240,7 +240,7 @@ function SocialLinks({ compact = false }) {
 function AdminSidebar({ pathname, staffUser }) {
   const orders = useStoredOrders();
   const staffWorkspace = isStaffWorkspaceView(staffUser);
-  const visibleOrders = isOwnerView(staffUser)
+  const visibleOrders = isAdminWorkspaceView(staffUser)
     ? orders
     : orders.filter(
         (order) =>
@@ -252,8 +252,7 @@ function AdminSidebar({ pathname, staffUser }) {
     { staffWorkspace }
   );
   const activeLink = getActiveSidebarLink(pathname);
-  const role = staffUser?.role || "Staff";
-  const adminSections = getAdminSections(role);
+  const adminSections = getAdminSections(staffUser);
   const workspaceLabel = staffWorkspace
     ? "Staff Operations"
     : "Central Operations";

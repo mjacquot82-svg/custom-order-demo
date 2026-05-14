@@ -4,13 +4,18 @@ export function getAdminViewer(staffUser = getActiveStaffUser()) {
   return staffUser || null;
 }
 
+export function isAdminWorkspaceView(staffUser = getActiveStaffUser()) {
+  const role = getAdminViewer(staffUser)?.role;
+  return role === "Owner" || role === "Manager";
+}
+
 export function isOwnerView(staffUser = getActiveStaffUser()) {
   return getAdminViewer(staffUser)?.role === "Owner";
 }
 
 export function isStaffWorkspaceView(staffUser = getActiveStaffUser()) {
   const viewer = getAdminViewer(staffUser);
-  return Boolean(viewer) && viewer.role !== "Owner";
+  return Boolean(viewer) && viewer.role === "Staff";
 }
 
 export function matchesAssignedStaff(order, staffUser = getActiveStaffUser()) {
