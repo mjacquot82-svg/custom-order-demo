@@ -10,7 +10,7 @@ import {
 } from "../lib/ordersStore";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 import { validatePaymentAmount } from "../lib/financialValidation";
-import { formatDateTime, formatShortDate } from "../lib/dateFormatting";
+import { formatShortDate } from "../lib/dateFormatting";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import { PAYMENT_METHOD_OPTIONS } from "../orders/orderFinancials";
 import { isStaffWorkspaceView } from "./adminRoleView";
@@ -300,6 +300,7 @@ function buildCustomerSummary(orders = []) {
   const releaseReady = orders.filter(
     (order) => order.pickup_status === "Ready for Pickup" && Number(order.balance_due || 0) <= 0
   ).length;
+  const pickupAwaitingPayment = Math.max(0, pickupReady - releaseReady);
   const outstandingBalance = sumValues(orders.map((order) => order.balance_due));
 
   return {
@@ -307,6 +308,7 @@ function buildCustomerSummary(orders = []) {
     unpaidBalances,
     pickupReady,
     releaseReady,
+    pickupAwaitingPayment,
     outstandingBalance,
   };
 }
@@ -369,7 +371,8 @@ export default function QuickSale() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedTransactionIds, setSelectedTransactionIds] = useState([]);
   const [transactionMessage, setTransactionMessage] = useState("");
-  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentAmountOverride, setPaymentAmountOverride] = useState("");
+  const [paymentAmountOverrideSelection, setPaymentAmountOverrideSelection] = useState("");
   const [paymentMethod, setPaymentMethod] = useState(counterPaymentMethods[0] || "Cash");
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentError, setPaymentError] = useState("");
@@ -422,6 +425,15 @@ export default function QuickSale() {
     () => selectableItems.filter((item) => selectedTransactionIds.includes(item.id)),
     [selectableItems, selectedTransactionIds]
   );
+  const selectedPaymentSignature = useMemo(
+    () =>
+      selectedTransactionItems
+        .filter((item) => item.kind === "payment")
+        .map((item) => item.id)
+        .sort()
+        .join("|"),
+    [selectedTransactionItems]
+  );
   const selectedTransactionKind = selectedTransactionItems[0]?.kind || "";
   const selectedTransactionOrders = useMemo(() => {
     const seen = new Set();
@@ -443,6 +455,18 @@ export default function QuickSale() {
     };
   }, [selectedTransactionItems]);
   const customerSummary = useMemo(() => buildCustomerSummary(customerOrders), [customerOrders]);
+  const paymentSelectionKey = `${selectedPaymentSignature}:${Number(transactionSummary.amountDue || 0)}`;
+  const paymentAmount =
+    selectedTransactionKind !== "payment"
+      ? ""
+      : paymentAmountOverrideSelection === paymentSelectionKey
+      ? paymentAmountOverride
+      : String(Number(transactionSummary.amountDue || 0) || "");
+  const enteredPaymentAmount = Number(paymentAmount || 0);
+  const outstandingBalanceAfterPayment = Math.max(
+    0,
+    Number(transactionSummary.amountDue || 0) - enteredPaymentAmount
+  );
 
   const subtotal = useMemo(() => {
     return cart.reduce((total, item) => total + item.qty * item.unit_price, 0);
@@ -473,32 +497,9 @@ export default function QuickSale() {
     return () => window.removeEventListener("keydown", handleGlobalEnter);
   }, []);
 
-  useEffect(() => {
-    setSelectedTransactionIds((current) =>
-      current.filter((id) => selectableItems.some((item) => item.id === id))
-    );
-  }, [selectableItems]);
-
-  useEffect(() => {
-    if (selectedTransactionKind !== "payment") {
-      if (paymentAmount) setPaymentAmount("");
-      return;
-    }
-
-    setPaymentAmount((current) => {
-      const normalizedCurrent = Number(current || 0);
-      const suggestedAmount = Number(transactionSummary.amountDue || 0);
-
-      if (!current || normalizedCurrent > suggestedAmount) {
-        return String(suggestedAmount || "");
-      }
-
-      return current;
-    });
-  }, [paymentAmount, selectedTransactionKind, transactionSummary.amountDue]);
-
   function resetPaymentForm(nextAmount = "") {
-    setPaymentAmount(nextAmount);
+    setPaymentAmountOverride(nextAmount);
+    setPaymentAmountOverrideSelection(nextAmount ? paymentSelectionKey : "");
     setPaymentMethod(counterPaymentMethods[0] || "Cash");
     setPaymentNote("");
     setPaymentError("");
@@ -555,6 +556,12 @@ export default function QuickSale() {
     setSelectedTransactionIds([]);
     setTransactionMessage("");
     resetPaymentForm("");
+  }
+
+  function removeTransactionItem(itemId) {
+    setSelectedTransactionIds((current) => current.filter((id) => id !== itemId));
+    setTransactionMessage("");
+    setPaymentError("");
   }
 
   function updateCustomerName(value) {
@@ -1191,8 +1198,8 @@ export default function QuickSale() {
                     </p>
                     <h2 style={{ margin: "6px 0 8px", fontSize: "24px" }}>Customer Summary</h2>
                     <p style={{ margin: 0, color: "#64748b" }}>
-                      Start with a compact summary instead of opening every balance, card, and
-                      action panel at once.
+                      Pickup readiness here reflects the customer-facing shop state, separate from
+                      personal worker assignment.
                     </p>
                   </div>
 
@@ -1213,6 +1220,10 @@ export default function QuickSale() {
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
                           <span style={{ color: "#475569", fontWeight: 700 }}>Release-ready orders</span>
                           <strong style={{ color: "#166534" }}>{customerSummary.releaseReady}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                          <span style={{ color: "#475569", fontWeight: 700 }}>Awaiting balance before release</span>
+                          <strong style={{ color: "#b45309" }}>{customerSummary.pickupAwaitingPayment}</strong>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
                           <span style={{ color: "#475569", fontWeight: 700 }}>Current filter</span>
@@ -1262,7 +1273,8 @@ export default function QuickSale() {
                   </h2>
                   <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
                     Select only what the customer is paying for or picking up. Totals on the right
-                    are generated from this selection only.
+                    are generated from this selection only. Pickup visibility remains based on
+                    customer-ready shop state, not worker assignment.
                   </p>
                 </div>
 
@@ -1458,6 +1470,11 @@ export default function QuickSale() {
                         />
                       </div>
 
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" }}>
+                        <OperationalStat label="Payment Items" value={transactionSummary.paymentCount} />
+                        <OperationalStat label="Pickup Releases" value={transactionSummary.pickupCount} />
+                      </div>
+
                       <div style={{ display: "grid", gap: "10px" }}>
                         {selectedTransactionItems.map((item) => (
                           <article
@@ -1477,6 +1494,26 @@ export default function QuickSale() {
                             </div>
                             <div style={{ marginTop: "4px", color: "#64748b", fontSize: "13px" }}>
                               {item.label}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", marginTop: "10px", flexWrap: "wrap" }}>
+                              <span style={{ color: "#475569", fontSize: "13px", fontWeight: 700 }}>
+                                {item.kind === "pickup" ? "Customer release-ready item" : "Selected for counter payment"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeTransactionItem(item.id)}
+                                style={{
+                                  border: "1px solid #fecaca",
+                                  background: "#ffffff",
+                                  color: "#b91c1c",
+                                  borderRadius: "10px",
+                                  padding: "8px 10px",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Remove
+                              </button>
                             </div>
                           </article>
                         ))}
@@ -1533,7 +1570,8 @@ export default function QuickSale() {
                           step="0.01"
                           value={paymentAmount}
                           onChange={(event) => {
-                            setPaymentAmount(event.target.value);
+                            setPaymentAmountOverride(event.target.value);
+                            setPaymentAmountOverrideSelection(paymentSelectionKey);
                             setPaymentError("");
                           }}
                           style={{
@@ -1544,6 +1582,36 @@ export default function QuickSale() {
                           }}
                         />
                       </label>
+
+                      <div
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "14px",
+                          padding: "14px 16px",
+                          background: "#f8fafc",
+                          display: "grid",
+                          gap: "8px",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                          <span style={{ color: "#475569", fontWeight: 700 }}>Selected transaction total</span>
+                          <strong style={{ color: "#0f172a" }}>{currency(transactionSummary.amountDue)}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                          <span style={{ color: "#475569", fontWeight: 700 }}>Remaining after entered payment</span>
+                          <strong
+                            style={{
+                              color: outstandingBalanceAfterPayment > 0 ? "#b45309" : "#166534",
+                            }}
+                          >
+                            {currency(outstandingBalanceAfterPayment)}
+                          </strong>
+                        </div>
+                        <p style={{ margin: 0, color: "#64748b", fontSize: "13px", lineHeight: 1.5 }}>
+                          The amount auto-fills from the current selection and can still be edited for
+                          partial or split payments.
+                        </p>
+                      </div>
 
                       <label style={labelStyle}>
                         Payment Method
