@@ -1,9 +1,11 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { formatShortDate } from "../lib/dateFormatting";
-import { useStoredOrders } from "../lib/ordersStore";
+import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import { isQuoteArchived } from "../quotes/quoteWorkflow";
+import { getActiveStaffUser } from "../lib/staffUsersStore";
+import { canManageArchivedQuotes, getAdminViewer } from "./adminRoleView";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -26,10 +28,12 @@ function buildArchivedQuotes(orders) {
 export default function ArchivedQuotes() {
   const location = useLocation();
   const navigate = useNavigate();
+  const viewer = getAdminViewer(getActiveStaffUser());
+  const canManageArchive = canManageArchivedQuotes(viewer);
   const orders = useStoredOrders();
   const archivedQuotes = useMemo(() => buildArchivedQuotes(orders), [orders]);
   const [flashMessage, setFlashMessage] = useState(() => location.state?.flashMessage || "");
-  const [flashTone] = useState(() => location.state?.flashTone || "default");
+  const [flashTone, setFlashTone] = useState(() => location.state?.flashTone || "default");
 
   useEffect(() => {
     if (!location.state?.flashMessage) return;
@@ -45,6 +49,31 @@ export default function ArchivedQuotes() {
 
     return () => window.clearTimeout(flashTimer);
   }, [flashMessage]);
+
+  function handleRestoreQuote(quote) {
+    if (!canManageArchive) return;
+
+    const confirmed = window.confirm(
+      `Restore quote ${quote.order_number} to the active workflow? It will leave Archived Quotes and become operationally visible again.`
+    );
+    if (!confirmed) return;
+
+    updateStoredOrder(quote.order_number, {
+      quote_archived: false,
+      quote_archived_at: null,
+      activity_type: "quote_restore",
+      activity_note: "Quote restored to active workflow.",
+    });
+
+    setFlashTone("success");
+    setFlashMessage(`Quote ${quote.order_number} was restored to the active workflow.`);
+    navigate(`/admin/quotes/${quote.order_number}`, {
+      state: {
+        flashMessage: `Quote ${quote.order_number} was restored to active workflow.`,
+        flashTone: "success",
+      },
+    });
+  }
 
   return (
     <div style={{ maxWidth: "1180px", margin: "0 auto", padding: "24px" }}>
@@ -73,7 +102,7 @@ export default function ArchivedQuotes() {
           </p>
           <h1 style={{ margin: "8px 0 6px" }}>Archived Quotes</h1>
           <p style={{ margin: 0, color: "#475569", maxWidth: "760px", lineHeight: 1.6 }}>
-            Historical quote records live here after removal from the active sales workflow. This view is for reference, not operational movement.
+            Historical quote records live here after removal from the active sales workflow. Restore actions remain visible so lifecycle management stays reversible and operational.
           </p>
         </div>
 
@@ -188,17 +217,36 @@ export default function ArchivedQuotes() {
                 <span style={{ color: "#475569", fontWeight: 600 }}>
                   {quote.quote_status || "Archived"}
                 </span>
-                <Link
-                  to={`/admin/quotes/${quote.order_number}`}
-                  style={{
-                    justifySelf: "start",
-                    color: "#0f172a",
-                    textDecoration: "none",
-                    fontWeight: 800,
-                  }}
-                >
-                  View
-                </Link>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifySelf: "start" }}>
+                  {canManageArchive ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreQuote(quote)}
+                      style={{
+                        border: "1px solid #d6dbe4",
+                        background: "#f8fafc",
+                        color: "#0f172a",
+                        borderRadius: "12px",
+                        padding: "10px 12px",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Restore Quote
+                    </button>
+                  ) : null}
+                  <Link
+                    to={`/admin/quotes/${quote.order_number}`}
+                    style={{
+                      alignSelf: "center",
+                      color: "#0f172a",
+                      textDecoration: "none",
+                      fontWeight: 800,
+                    }}
+                  >
+                    View
+                  </Link>
+                </div>
               </article>
             ))
           ) : (

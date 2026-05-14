@@ -562,7 +562,7 @@ export default function QuoteDetail() {
                 cursor: "pointer",
               }}
             >
-              Archive from Active Workflow
+              Archive Quote
             </button>
           ) : null}
           {!archived && canManageArchive ? (
@@ -871,11 +871,11 @@ export default function QuoteDetail() {
         {canManageArchive ? (
           <WorkspaceCard
             eyebrow="Workflow Visibility"
-            title={archived ? "Archived record" : "Active quote workflow control"}
+            title={archived ? "Archived record" : "Quote lifecycle management"}
             description={
               archived
                 ? "This record is preserved for reference, but it is no longer treated as active operational work."
-                : "Archive completed quotes out of active workflow once they should no longer appear in operational queues."
+                : "Archive and restore are normal operational lifecycle actions for owner and admin workflow management."
             }
             background={archived ? "#f8fafc" : "#ffffff"}
           >
@@ -929,7 +929,7 @@ export default function QuoteDetail() {
                   gap: "10px",
                 }}
               >
-                <strong style={{ color: "#0f172a" }}>Archive from active workflow</strong>
+                <strong style={{ color: "#0f172a" }}>Archive Quote</strong>
                 <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
                   Move this quote out of active operational workflow while keeping the full record available.
                 </p>

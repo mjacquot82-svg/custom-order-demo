@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getOrderArtworkNames } from "../lib/orderArtwork";
 import { getJsonStorageItem, setJsonStorageItem } from "../lib/browserStorage";
-import { useStoredOrders } from "../lib/ordersStore";
+import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
   canAdvanceQuoteStatus,
@@ -323,6 +323,36 @@ export default function Quotes() {
     }));
   }
 
+  function handleArchiveQuote(quote) {
+    if (!canViewArchivedQuotes) return;
+
+    const confirmed = window.confirm(
+      `Archive quote ${quote.order_number} from the active workflow? It will move to Archived Quotes and stay recoverable.`
+    );
+    if (!confirmed) return;
+
+    updateStoredOrder(quote.order_number, {
+      quote_archived: true,
+      quote_archived_at: new Date().toISOString(),
+      operational_visible: false,
+      production_ready: false,
+      activity_type: "quote_archive",
+      activity_note: "Quote archived from active workflow.",
+    });
+
+    setFlashTitle("Quote Archived");
+    setFlashMessage(`Quote ${quote.order_number} was removed from active workflow and moved to Archived Quotes.`);
+    setFlashTone("success");
+    setHighlightedQuote("");
+    setExpandedQuotes((current) => {
+      if (!current[quote.order_number]) return current;
+
+      const nextState = { ...current };
+      delete nextState[quote.order_number];
+      return nextState;
+    });
+  }
+
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div
@@ -559,24 +589,44 @@ export default function Quotes() {
                       </div>
                     </button>
 
-                    <Link
-                      to={`/admin/quotes/${quote.order_number}`}
-                      style={{
-                        color: "#0f172a",
-                        textDecoration: "none",
-                        fontWeight: 700,
-                        padding: "0 14px",
-                        borderRadius: "12px",
-                        border: "1px solid #d6dbe4",
-                        background: "#ffffff",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minHeight: "100%",
-                      }}
-                    >
-                      Open Workspace
-                    </Link>
+                    <div style={{ display: "grid", gap: "10px", alignItems: "stretch" }}>
+                      <Link
+                        to={`/admin/quotes/${quote.order_number}`}
+                        style={{
+                          color: "#0f172a",
+                          textDecoration: "none",
+                          fontWeight: 700,
+                          padding: "0 14px",
+                          borderRadius: "12px",
+                          border: "1px solid #d6dbe4",
+                          background: "#ffffff",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: canViewArchivedQuotes ? "56px" : "100%",
+                        }}
+                      >
+                        Open Workspace
+                      </Link>
+                      {canViewArchivedQuotes ? (
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveQuote(quote)}
+                          style={{
+                            border: "1px solid #d6dbe4",
+                            background: "#f8fafc",
+                            color: "#0f172a",
+                            borderRadius: "12px",
+                            padding: "0 14px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            minHeight: "56px",
+                          }}
+                        >
+                          Archive Quote
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div
@@ -790,6 +840,84 @@ export default function Quotes() {
                             </div>
                           </div>
                         </div>
+
+                        {canViewArchivedQuotes ? (
+                          <section
+                            style={{
+                              border: "1px solid #d6dbe4",
+                              borderRadius: "16px",
+                              background: "#f8fafc",
+                              padding: "14px 16px",
+                              display: "grid",
+                              gap: "10px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: "12px",
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <div>
+                                <p
+                                  style={{
+                                    margin: 0,
+                                    color: "#64748b",
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    letterSpacing: "0.08em",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  Lifecycle Management
+                                </p>
+                                <p style={{ margin: "4px 0 0", color: "#334155", fontWeight: 700 }}>
+                                  Archive Quote
+                                </p>
+                              </div>
+                              <StatusPill tone="warning">Admin / Owner</StatusPill>
+                            </div>
+
+                            <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+                              Remove this quote from the active workflow once it should no longer appear in the operational queue, while keeping the full record recoverable in Archived Quotes.
+                            </p>
+
+                            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                onClick={() => handleArchiveQuote(quote)}
+                                style={{
+                                  border: "1px solid #d6dbe4",
+                                  background: "#ffffff",
+                                  color: "#0f172a",
+                                  borderRadius: "12px",
+                                  padding: "11px 14px",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Archive Quote
+                              </button>
+                              <Link
+                                to="/admin/quotes/archived"
+                                style={{
+                                  border: "1px solid #d6dbe4",
+                                  background: "#ffffff",
+                                  color: "#334155",
+                                  borderRadius: "12px",
+                                  padding: "11px 14px",
+                                  fontWeight: 700,
+                                  textDecoration: "none",
+                                }}
+                              >
+                                View Archived Quotes
+                              </Link>
+                            </div>
+                          </section>
+                        ) : null}
 
                         {quote.notes ? (
                           <div
