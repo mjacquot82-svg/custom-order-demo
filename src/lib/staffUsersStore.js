@@ -63,29 +63,6 @@ function validateUniqueStaffPin(pin, users, excludedUserId) {
   return cleanedPin;
 }
 
-export function normalizeStaffRole(role, fallbackRole = "Staff") {
-  const normalizedRole = String(role ?? "").trim().toLowerCase();
-
-  if (
-    normalizedRole === "owner" ||
-    normalizedRole === "admin" ||
-    normalizedRole === "owner/admin" ||
-    normalizedRole === "owner / admin"
-  ) {
-    return "Owner";
-  }
-
-  if (normalizedRole === "manager") {
-    return "Manager";
-  }
-
-  if (normalizedRole === "staff") {
-    return "Staff";
-  }
-
-  return fallbackRole;
-}
-
 function prepareStaffUserInput(userInput, users, excludedUserId) {
   const nextInput = { ...userInput };
 
@@ -103,12 +80,17 @@ function prepareStaffUserInput(userInput, users, excludedUserId) {
 function normalizeStaffUser(user) {
   const isProtectedOwner = user.id === PROTECTED_OWNER_ID;
   const fallbackRole = isProtectedOwner ? "Owner" : "Staff";
-  const normalizedRole = normalizeStaffRole(user.role, fallbackRole);
 
   return {
     id: user.id || `staff-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: user.name || "New Staff User",
-    role: isProtectedOwner ? "Owner" : normalizedRole,
+    role: isProtectedOwner
+      ? "Owner"
+      : user.role === "Owner"
+        ? "Staff"
+        : STAFF_ROLES.includes(user.role)
+          ? user.role
+          : fallbackRole,
     pin: formatStaffPin(user.pin || "0000"),
     status: isProtectedOwner
       ? "Active"
@@ -268,7 +250,7 @@ export function setActiveStaffUser(user) {
   const nextActiveUser = JSON.stringify({
     id: user.id,
     name: user.name,
-    role: normalizeStaffRole(user.role, "Staff"),
+    role: user.role,
   });
 
   setRawStorageItem(ACTIVE_STAFF_KEY, nextActiveUser);
@@ -320,11 +302,11 @@ export function getActiveStaffUser() {
 }
 
 export function isActiveStaffOwner() {
-  return normalizeStaffRole(getActiveStaffUser()?.role, "") === "Owner";
+  return getActiveStaffUser()?.role === "Owner";
 }
 
 export function isProtectedStaffUser(user) {
-  return user?.id === PROTECTED_OWNER_ID || normalizeStaffRole(user?.role, "") === "Owner";
+  return user?.id === PROTECTED_OWNER_ID || user?.role === "Owner";
 }
 
 export function generateUniqueStaffPin(excludedUserId) {
