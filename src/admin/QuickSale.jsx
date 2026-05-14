@@ -406,8 +406,9 @@ function buildSelectableTransactionItems(orders = []) {
 }
 
 function buildCustomerSummary(orders = []) {
-  const openOrders = orders.length;
+  const activeOrders = orders.length;
   const unpaidBalances = orders.filter((order) => Number(order.balance_due || 0) > 0).length;
+  const paidOrders = Math.max(0, orders.length - unpaidBalances);
   const pickupReady = orders.filter((order) => order.pickup_status === "Ready for Pickup").length;
   const releaseReady = orders.filter(
     (order) => order.pickup_status === "Ready for Pickup" && Number(order.balance_due || 0) <= 0
@@ -416,12 +417,39 @@ function buildCustomerSummary(orders = []) {
   const outstandingBalance = sumValues(orders.map((order) => order.balance_due));
 
   return {
-    openOrders,
+    activeOrders,
     unpaidBalances,
+    paidOrders,
     pickupReady,
     releaseReady,
     pickupAwaitingPayment,
     outstandingBalance,
+  };
+}
+
+function buildCustomerSummaryStatus(summary) {
+  if (!summary.activeOrders) {
+    return {
+      title: "No active customer orders",
+      detail: "No operational work or payment follow-up is currently linked to this customer.",
+      tone: "default",
+    };
+  }
+
+  if (summary.outstandingBalance <= 0) {
+    return {
+      title: "Financially clear, operationally active",
+      detail:
+        "Payment obligations are cleared. Any remaining active orders are still tracked for production, pickup readiness, or release.",
+      tone: "success",
+    };
+  }
+
+  return {
+    title: "Operational work and payment follow-up remain",
+    detail:
+      "Some orders are still active in workflow, and at least one order still has a balance due before financial completion.",
+    tone: "warning",
   };
 }
 
@@ -585,6 +613,10 @@ export default function QuickSale() {
     };
   }, [selectedTransactionItems]);
   const customerSummary = useMemo(() => buildCustomerSummary(customerOrders), [customerOrders]);
+  const customerSummaryStatus = useMemo(
+    () => buildCustomerSummaryStatus(customerSummary),
+    [customerSummary]
+  );
   const paymentSelectionKey = `${selectedPaymentSignature}:${Number(transactionSummary.amountDue || 0)}`;
   const paymentAmount =
     selectedTransactionKind !== "payment"
@@ -1038,10 +1070,12 @@ export default function QuickSale() {
       readyForRelease.length
         ? `${activePaymentAction.title} recorded across ${selectedTransactionItems.length} selected item${
             selectedTransactionItems.length === 1 ? "" : "s"
-          }. ${readyForRelease.length} order${readyForRelease.length === 1 ? " is" : "s are"} now ready to release.`
+          }. Financial balances were updated successfully. ${readyForRelease.length} order${
+            readyForRelease.length === 1 ? " is" : "s are"
+          } now ready to release.`
         : `${activePaymentAction.title} recorded across ${selectedTransactionItems.length} selected item${
             selectedTransactionItems.length === 1 ? "" : "s"
-          }.`
+          }. Financial balances were updated successfully. Operational order status may still remain active until production or pickup workflow is complete.`
     );
     if (readyForRelease.length) {
       setActiveMode("pickup");
@@ -1491,27 +1525,101 @@ export default function QuickSale() {
                     </p>
                     <h2 style={{ margin: "6px 0 8px", fontSize: "24px" }}>Customer Summary</h2>
                     <p style={{ margin: 0, color: "#64748b" }}>
-                      Use this snapshot to decide whether staff should collect payment or release a
-                      pickup next.
+                      Review operational workflow state separately from financial status so payment
+                      completion does not read like production closure.
                     </p>
                   </div>
 
                   {selectedCustomer ? (
                     <>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" }}>
-                        <OperationalStat label="Open Orders" value={customerSummary.openOrders} />
-                        <OperationalStat label="Unpaid Balances" value={customerSummary.unpaidBalances} />
-                        <OperationalStat label="Pickup Ready" value={customerSummary.pickupReady} />
-                        <OperationalStat
-                          label="Outstanding"
-                          value={currency(customerSummary.outstandingBalance)}
-                          emphasis={customerSummary.outstandingBalance > 0 ? "danger" : "success"}
-                        />
+                      <div style={{ display: "grid", gap: "14px" }}>
+                        <div
+                          style={{
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "18px",
+                            padding: "14px",
+                            display: "grid",
+                            gap: "12px",
+                            background: "#ffffff",
+                          }}
+                        >
+                          <div>
+                            <span
+                              style={{
+                                color: "#64748b",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.06em",
+                              }}
+                            >
+                              Operational State
+                            </span>
+                            <p style={{ margin: "6px 0 0", color: "#475569", fontSize: "14px" }}>
+                              Orders that still require production, pickup, or release handling.
+                            </p>
+                          </div>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                              gap: "12px",
+                            }}
+                          >
+                            <OperationalStat label="Active Orders" value={customerSummary.activeOrders} />
+                            <OperationalStat label="Pickup Ready" value={customerSummary.pickupReady} />
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "18px",
+                            padding: "14px",
+                            display: "grid",
+                            gap: "12px",
+                            background: "#ffffff",
+                          }}
+                        >
+                          <div>
+                            <span
+                              style={{
+                                color: "#64748b",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.06em",
+                              }}
+                            >
+                              Financial State
+                            </span>
+                            <p style={{ margin: "6px 0 0", color: "#475569", fontSize: "14px" }}>
+                              Payment completion and remaining customer balance.
+                            </p>
+                          </div>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                              gap: "12px",
+                            }}
+                          >
+                            <OperationalStat label="Unpaid Orders" value={customerSummary.unpaidBalances} />
+                            <OperationalStat label="Paid Orders" value={customerSummary.paidOrders} />
+                            <div style={{ gridColumn: "1 / -1" }}>
+                              <OperationalStat
+                                label="Outstanding Balance"
+                                value={currency(customerSummary.outstandingBalance)}
+                                emphasis={customerSummary.outstandingBalance > 0 ? "danger" : "success"}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "14px", display: "grid", gap: "8px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                          <span style={{ color: "#475569", fontWeight: 700 }}>Release-ready orders</span>
+                          <span style={{ color: "#475569", fontWeight: 700 }}>Ready for pickup release</span>
                           <strong style={{ color: "#166534" }}>{customerSummary.releaseReady}</strong>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
@@ -1522,6 +1630,43 @@ export default function QuickSale() {
                           <span style={{ color: "#475569", fontWeight: 700 }}>Current workflow</span>
                           <strong style={{ color: "#0f172a" }}>{activeWorkspaceMode.label}</strong>
                         </div>
+                      </div>
+
+                      <div
+                        style={{
+                          border:
+                            customerSummaryStatus.tone === "success"
+                              ? "1px solid #bbf7d0"
+                              : customerSummaryStatus.tone === "warning"
+                              ? "1px solid #fde68a"
+                              : "1px solid #e2e8f0",
+                          background:
+                            customerSummaryStatus.tone === "success"
+                              ? "#f0fdf4"
+                              : customerSummaryStatus.tone === "warning"
+                              ? "#fffbeb"
+                              : "#f8fafc",
+                          borderRadius: "16px",
+                          padding: "14px 16px",
+                          display: "grid",
+                          gap: "6px",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            color:
+                              customerSummaryStatus.tone === "success"
+                                ? "#166534"
+                                : customerSummaryStatus.tone === "warning"
+                                ? "#92400e"
+                                : "#0f172a",
+                          }}
+                        >
+                          {customerSummaryStatus.title}
+                        </strong>
+                        <span style={{ color: "#475569", lineHeight: 1.5 }}>
+                          {customerSummaryStatus.detail}
+                        </span>
                       </div>
                     </>
                   ) : (
