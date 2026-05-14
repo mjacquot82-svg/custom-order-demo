@@ -24,13 +24,14 @@ function Section({ title, children, description }) {
     <section
       style={{
         background: "#ffffff",
-        borderRadius: "20px",
-        padding: "22px",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-        marginBottom: "22px",
+        borderRadius: "24px",
+        padding: "28px",
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 16px 40px rgba(15, 23, 42, 0.04)",
+        marginBottom: "28px",
       }}
     >
-      <div style={{ marginBottom: "16px" }}>
+      <div style={{ marginBottom: "18px" }}>
         <h2 style={{ margin: 0 }}>{title}</h2>
         {description ? (
           <p style={{ margin: "8px 0 0", color: "#64748b", maxWidth: "760px", lineHeight: 1.6 }}>
@@ -247,80 +248,189 @@ function WorkspaceCountLink({ label, count, description, to, tone = "default" })
       to={to}
       style={{
         display: "grid",
-        gridTemplateColumns: "auto minmax(0, 1fr) auto",
         gap: "14px",
-        alignItems: "center",
-        borderRadius: "18px",
-        padding: "16px 18px",
+        alignItems: "start",
+        borderRadius: "20px",
+        padding: "20px",
         background: palette.background,
         border: `1px solid ${palette.border}`,
         color: "#171717",
         textDecoration: "none",
       }}
     >
-      <strong style={{ fontSize: "28px", lineHeight: 1, color: palette.count }}>{count}</strong>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ margin: 0, fontWeight: 800, color: palette.label }}>{label}</p>
-        <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "14px", lineHeight: 1.4 }}>
-          {description}
-        </p>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: 0, fontWeight: 900, fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase", color: palette.label }}>
+            {label}
+          </p>
+          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "14px", lineHeight: 1.5 }}>
+            {description}
+          </p>
+        </div>
+        <strong style={{ fontSize: "34px", lineHeight: 1, color: palette.count }}>{count}</strong>
       </div>
-      <span style={{ color: "#64748b", fontWeight: 700, whiteSpace: "nowrap" }}>Open</span>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
+        <span style={{ color: "#475569", fontWeight: 700, fontSize: "13px" }}>Open dedicated workspace</span>
+        <span style={{ color: "#64748b", fontWeight: 800, whiteSpace: "nowrap" }}>View</span>
+      </div>
     </Link>
   );
 }
 
-function buildOwnerWorkspaceQueues(orders = []) {
+function WorkspaceOverviewLink({ label, count, description, to }) {
+  return (
+    <Link
+      to={to}
+      style={{
+        display: "grid",
+        gap: "10px",
+        padding: "18px",
+        borderRadius: "18px",
+        border: "1px solid #e2e8f0",
+        background: "#f8fafc",
+        textDecoration: "none",
+        color: "#171717",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "baseline" }}>
+        <strong style={{ fontSize: "16px" }}>{label}</strong>
+        <span style={{ color: "#0f172a", fontSize: "22px", fontWeight: 900 }}>{count}</span>
+      </div>
+      <p style={{ margin: 0, color: "#64748b", fontSize: "14px", lineHeight: 1.5 }}>{description}</p>
+    </Link>
+  );
+}
+
+function buildOwnerAttentionItems(orders = []) {
   const snapshot = buildWorkflowSnapshotCards(orders);
   const lookup = Object.fromEntries(snapshot.map((card) => [card.label, card.value]));
+  const metrics = buildOperationalMetrics(orders);
   const activeOrders = orders.filter((order) => {
     const status = normalizeOperationalStatus(order.status);
     return !isCompletedOperationalStatus(status) && !isCanceledOperationalStatus(status);
   });
-  const unassignedOrders = activeOrders.filter(
-    (order) => order.needs_assignment || !order.assigned_to_staff_id
-  );
   const readyForPickup = activeOrders.filter(
     (order) => normalizeOperationalStatus(order.status) === "Ready for Pickup"
-  );
+  ).length;
 
   return [
     {
+      label: "Overdue Production",
+      count: metrics.overdue,
+      description: "Jobs past due date need immediate review in Shop Production.",
+      to: "/admin/orders",
+      tone: "danger",
+    },
+    {
       label: "Awaiting Approval",
       count: lookup["Awaiting Approval"] || 0,
-      description: "Quotes still waiting on customer approval.",
+      description: "Quotes still waiting on customer approval before production can move.",
       to: "/admin/quotes",
       tone: "warning",
     },
     {
       label: "Awaiting Deposit",
       count: lookup["Awaiting Deposit"] || 0,
-      description: "Quote work blocked until deposit is collected.",
+      description: "Quote work is blocked until deposit collection is complete.",
       to: "/admin/quotes",
       tone: "warning",
     },
     {
-      label: "Artwork Needed",
-      count: lookup["Artwork Needed"] || 0,
-      description: "Quotes waiting on art files or approvals.",
-      to: "/admin/quotes",
-      tone: "warning",
-    },
-    {
-      label: "Need Assignment",
-      count: unassignedOrders.length,
-      description: "Production work that still needs dispatch.",
+      label: "Needs Assignment",
+      count: metrics.needsAssignment,
+      description: "Operational work still needs dispatch before the floor can absorb it.",
       to: "/admin/assignments",
       tone: "default",
     },
     {
       label: "Ready For Pickup",
-      count: readyForPickup.length,
-      description: "Completed jobs waiting at the counter.",
+      count: readyForPickup,
+      description: "Completed work is waiting for customer handoff at the counter.",
       to: "/admin/orders?status=ready-for-pickup",
       tone: "success",
     },
+  ]
+    .filter((item) => item.count > 0)
+    .slice(0, 3);
+}
+
+function buildOwnerWorkspaceOverview(orders = []) {
+  const metrics = buildOperationalMetrics(orders);
+
+  return [
+    {
+      label: "Quotes",
+      count: metrics.activeQuotes,
+      description: "Pricing, approvals, deposits, and artwork readiness.",
+      to: "/admin/quotes",
+    },
+    {
+      label: "Front Counter",
+      count: metrics.readyForPickup,
+      description: "Pickup-ready orders and day-of customer transactions.",
+      to: "/admin/sales/new",
+    },
+    {
+      label: "Shop Production",
+      count: metrics.activeProduction,
+      description: "Active production work currently moving through the floor.",
+      to: "/admin/orders",
+    },
+    {
+      label: "Financial",
+      count: metrics.outstandingPayments,
+      description: "Orders with remaining balances and invoice follow-up.",
+      to: "/admin/financial",
+    },
   ];
+}
+
+function UpcomingOrderCard({ order }) {
+  return (
+    <Link
+      to={`/admin/orders/${order.orderNumber}`}
+      style={{
+        display: "grid",
+        gap: "14px",
+        borderRadius: "18px",
+        padding: "18px",
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        textDecoration: "none",
+        color: "#171717",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0 }}>
+          <strong>{order.orderNumber}</strong>
+          <p style={{ margin: "6px 0 0", fontWeight: 700 }}>{order.customerName}</p>
+        </div>
+        <strong style={{ color: "#0f172a", whiteSpace: "nowrap" }}>{order.dueLabel}</strong>
+      </div>
+      <div>
+        <p style={{ margin: 0, color: "#475569", fontWeight: 700, fontSize: "13px" }}>{order.status}</p>
+        <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: "14px", lineHeight: 1.5 }}>{order.garment}</p>
+      </div>
+    </Link>
+  );
+}
+
+function EmptyAttentionState() {
+  return (
+    <div
+      style={{
+        padding: "22px",
+        borderRadius: "20px",
+        border: "1px dashed #cbd5e1",
+        background: "#f8fafc",
+      }}
+    >
+      <p style={{ margin: 0, fontWeight: 800, color: "#0f172a" }}>No immediate owner escalations.</p>
+      <p style={{ margin: "8px 0 0", color: "#64748b", lineHeight: 1.6 }}>
+        The highest-priority queues are clear right now. Use the workspace links to move into quotes, production, counter, or financial detail only when needed.
+      </p>
+    </div>
+  );
 }
 
 function buildUpcomingOperationalOrders(orders = []) {
@@ -367,69 +477,76 @@ function buildUpcomingOperationalOrders(orders = []) {
 
 function OwnerDashboard({ orders }) {
   const metrics = buildOperationalMetrics(orders);
-  const workspaceQueues = buildOwnerWorkspaceQueues(orders);
+  const attentionItems = buildOwnerAttentionItems(orders);
+  const workspaceOverview = buildOwnerWorkspaceOverview(orders);
   const upcomingOrders = buildUpcomingOperationalOrders(orders);
 
   return (
-    <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
-      <div style={{ marginBottom: "20px" }}>
+    <div style={{ maxWidth: "1240px", margin: "0 auto", padding: "32px 24px 44px" }}>
+      <div style={{ marginBottom: "28px" }}>
         <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Owner Operations</p>
         <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>Dashboard</h1>
         <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>Global operational overview for the owner workspace. Use this page to spot pressure points, then move into the dedicated workspace that handles the work.</p>
       </div>
 
-      <div style={{ marginBottom: "22px" }}>
+      <div style={{ marginBottom: "30px" }}>
         <OperationsSummaryCards metrics={metrics} />
       </div>
 
-      <Section
-        title="Priority Queues"
-        description="This page surfaces what needs intervention across intake, production, dispatch, and pickup without duplicating the full working views."
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: "24px",
+          alignItems: "start",
+          marginBottom: "28px",
+        }}
       >
-        <div style={{ display: "grid", gap: "12px" }}>
-          {workspaceQueues.map((queue) => (
-            <WorkspaceCountLink
-              key={queue.label}
-              label={queue.label}
-              count={queue.count}
-              description={queue.description}
-              to={queue.to}
-              tone={queue.tone}
-            />
-          ))}
-        </div>
-      </Section>
+        <Section
+          title="Owner Attention"
+          description="Only the highest-priority items stay here. Detailed queue management remains in Quotes, Shop Production, Front Counter, Assignments, and Financial."
+        >
+          {attentionItems.length ? (
+            <div style={{ display: "grid", gap: "14px" }}>
+              {attentionItems.map((queue) => (
+                <WorkspaceCountLink
+                  key={queue.label}
+                  label={queue.label}
+                  count={queue.count}
+                  description={queue.description}
+                  to={queue.to}
+                  tone={queue.tone}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyAttentionState />
+          )}
+        </Section>
+
+        <Section
+          title="Workspace Guide"
+          description="Each workspace keeps its own workflow detail so the dashboard can stay calm and quick to scan."
+        >
+          <div style={{ display: "grid", gap: "12px" }}>
+            {workspaceOverview.map((workspace) => (
+              <WorkspaceOverviewLink
+                key={workspace.label}
+                label={workspace.label}
+                count={workspace.count}
+                description={workspace.description}
+                to={workspace.to}
+              />
+            ))}
+          </div>
+        </Section>
+      </div>
 
       <Section title="Upcoming Deadlines" description="A short operational cut of the next due jobs so the owner overview stays useful without becoming another production board.">
         {upcomingOrders.length ? (
-          <div style={{ display: "grid", gap: "12px" }}>
-            {upcomingOrders.map((order) => (
-              <Link
-                key={order.orderNumber}
-                to={`/admin/orders/${order.orderNumber}`}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) auto",
-                  gap: "12px",
-                  alignItems: "center",
-                  borderRadius: "18px",
-                  padding: "16px 18px",
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  textDecoration: "none",
-                  color: "#171717",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                    <strong>{order.orderNumber}</strong>
-                    <span style={{ color: "#475569", fontWeight: 700, fontSize: "13px" }}>{order.status}</span>
-                  </div>
-                  <p style={{ margin: "6px 0 0", fontWeight: 700 }}>{order.customerName}</p>
-                  <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "14px" }}>{order.garment}</p>
-                </div>
-                <strong style={{ color: "#0f172a", whiteSpace: "nowrap" }}>{order.dueLabel}</strong>
-              </Link>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "14px" }}>
+            {upcomingOrders.slice(0, 4).map((order) => (
+              <UpcomingOrderCard key={order.orderNumber} order={order} />
             ))}
           </div>
         ) : (

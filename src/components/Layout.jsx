@@ -117,17 +117,10 @@ function getAdminSections(staffUser) {
       ],
     },
     {
-      title: "Sales And Intake",
+      title: "Workspaces",
       links: [
         { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
         { to: "/admin/quotes", label: "Quotes", navKey: "quotes" },
-        { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
-        { to: "/admin/sales", label: "Sales History", navKey: "counterSales" },
-      ],
-    },
-    {
-      title: "Shop Production",
-      links: [
         {
           to: "/admin/orders",
           label: "Shop Production",
@@ -140,11 +133,6 @@ function getAdminSections(staffUser) {
           navKey: "assignments",
           badgeKey: "assignments",
         },
-      ],
-    },
-    {
-      title: "Financial",
-      links: [
         {
           to: "/admin/financial",
           label: "Invoices & Payments",
@@ -155,6 +143,8 @@ function getAdminSections(staffUser) {
     {
       title: "Records",
       links: [
+        { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
+        { to: "/admin/sales", label: "Sales History", navKey: "counterSales" },
         ...(canManageCatalog
           ? [{ to: "/admin/products", label: "Products", navKey: "products" }]
           : []),
@@ -198,17 +188,17 @@ function AttentionBadge({ count, active = false }) {
   return (
     <span
       style={{
-        minWidth: "22px",
-        height: "22px",
-        padding: "0 7px",
+        minWidth: "20px",
+        height: "20px",
+        padding: "0 6px",
         borderRadius: "999px",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        background: active ? "rgba(255,255,255,0.16)" : "#fff7ed",
-        color: active ? "#ffffff" : "#c2410c",
-        border: active ? "1px solid rgba(255,255,255,0.2)" : "1px solid #fed7aa",
-        fontSize: "12px",
+        background: active ? "#dbeafe" : "#fff7ed",
+        color: active ? "#1d4ed8" : "#c2410c",
+        border: active ? "1px solid #bfdbfe" : "1px solid #fed7aa",
+        fontSize: "11px",
         fontWeight: 900,
       }}
     >
@@ -281,9 +271,9 @@ function AdminSidebar({ pathname, staffUser }) {
   return (
     <aside
       style={{
-        width: "250px",
-        minWidth: "250px",
-        maxWidth: "250px",
+        width: "238px",
+        minWidth: "238px",
+        maxWidth: "238px",
         flexShrink: 0,
         display: "flex",
         flexDirection: "column",
@@ -291,7 +281,7 @@ function AdminSidebar({ pathname, staffUser }) {
         minHeight: "100vh",
         background: "#ffffff",
         borderRight: "1px solid #e2e8f0",
-        padding: "18px 14px",
+        padding: "20px 14px 16px",
         boxSizing: "border-box",
         position: "sticky",
         top: 0,
@@ -306,7 +296,7 @@ function AdminSidebar({ pathname, staffUser }) {
           gap: "12px",
           textDecoration: "none",
           color: "#171717",
-          marginBottom: "24px",
+          marginBottom: "22px",
           minHeight: "56px",
         }}
       >
@@ -365,10 +355,10 @@ function AdminSidebar({ pathname, staffUser }) {
       </Link>
 
       {adminSections.map((section) => (
-        <div key={section.title} style={{ marginBottom: "18px" }}>
+        <div key={section.title} style={{ marginBottom: "16px" }}>
           <p
             style={{
-              margin: "0 0 8px",
+              margin: "0 0 7px",
               fontSize: "11px",
               fontWeight: 900,
               color: "#78716c",
@@ -379,29 +369,30 @@ function AdminSidebar({ pathname, staffUser }) {
             {section.title}
           </p>
 
-          <div style={{ display: "grid", gap: "6px" }}>
+          <div style={{ display: "grid", gap: "4px" }}>
             {section.links.map((link) => {
               const active = activeLink === (link.navKey || link.to);
               const navItemStyle = {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                padding: active ? "12px 13px" : "11px 12px",
-                borderRadius: "14px",
+                padding: active ? "11px 12px" : "10px 11px",
+                borderRadius: "12px",
                 background: active
-                  ? "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)"
+                  ? "#eff6ff"
                   : "#ffffff",
                 color: active ? "#ffffff" : "#171717",
                 textDecoration: "none",
                 border: active
-                  ? "1px solid #0f172a"
+                  ? "1px solid #bfdbfe"
                   : "1px solid #e2e8f0",
                 fontWeight: active ? 800 : 700,
                 boxShadow: active
-                  ? "inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 28px rgba(15, 23, 42, 0.16)"
+                  ? "none"
                   : "none",
                 cursor: active ? "default" : "pointer",
                 pointerEvents: active ? "none" : "auto",
+                color: active ? "#1d4ed8" : "#171717",
               };
 
               const content = (
@@ -458,7 +449,7 @@ function AdminSidebar({ pathname, staffUser }) {
           Tee & Co Social
         </p>
 
-        <SocialLinks />
+        <SocialLinks compact />
       </div>
     </aside>
   );
