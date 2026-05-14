@@ -8,7 +8,6 @@ import {
   canAdvanceQuoteStatus,
   getNextQuoteStatus,
   isActiveQuoteWorkflowOrder,
-  isQuoteCanceled,
   isQuoteReadyForProduction,
   sortQuotesByStatus,
 } from "../quotes/quoteWorkflow";
@@ -20,7 +19,6 @@ import {
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 import {
   canManageArchivedQuotes,
-  canManageCanceledOrders,
   getAdminViewer,
   isStaffWorkspaceView,
 } from "./adminRoleView";
@@ -233,7 +231,6 @@ export default function Quotes() {
   const viewer = getAdminViewer(staffUser);
   const isStaffWorkspace = isStaffWorkspaceView(staffUser);
   const canViewArchivedQuotes = canManageArchivedQuotes(viewer);
-  const canViewCanceledOrders = canManageCanceledOrders(viewer);
   const orders = useStoredOrders();
   const cardRefs = useRef({});
   const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
@@ -245,10 +242,6 @@ export default function Quotes() {
   );
   const quotes = useMemo(
     () => sortQuotesByStatus(orders.filter((order) => isActiveQuoteWorkflowOrder(order))),
-    [orders]
-  );
-  const canceledQuotes = useMemo(
-    () => sortQuotesByStatus(orders.filter((order) => isQuoteCanceled(order))),
     [orders]
   );
   const statusCounts = useMemo(() => buildStatusCountMap(quotes), [quotes]);
@@ -978,77 +971,6 @@ export default function Quotes() {
           )}
         </div>
       </section>
-
-      {canViewCanceledOrders && canceledQuotes.length ? (
-        <section
-          style={{
-            background: "#fff7f7",
-            borderRadius: "20px",
-            padding: "22px",
-            border: "1px solid #fecaca",
-            display: "grid",
-            gap: "14px",
-            marginTop: "18px",
-          }}
-        >
-          <div>
-            <p
-              style={{
-                margin: 0,
-                color: "#b91c1c",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              Historical Records
-            </p>
-            <h2 style={{ margin: "6px 0 4px", color: "#7f1d1d" }}>Canceled Orders</h2>
-            <p style={{ margin: 0, color: "#7f1d1d", maxWidth: "780px", lineHeight: 1.6 }}>
-              Canceled workflow records now live in their own records area so active quote intake stays operationally clean while preserved canceled history remains reviewable.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "16px",
-              flexWrap: "wrap",
-              border: "1px solid #fecaca",
-              borderRadius: "16px",
-              background: "#ffffff",
-              padding: "18px",
-            }}
-          >
-            <div style={{ display: "grid", gap: "6px" }}>
-              <strong style={{ color: "#7f1d1d" }}>
-                {canceledQuotes.length} canceled workflow record{canceledQuotes.length === 1 ? "" : "s"}
-              </strong>
-              <span style={{ color: "#475569", lineHeight: 1.6 }}>
-                Open the dedicated records view for canceled dates, lifecycle context, preserved financial state, and the correct quote or production detail workspace.
-              </span>
-            </div>
-
-            <Link
-              to="/admin/records/canceled"
-              style={{
-                color: "#7f1d1d",
-                textDecoration: "none",
-                fontWeight: 800,
-                border: "1px solid #fecaca",
-                borderRadius: "12px",
-                padding: "11px 14px",
-                background: "#fff5f5",
-              }}
-            >
-              Open Canceled Orders
-            </Link>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
