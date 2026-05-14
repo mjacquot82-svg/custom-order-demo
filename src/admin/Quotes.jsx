@@ -20,6 +20,7 @@ import {
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 import {
   canManageArchivedQuotes,
+  canManageCanceledOrders,
   getAdminViewer,
   isStaffWorkspaceView,
 } from "./adminRoleView";
@@ -232,6 +233,7 @@ export default function Quotes() {
   const viewer = getAdminViewer(staffUser);
   const isStaffWorkspace = isStaffWorkspaceView(staffUser);
   const canViewArchivedQuotes = canManageArchivedQuotes(viewer);
+  const canViewCanceledOrders = canManageCanceledOrders(viewer);
   const orders = useStoredOrders();
   const cardRefs = useRef({});
   const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
@@ -977,7 +979,7 @@ export default function Quotes() {
         </div>
       </section>
 
-      {canViewArchivedQuotes && canceledQuotes.length ? (
+      {canViewCanceledOrders && canceledQuotes.length ? (
         <section
           style={{
             background: "#fff7f7",
@@ -1002,62 +1004,48 @@ export default function Quotes() {
             >
               Historical Records
             </p>
-            <h2 style={{ margin: "6px 0 4px", color: "#7f1d1d" }}>Canceled Quotes</h2>
+            <h2 style={{ margin: "6px 0 4px", color: "#7f1d1d" }}>Canceled Orders</h2>
             <p style={{ margin: 0, color: "#7f1d1d", maxWidth: "780px", lineHeight: 1.6 }}>
-              These quotes were intentionally terminated after entering workflow. Their operational and financial context stays preserved for review.
+              Canceled workflow records now live in their own records area so active quote intake stays operationally clean while preserved canceled history remains reviewable.
             </p>
           </div>
 
-          <div style={{ display: "grid", gap: "10px" }}>
-            {canceledQuotes.map((quote) => {
-              const summary = buildQuoteSummary(quote);
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "16px",
+              flexWrap: "wrap",
+              border: "1px solid #fecaca",
+              borderRadius: "16px",
+              background: "#ffffff",
+              padding: "18px",
+            }}
+          >
+            <div style={{ display: "grid", gap: "6px" }}>
+              <strong style={{ color: "#7f1d1d" }}>
+                {canceledQuotes.length} canceled workflow record{canceledQuotes.length === 1 ? "" : "s"}
+              </strong>
+              <span style={{ color: "#475569", lineHeight: 1.6 }}>
+                Open the dedicated records view for canceled dates, lifecycle context, preserved financial state, and the correct quote or production detail workspace.
+              </span>
+            </div>
 
-              return (
-                <article
-                  key={quote.order_number}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(120px, 1fr) minmax(180px, 1.4fr) minmax(160px, 1fr) auto",
-                    gap: "12px",
-                    alignItems: "center",
-                    padding: "16px",
-                    borderRadius: "16px",
-                    border: "1px solid #fecaca",
-                    background: "#ffffff",
-                  }}
-                >
-                  <div style={{ display: "grid", gap: "6px" }}>
-                    <strong style={{ color: "#7f1d1d" }}>{quote.order_number || "—"}</strong>
-                    <StatusPill tone="danger">Canceled</StatusPill>
-                  </div>
-
-                  <div style={{ display: "grid", gap: "4px" }}>
-                    <strong style={{ color: "#0f172a" }}>{quote.customer_name || "Walk-in Customer"}</strong>
-                    <span style={{ color: "#475569" }}>{quote.garment || "Custom garment"}</span>
-                  </div>
-
-                  <div style={{ display: "grid", gap: "4px" }}>
-                    <span style={{ color: "#475569", fontSize: "13px", fontWeight: 700 }}>
-                      Canceled {quote.canceled_at ? formatValue(quote.canceled_at) : formatValue(quote.updated_at)}
-                    </span>
-                    <span style={{ color: "#475569", fontSize: "13px", fontWeight: 700 }}>
-                      {summary.depositStatus} • Balance {money(summary.balance)}
-                    </span>
-                  </div>
-
-                  <Link
-                    to={`/admin/quotes/${quote.order_number}`}
-                    style={{
-                      color: "#7f1d1d",
-                      textDecoration: "none",
-                      fontWeight: 800,
-                    }}
-                  >
-                    View Record
-                  </Link>
-                </article>
-              );
-            })}
+            <Link
+              to="/admin/records/canceled"
+              style={{
+                color: "#7f1d1d",
+                textDecoration: "none",
+                fontWeight: 800,
+                border: "1px solid #fecaca",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                background: "#fff5f5",
+              }}
+            >
+              Open Canceled Orders
+            </Link>
           </div>
         </section>
       ) : null}

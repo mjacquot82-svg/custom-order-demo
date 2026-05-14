@@ -32,6 +32,10 @@ export function canManageArchivedQuotes(staffUser = getActiveStaffUser()) {
   return isAdminWorkspaceView(staffUser);
 }
 
+export function canManageCanceledOrders(staffUser = getActiveStaffUser()) {
+  return isAdminWorkspaceView(staffUser);
+}
+
 export function matchesAssignedStaff(order, staffUser = getActiveStaffUser()) {
   const viewer = getAdminViewer(staffUser);
   if (!viewer) return false;
@@ -67,6 +71,7 @@ export function canAccessOwnerWorkspace(pathname, staffUser = getActiveStaffUser
     "/admin/customers",
     "/admin/products",
     "/admin/quotes/archived",
+    "/admin/records/canceled",
   ];
 
   return !(

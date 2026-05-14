@@ -538,7 +538,7 @@ export default function QuoteDetail() {
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <Link
-            to={archived ? "/admin/quotes/archived" : "/admin/quotes"}
+            to={archived ? "/admin/quotes/archived" : canceled ? "/admin/records/canceled" : "/admin/quotes"}
             style={{
               background: "#ffffff",
               color: "#171717",
@@ -549,7 +549,7 @@ export default function QuoteDetail() {
               fontWeight: 700,
             }}
           >
-            {archived ? "Back to Archived Quotes" : "Back to Quotes"}
+            {archived ? "Back to Archived Quotes" : canceled ? "Back to Canceled Orders" : "Back to Quotes"}
           </Link>
           {!archived && !canceled && canAdvanceQuoteStatus(order.quote_status) ? (
             <button

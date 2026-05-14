@@ -341,7 +341,11 @@ export default function OrderDetail() {
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <Link
-            to="/admin/orders"
+            to={
+              canManageAssignments && isCanceledOperationalStatus(order.status)
+                ? "/admin/records/canceled"
+                : "/admin/orders"
+            }
             style={{
               border: "1px solid #cbd5e1",
               borderRadius: "12px",
@@ -351,7 +355,11 @@ export default function OrderDetail() {
               fontWeight: 700,
             }}
           >
-            {isStaffWorkspace ? "Production Queue" : "Orders"}
+            {canManageAssignments && isCanceledOperationalStatus(order.status)
+              ? "Canceled Orders"
+              : isStaffWorkspace
+              ? "Production Queue"
+              : "Orders"}
           </Link>
 
           <button

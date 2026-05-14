@@ -168,6 +168,11 @@ function getAdminSections(staffUser) {
           label: "Archived Quotes",
           navKey: "archivedQuotes",
         },
+        {
+          to: "/admin/records/canceled",
+          label: "Canceled Orders",
+          navKey: "canceledOrders",
+        },
       ],
     },
   ];
@@ -178,6 +183,7 @@ function getActiveSidebarLink(pathname) {
   if (pathname.startsWith("/admin/products")) return "products";
   if (pathname.startsWith("/admin/customers")) return "customers";
   if (pathname.startsWith("/admin/staff-users")) return "staffUsers";
+  if (pathname === "/admin/records/canceled") return "canceledOrders";
   if (pathname === "/admin/quotes/archived") return "archivedQuotes";
   if (pathname === "/admin/quotes") return "quotes";
   if (pathname.startsWith("/admin/quotes/")) return pathname === "/admin/quotes/new" ? "newQuote" : "quotes";
