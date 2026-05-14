@@ -20,6 +20,62 @@ const counterPaymentMethods = PAYMENT_METHOD_OPTIONS.filter((option) =>
   ["Cash", "Debit", "Credit", "E-Transfer", "Cheque", "Other"].includes(option)
 );
 const quickSalePaymentMethods = [...counterPaymentMethods, "Pay Later"];
+const splitPaymentMethods = ["Cash", "Debit", "Credit", "E-Transfer", "Cheque", "Other"];
+const paymentWorkflowActions = [
+  {
+    id: "card",
+    title: "Charge Card",
+    recordMethod: "Card",
+    shortLabel: "Card",
+    summary: "Use for counter card transactions today and terminal-push handoff later.",
+    detail:
+      "This is the future terminal action point. For V1, staff can still record manual card entry or a standalone terminal result here.",
+    buttonLabel: "Record Card Payment",
+    notePlaceholder: "Optional terminal note, approval ref, last four, or manual card note.",
+    accent: "#1d4ed8",
+    background: "#eff6ff",
+    border: "1px solid #bfdbfe",
+  },
+  {
+    id: "cash",
+    title: "Record Cash Payment",
+    recordMethod: "Cash",
+    shortLabel: "Cash",
+    summary: "Use when cash is received at the counter and needs to be logged immediately.",
+    detail: "Staff can capture tendered cash as a full or partial payment without leaving the counter workflow.",
+    buttonLabel: "Record Cash Payment",
+    notePlaceholder: "Optional drawer note, change note, or cash handling detail.",
+    accent: "#047857",
+    background: "#ecfdf5",
+    border: "1px solid #a7f3d0",
+  },
+  {
+    id: "etransfer",
+    title: "Record E-Transfer",
+    recordMethod: "E-Transfer",
+    shortLabel: "E-Transfer",
+    summary: "Use when staff has confirmed the transfer and needs to post it to the order.",
+    detail: "Good for manual confirmation workflows where payment arrived outside a terminal or gateway integration.",
+    buttonLabel: "Record E-Transfer",
+    notePlaceholder: "Optional sender name, transfer note, or confirmation reference.",
+    accent: "#7c3aed",
+    background: "#f5f3ff",
+    border: "1px solid #ddd6fe",
+  },
+  {
+    id: "split",
+    title: "Split Payment",
+    recordMethod: "Split Payment",
+    shortLabel: "Split",
+    summary: "Break the counter transaction into two payment legs with separate methods.",
+    detail: "Use this when the customer is combining cash, card, e-transfer, or another manual method in the same transaction.",
+    buttonLabel: "Record Split Payment",
+    notePlaceholder: "Optional note describing how the split was handled at the counter.",
+    accent: "#c2410c",
+    background: "#fff7ed",
+    border: "1px solid #fdba74",
+  },
+];
 
 const fieldStyle = {
   border: "1px solid #cbd5e1",
@@ -97,6 +153,22 @@ function getActionToneStyles(tone = "default") {
   }
 
   return { background: "#eff6ff", border: "1px solid #bfdbfe", accent: "#1d4ed8" };
+}
+
+function getPaymentActionConfig(actionId) {
+  return paymentWorkflowActions.find((action) => action.id === actionId) || null;
+}
+
+function getSplitMethodButtonStyle(active) {
+  return {
+    border: active ? "1px solid #0f172a" : "1px solid #cbd5e1",
+    background: active ? "#0f172a" : "#ffffff",
+    color: active ? "#ffffff" : "#0f172a",
+    borderRadius: "999px",
+    padding: "8px 12px",
+    fontWeight: 700,
+    cursor: "pointer",
+  };
 }
 
 function buildCustomerDirectory(customers, orders) {
@@ -349,6 +421,40 @@ function OperationalStat({ label, value, emphasis = "default" }) {
   );
 }
 
+function PaymentWorkflowActionButton({ action, active, onSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(action.id)}
+      style={{
+        borderRadius: "18px",
+        padding: "16px",
+        border: active ? `1px solid ${action.accent}` : action.border,
+        background: active ? action.background : "#ffffff",
+        textAlign: "left",
+        display: "grid",
+        gap: "8px",
+        cursor: "pointer",
+        boxShadow: active ? `0 0 0 2px ${action.background}` : "none",
+      }}
+    >
+      <span
+        style={{
+          color: action.accent,
+          fontSize: "11px",
+          fontWeight: 800,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
+        Payment Action
+      </span>
+      <strong style={{ color: "#0f172a", fontSize: "18px" }}>{action.title}</strong>
+      <span style={{ color: "#475569", lineHeight: 1.5 }}>{action.summary}</span>
+    </button>
+  );
+}
+
 export default function QuickSale() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -373,7 +479,10 @@ export default function QuickSale() {
   const [transactionMessage, setTransactionMessage] = useState("");
   const [paymentAmountOverride, setPaymentAmountOverride] = useState("");
   const [paymentAmountOverrideSelection, setPaymentAmountOverrideSelection] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState(counterPaymentMethods[0] || "Cash");
+  const [selectedPaymentAction, setSelectedPaymentAction] = useState("");
+  const [splitPrimaryMethod, setSplitPrimaryMethod] = useState("Cash");
+  const [splitSecondaryMethod, setSplitSecondaryMethod] = useState("Credit");
+  const [splitPrimaryAmount, setSplitPrimaryAmount] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentError, setPaymentError] = useState("");
 
@@ -480,6 +589,56 @@ export default function QuickSale() {
     amount: paymentAmount,
     remainingBalance: transactionSummary.amountDue || 0,
   });
+  const activePaymentAction = useMemo(
+    () => getPaymentActionConfig(selectedPaymentAction),
+    [selectedPaymentAction]
+  );
+  const isSplitPaymentAction = selectedPaymentAction === "split";
+  const splitPrimaryAmountValue =
+    splitPrimaryAmount === "" ? 0 : Math.max(0, Number(splitPrimaryAmount) || 0);
+  const splitSecondaryAmountValue = Math.max(
+    0,
+    Number(paymentAmount || 0) - splitPrimaryAmountValue
+  );
+  const splitTotalMatches = Math.abs(
+    splitPrimaryAmountValue + splitSecondaryAmountValue - Number(paymentAmount || 0)
+  ) < 0.001;
+  const splitPaymentValidation = useMemo(() => {
+    if (!isSplitPaymentAction) {
+      return { valid: true, message: "" };
+    }
+
+    if (!paymentValidation.valid) {
+      return { valid: false, message: paymentValidation.message || "Enter a valid payment amount." };
+    }
+
+    if (splitPrimaryAmount === "") {
+      return { valid: false, message: "Enter the first split amount." };
+    }
+
+    if (splitPrimaryAmountValue <= 0) {
+      return { valid: false, message: "The first split amount must be greater than zero." };
+    }
+
+    if (splitSecondaryAmountValue <= 0) {
+      return { valid: false, message: "Split payments need a second payment leg greater than zero." };
+    }
+
+    if (!splitTotalMatches) {
+      return { valid: false, message: "Split payment amounts must equal the entered transaction amount." };
+    }
+
+    return { valid: true, message: "" };
+  }, [
+    isSplitPaymentAction,
+    paymentValidation.valid,
+    paymentValidation.message,
+    splitPrimaryAmount,
+    splitPrimaryAmountValue,
+    splitSecondaryAmountValue,
+    splitTotalMatches,
+    paymentAmount,
+  ]);
 
   const handleGlobalEnter = useEffectEvent((event) => {
     if (completedSaleNumber || activeMode !== "quick-sale" || event.key !== "Enter" || !canCompleteSale) {
@@ -500,7 +659,10 @@ export default function QuickSale() {
   function resetPaymentForm(nextAmount = "") {
     setPaymentAmountOverride(nextAmount);
     setPaymentAmountOverrideSelection(nextAmount ? paymentSelectionKey : "");
-    setPaymentMethod(counterPaymentMethods[0] || "Cash");
+    setSelectedPaymentAction("");
+    setSplitPrimaryMethod("Cash");
+    setSplitSecondaryMethod("Credit");
+    setSplitPrimaryAmount("");
     setPaymentNote("");
     setPaymentError("");
   }
@@ -556,6 +718,21 @@ export default function QuickSale() {
     setSelectedTransactionIds([]);
     setTransactionMessage("");
     resetPaymentForm("");
+  }
+
+  function selectPaymentWorkflowAction(actionId) {
+    setSelectedPaymentAction(actionId);
+    setPaymentError("");
+
+    if (actionId === "split") {
+      const suggestedAmount = Number(paymentAmount || 0);
+      if (suggestedAmount > 0) {
+        setSplitPrimaryAmount(String((suggestedAmount / 2).toFixed(2)));
+      }
+      return;
+    }
+
+    setSplitPrimaryAmount("");
   }
 
   function removeTransactionItem(itemId) {
@@ -727,26 +904,68 @@ export default function QuickSale() {
       return;
     }
 
-    let remainingAmount = Number(paymentAmount || 0);
+    if (!activePaymentAction) {
+      setPaymentError("Choose a payment action before recording the transaction.");
+      return;
+    }
+
+    if (!splitPaymentValidation.valid) {
+      setPaymentError(splitPaymentValidation.message || "Complete the split payment workflow.");
+      return;
+    }
+
+    const paymentEntries = isSplitPaymentAction
+      ? [
+          {
+            amount: splitPrimaryAmountValue,
+            method: splitPrimaryMethod,
+            note: paymentNote,
+          },
+          {
+            amount: splitSecondaryAmountValue,
+            method: splitSecondaryMethod,
+            note: paymentNote,
+          },
+        ]
+      : [
+          {
+            amount: Number(paymentAmount || 0),
+            method: activePaymentAction.recordMethod,
+            note: paymentNote,
+          },
+        ];
+
+    const orderBalanceRemaining = new Map(
+      selectedTransactionItems.map((item) => [item.orderNumber, Number(item.amount || 0)])
+    );
     const updatedOrders = [];
 
     try {
-      selectedTransactionItems.forEach((item) => {
-        if (remainingAmount <= 0) return;
+      paymentEntries.forEach((entry) => {
+        let entryRemaining = Number(entry.amount || 0);
+        if (entryRemaining <= 0) return;
 
-        const amountForOrder = Math.min(remainingAmount, Number(item.amount || 0));
-        if (amountForOrder <= 0) return;
+        selectedTransactionItems.forEach((item) => {
+          if (entryRemaining <= 0) return;
 
-        const updatedOrder = recordStoredOrderPayment(item.orderNumber, {
-          amount: amountForOrder,
-          method: paymentMethod,
-          note: paymentNote,
+          const orderRemaining = Number(orderBalanceRemaining.get(item.orderNumber) || 0);
+          if (orderRemaining <= 0) return;
+
+          const amountForOrder = Math.min(entryRemaining, orderRemaining);
+          if (amountForOrder <= 0) return;
+
+          const updatedOrder = recordStoredOrderPayment(item.orderNumber, {
+            amount: amountForOrder,
+            method: entry.method,
+            note: entry.note,
+          });
+
+          if (updatedOrder) {
+            updatedOrders.push(updatedOrder);
+            entryRemaining -= amountForOrder;
+            orderBalanceRemaining.set(item.orderNumber, orderRemaining - amountForOrder);
+          }
         });
-
-        if (updatedOrder) {
-          updatedOrders.push(updatedOrder);
-          remainingAmount -= amountForOrder;
-        }
       });
     } catch (error) {
       const message =
@@ -763,17 +982,21 @@ export default function QuickSale() {
       return;
     }
 
-    const readyForRelease = updatedOrders.filter(
-      (order) => order.pickup_status === "Ready for Pickup" && Number(order.balance_due || 0) <= 0
+    const readyForRelease = Array.from(
+      new Set(
+        updatedOrders
+          .filter((order) => order.pickup_status === "Ready for Pickup" && Number(order.balance_due || 0) <= 0)
+          .map((order) => order.order_number)
+      )
     );
     setSelectedTransactionIds([]);
     setTransactionMessage(
       readyForRelease.length
-        ? `Payment recorded across ${updatedOrders.length} selected item${
-            updatedOrders.length === 1 ? "" : "s"
+        ? `${activePaymentAction.title} recorded across ${selectedTransactionItems.length} selected item${
+            selectedTransactionItems.length === 1 ? "" : "s"
           }. ${readyForRelease.length} order${readyForRelease.length === 1 ? " is" : "s are"} now ready to release.`
-        : `Payment recorded across ${updatedOrders.length} selected item${
-            updatedOrders.length === 1 ? "" : "s"
+        : `${activePaymentAction.title} recorded across ${selectedTransactionItems.length} selected item${
+            selectedTransactionItems.length === 1 ? "" : "s"
           }.`
     );
     if (readyForRelease.length) {
@@ -1562,27 +1785,6 @@ export default function QuickSale() {
 
                   {selectedTransactionKind === "payment" ? (
                     <form onSubmit={handleRecordCounterPayment} style={{ display: "grid", gap: "16px" }}>
-                      <label style={labelStyle}>
-                        Payment Amount
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={paymentAmount}
-                          onChange={(event) => {
-                            setPaymentAmountOverride(event.target.value);
-                            setPaymentAmountOverrideSelection(paymentSelectionKey);
-                            setPaymentError("");
-                          }}
-                          style={{
-                            ...fieldStyle,
-                            border: paymentError || !paymentValidation.valid ? "1px solid #dc2626" : fieldStyle.border,
-                            background:
-                              paymentError || !paymentValidation.valid ? "#fff1f2" : fieldStyle.background,
-                          }}
-                        />
-                      </label>
-
                       <div
                         style={{
                           border: "1px solid #e2e8f0",
@@ -1613,20 +1815,186 @@ export default function QuickSale() {
                         </p>
                       </div>
 
-                      <label style={labelStyle}>
-                        Payment Method
-                        <select
-                          value={paymentMethod}
-                          onChange={(event) => setPaymentMethod(event.target.value)}
-                          style={fieldStyle}
-                        >
-                          {counterPaymentMethods.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
+                      <div style={{ display: "grid", gap: "12px" }}>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: "17px", color: "#0f172a" }}>
+                            Choose Payment Action
+                          </h3>
+                          <p style={{ margin: "6px 0 0", color: "#64748b", lineHeight: 1.5 }}>
+                            Select how staff is processing this counter transaction. Actions reveal the
+                            operational workflow instead of a static payment-method field.
+                          </p>
+                        </div>
+
+                        <div style={{ display: "grid", gap: "12px" }}>
+                          {paymentWorkflowActions.map((action) => (
+                            <PaymentWorkflowActionButton
+                              key={action.id}
+                              action={action}
+                              active={selectedPaymentAction === action.id}
+                              onSelect={selectPaymentWorkflowAction}
+                            />
                           ))}
-                        </select>
+                        </div>
+                      </div>
+
+                      <label style={labelStyle}>
+                        Transaction Amount
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={paymentAmount}
+                          onChange={(event) => {
+                            setPaymentAmountOverride(event.target.value);
+                            setPaymentAmountOverrideSelection(paymentSelectionKey);
+                            setPaymentError("");
+                          }}
+                          style={{
+                            ...fieldStyle,
+                            border:
+                              paymentError || !paymentValidation.valid || !splitPaymentValidation.valid
+                                ? "1px solid #dc2626"
+                                : fieldStyle.border,
+                            background:
+                              paymentError || !paymentValidation.valid || !splitPaymentValidation.valid
+                                ? "#fff1f2"
+                                : fieldStyle.background,
+                          }}
+                        />
                       </label>
+
+                      {activePaymentAction ? (
+                        <div
+                          style={{
+                            borderRadius: "18px",
+                            padding: "16px",
+                            border: activePaymentAction.border,
+                            background: activePaymentAction.background,
+                            display: "grid",
+                            gap: "12px",
+                          }}
+                        >
+                          <div style={{ display: "grid", gap: "6px" }}>
+                            <span
+                              style={{
+                                color: activePaymentAction.accent,
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.08em",
+                              }}
+                            >
+                              Active Workflow
+                            </span>
+                            <h3 style={{ margin: 0, fontSize: "20px", color: "#0f172a" }}>
+                              {activePaymentAction.title}
+                            </h3>
+                            <p style={{ margin: 0, color: "#334155", lineHeight: 1.6 }}>
+                              {activePaymentAction.detail}
+                            </p>
+                          </div>
+
+                          {selectedPaymentAction === "card" ? (
+                            <div
+                              style={{
+                                border: "1px dashed #93c5fd",
+                                borderRadius: "14px",
+                                padding: "14px 16px",
+                                background: "#ffffff",
+                                color: "#1e3a8a",
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              Future POS terminal handoff starts here. In V1, use this action to log a
+                              manual card entry or a completed standalone terminal charge.
+                            </div>
+                          ) : null}
+
+                          {isSplitPaymentAction ? (
+                            <div style={{ display: "grid", gap: "14px" }}>
+                              <div style={{ display: "grid", gap: "8px" }}>
+                                <span style={{ color: "#292524", fontWeight: 700 }}>Payment Leg 1</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={splitPrimaryAmount}
+                                  onChange={(event) => {
+                                    setSplitPrimaryAmount(event.target.value);
+                                    setPaymentError("");
+                                  }}
+                                  placeholder="Enter first payment amount"
+                                  style={fieldStyle}
+                                />
+                                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                  {splitPaymentMethods.map((method) => (
+                                    <button
+                                      key={`split-primary-${method}`}
+                                      type="button"
+                                      onClick={() => setSplitPrimaryMethod(method)}
+                                      style={getSplitMethodButtonStyle(splitPrimaryMethod === method)}
+                                    >
+                                      {method}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div
+                                style={{
+                                  border: "1px solid #fed7aa",
+                                  borderRadius: "14px",
+                                  padding: "14px 16px",
+                                  background: "#ffffff",
+                                  display: "grid",
+                                  gap: "10px",
+                                }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                                  <span style={{ color: "#475569", fontWeight: 700 }}>Payment Leg 2</span>
+                                  <strong style={{ color: "#0f172a" }}>
+                                    {currency(splitSecondaryAmountValue)}
+                                  </strong>
+                                </div>
+                                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                  {splitPaymentMethods.map((method) => (
+                                    <button
+                                      key={`split-secondary-${method}`}
+                                      type="button"
+                                      onClick={() => setSplitSecondaryMethod(method)}
+                                      style={getSplitMethodButtonStyle(splitSecondaryMethod === method)}
+                                    >
+                                      {method}
+                                    </button>
+                                  ))}
+                                </div>
+                                <p style={{ margin: 0, color: "#64748b", fontSize: "13px", lineHeight: 1.5 }}>
+                                  The second leg auto-balances the remaining amount from the current
+                                  transaction total.
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                borderRadius: "14px",
+                                padding: "14px 16px",
+                                background: "#ffffff",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: "10px",
+                                flexWrap: "wrap",
+                                alignItems: "center",
+                              }}
+                            >
+                              <span style={{ color: "#475569", fontWeight: 700 }}>Posting Method</span>
+                              <strong style={{ color: "#0f172a" }}>{activePaymentAction.shortLabel}</strong>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
 
                       <label style={labelStyle}>
                         Counter Note
@@ -1634,31 +2002,40 @@ export default function QuickSale() {
                           value={paymentNote}
                           onChange={(event) => setPaymentNote(event.target.value)}
                           rows={3}
-                          placeholder="Optional note for this selected transaction"
+                          placeholder={
+                            activePaymentAction?.notePlaceholder ||
+                            "Optional note for this selected transaction"
+                          }
                           style={{ ...fieldStyle, resize: "vertical" }}
                         />
                       </label>
 
-                      {paymentError || !paymentValidation.valid ? (
+                      {paymentError || !paymentValidation.valid || !splitPaymentValidation.valid ? (
                         <p style={{ margin: 0, color: "#b91c1c", fontWeight: 700 }}>
-                          {paymentError || paymentValidation.message}
+                          {paymentError || splitPaymentValidation.message || paymentValidation.message}
                         </p>
                       ) : null}
 
                       <button
                         type="submit"
-                        disabled={!paymentValidation.valid}
+                        disabled={!paymentValidation.valid || !splitPaymentValidation.valid || !activePaymentAction}
                         style={{
-                          background: paymentValidation.valid ? "#171717" : "#a8a29e",
+                          background:
+                            paymentValidation.valid && splitPaymentValidation.valid && activePaymentAction
+                              ? "#171717"
+                              : "#a8a29e",
                           color: "#ffffff",
                           border: "none",
                           borderRadius: "12px",
                           padding: "13px 18px",
-                          cursor: paymentValidation.valid ? "pointer" : "not-allowed",
+                          cursor:
+                            paymentValidation.valid && splitPaymentValidation.valid && activePaymentAction
+                              ? "pointer"
+                              : "not-allowed",
                           fontWeight: 800,
                         }}
                       >
-                        Record Selected Payment
+                        {activePaymentAction?.buttonLabel || "Choose Payment Action"}
                       </button>
 
                       {selectedTransactionOrders.length ? (
