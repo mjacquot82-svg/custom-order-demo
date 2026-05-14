@@ -1,20 +1,20 @@
-import { getActiveStaffUser } from "../lib/staffUsersStore";
+import { getActiveStaffUser, normalizeStaffRole } from "../lib/staffUsersStore";
 
 export function getAdminViewer(staffUser = getActiveStaffUser()) {
   return staffUser || null;
 }
 
 export function isAdminWorkspaceView(staffUser = getActiveStaffUser()) {
-  const role = staffUser?.role;
+  const role = normalizeStaffRole(staffUser?.role, "");
   return role === "Owner" || role === "Manager";
 }
 
 export function isOwnerView(staffUser = getActiveStaffUser()) {
-  return staffUser?.role === "Owner";
+  return normalizeStaffRole(staffUser?.role, "") === "Owner";
 }
 
 export function isStaffWorkspaceView(staffUser = getActiveStaffUser()) {
-  return staffUser?.role === "Staff";
+  return normalizeStaffRole(staffUser?.role, "") === "Staff";
 }
 
 export function hasOperationalSession(staffUser = getActiveStaffUser()) {
