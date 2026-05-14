@@ -1,9 +1,10 @@
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PricingSummary from "../components/PricingSummary";
 import { formatDateTime } from "../lib/dateFormatting";
 import { getOrderArtworkNames } from "../lib/orderArtwork";
 import { updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
+import { getActiveStaffUser } from "../lib/staffUsersStore";
 import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import {
   canAdvanceQuoteStatus,
@@ -16,6 +17,11 @@ import {
   buildDepositStatus,
   buildProductionReadiness,
 } from "../quotes/productionReadiness";
+import {
+  canManageArchivedQuotes,
+  getAdminViewer,
+  isStaffWorkspaceView,
+} from "./adminRoleView";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -293,6 +299,10 @@ export default function QuoteDetail() {
   const { orderNumber } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const activeStaffUser = getActiveStaffUser();
+  const viewer = getAdminViewer(activeStaffUser);
+  const isStaffWorkspace = isStaffWorkspaceView(activeStaffUser);
+  const canManageArchive = canManageArchivedQuotes(viewer);
   const orders = useStoredOrders();
   const savedOrder = location.state?.savedOrder || null;
   const order = useMemo(
@@ -353,6 +363,18 @@ export default function QuoteDetail() {
       </div>
     );
   }
+
+  useEffect(() => {
+    if (!archived || !isStaffWorkspace) return;
+
+    navigate("/admin/quotes", {
+      replace: true,
+      state: {
+        flashMessage: "Archived quote records are available only in the owner/admin workspace.",
+        flashTone: "default",
+      },
+    });
+  }, [archived, isStaffWorkspace, navigate]);
 
   function handleAdvanceQuote() {
     if (archived) return;
@@ -526,7 +548,7 @@ export default function QuoteDetail() {
               Release to Production
             </button>
           ) : null}
-          {!archived ? (
+          {!archived && canManageArchive ? (
             <button
               type="button"
               onClick={() => setShowArchiveConfirm((current) => !current)}
@@ -542,6 +564,38 @@ export default function QuoteDetail() {
             >
               Archive from Active Workflow
             </button>
+          ) : null}
+          {!archived && canManageArchive ? (
+            <Link
+              to="/admin/quotes/archived"
+              style={{
+                background: "#ffffff",
+                color: "#171717",
+                border: "1px solid #d6dbe4",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              Archived Quotes
+            </Link>
+          ) : null}
+          {archived && canManageArchive ? (
+            <Link
+              to="/admin/quotes"
+              style={{
+                background: "#ffffff",
+                color: "#171717",
+                border: "1px solid #d6dbe4",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              Active Quotes
+            </Link>
           ) : null}
         </div>
       </div>
@@ -568,23 +622,25 @@ export default function QuoteDetail() {
             It no longer appears in the active quote workflow and remains available here for historical reference.
           </p>
           <p style={{ margin: 0, color: "#78716c", fontSize: "14px" }}>Archived {archivedAt}</p>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={handleRestoreQuote}
-              style={{
-                border: "1px solid #d6d3d1",
-                background: "#ffffff",
-                color: "#292524",
-                borderRadius: "12px",
-                padding: "11px 14px",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Restore Quote
-            </button>
-          </div>
+          {canManageArchive ? (
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={handleRestoreQuote}
+                style={{
+                  border: "1px solid #d6d3d1",
+                  background: "#ffffff",
+                  color: "#292524",
+                  borderRadius: "12px",
+                  padding: "11px 14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Restore Quote
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -812,16 +868,17 @@ export default function QuoteDetail() {
           </div>
         </WorkspaceCard>
 
-        <WorkspaceCard
-          eyebrow="Workflow Visibility"
-          title={archived ? "Archived record" : "Active quote workflow control"}
-          description={
-            archived
-              ? "This record is preserved for reference, but it is no longer treated as active operational work."
-              : "Archive completed quotes out of active workflow once they should no longer appear in operational queues."
-          }
-          background={archived ? "#f8fafc" : "#ffffff"}
-        >
+        {canManageArchive ? (
+          <WorkspaceCard
+            eyebrow="Workflow Visibility"
+            title={archived ? "Archived record" : "Active quote workflow control"}
+            description={
+              archived
+                ? "This record is preserved for reference, but it is no longer treated as active operational work."
+                : "Archive completed quotes out of active workflow once they should no longer appear in operational queues."
+            }
+            background={archived ? "#f8fafc" : "#ffffff"}
+          >
           <div
             style={{
               display: "grid",
@@ -944,7 +1001,8 @@ export default function QuoteDetail() {
               </div>
             )}
           </div>
-        </WorkspaceCard>
+          </WorkspaceCard>
+        ) : null}
 
         <div
           style={{

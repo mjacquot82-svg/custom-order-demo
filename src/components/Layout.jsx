@@ -4,6 +4,7 @@ import { useStoredOrders } from "../lib/ordersStore";
 import { isActiveOperationalStatus } from "../orders/orderWorkflow";
 import {
   canAccessOwnerWorkspace,
+  getAdminViewer,
   getAssignedOrdersForStaff,
   getOperationalOrdersForStaff,
   isAdminWorkspaceView,
@@ -581,10 +582,14 @@ function PublicHeader() {
 
 function AdminWorkspaceHeader({ staffUser }) {
   const navigate = useNavigate();
-  const initials = getUserInitials(staffUser?.name);
-  const displayName = staffUser?.name || "No active user";
-  const displayRole = staffUser?.role || "Not signed in";
+  const viewer = getAdminViewer(staffUser);
+  const initials = getUserInitials(viewer?.name);
+  const displayName = viewer?.name || "Operations";
+  const displayRole = viewer?.role || "Workspace";
   const isStaffWorkspace = isStaffWorkspaceView(staffUser);
+  const workspaceLabel = isStaffWorkspace
+    ? "Operational Workspace"
+    : "Owner Management Workspace";
 
   function handleLogout() {
     clearActiveStaffSession();
@@ -642,20 +647,18 @@ function AdminWorkspaceHeader({ staffUser }) {
           </div>
 
           <div style={{ minWidth: 0 }}>
-            {isStaffWorkspace ? (
-              <p
-                style={{
-                  margin: "0 0 4px",
-                  color: "#64748b",
-                  fontSize: "11px",
-                  fontWeight: 900,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Operational Workspace
-              </p>
-            ) : null}
+            <p
+              style={{
+                margin: "0 0 4px",
+                color: "#64748b",
+                fontSize: "11px",
+                fontWeight: 900,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              {workspaceLabel}
+            </p>
             <p
               style={{
                 margin: 0,

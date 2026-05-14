@@ -1,7 +1,17 @@
-import { getActiveStaffUser } from "../lib/staffUsersStore";
+import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
+
+function getDefaultOperationalViewer() {
+  return (
+    getStoredStaffUsers().find(
+      (user) =>
+        user?.status !== "Inactive" &&
+        (user.role === "Owner" || user.role === "Manager")
+    ) || null
+  );
+}
 
 export function getAdminViewer(staffUser = getActiveStaffUser()) {
-  return staffUser || null;
+  return staffUser || getDefaultOperationalViewer();
 }
 
 export function isAdminWorkspaceView(staffUser = getActiveStaffUser()) {
@@ -16,6 +26,10 @@ export function isOwnerView(staffUser = getActiveStaffUser()) {
 export function isStaffWorkspaceView(staffUser = getActiveStaffUser()) {
   const viewer = getAdminViewer(staffUser);
   return Boolean(viewer) && viewer.role === "Staff";
+}
+
+export function canManageArchivedQuotes(staffUser = getActiveStaffUser()) {
+  return isAdminWorkspaceView(staffUser);
 }
 
 export function matchesAssignedStaff(order, staffUser = getActiveStaffUser()) {

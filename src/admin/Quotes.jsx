@@ -17,7 +17,11 @@ import {
   buildProductionReadiness,
 } from "../quotes/productionReadiness";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
-import { isStaffWorkspaceView } from "./adminRoleView";
+import {
+  canManageArchivedQuotes,
+  getAdminViewer,
+  isStaffWorkspaceView,
+} from "./adminRoleView";
 
 const EXPANDED_QUOTES_STORAGE_KEY = "teeCoQuotesExpandedState";
 
@@ -223,7 +227,9 @@ export default function Quotes() {
   const location = useLocation();
   const navigate = useNavigate();
   const staffUser = getActiveStaffUser();
+  const viewer = getAdminViewer(staffUser);
   const isStaffWorkspace = isStaffWorkspaceView(staffUser);
+  const canViewArchivedQuotes = canManageArchivedQuotes(viewer);
   const orders = useStoredOrders();
   const cardRefs = useRef({});
   const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
@@ -349,23 +355,43 @@ export default function Quotes() {
               : "Intake, approvals, artwork sign-off, and deposit readiness stay here until work is released into production."}
           </p>
           <p style={{ margin: "8px 0 0", color: "#94a3b8", maxWidth: "760px", fontSize: "14px", fontWeight: 600 }}>
-            Archived quotes are intentionally removed from this active workflow view.
+            {canViewArchivedQuotes
+              ? "Archived quotes are intentionally removed from this active workflow view and remain available in Archived Quotes."
+              : "Archived quotes are intentionally removed from this active workflow view."}
           </p>
         </div>
 
-        <Link
-          to="/admin/quotes/new"
-          style={{
-            background: "#171717",
-            color: "#ffffff",
-            borderRadius: "12px",
-            padding: "12px 16px",
-            textDecoration: "none",
-            fontWeight: 700,
-          }}
-        >
-          {isStaffWorkspace ? "New Intake" : "New Quote"}
-        </Link>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          {canViewArchivedQuotes ? (
+            <Link
+              to="/admin/quotes/archived"
+              style={{
+                background: "#ffffff",
+                color: "#171717",
+                border: "1px solid #d6dbe4",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              Archived Quotes
+            </Link>
+          ) : null}
+          <Link
+            to="/admin/quotes/new"
+            style={{
+              background: "#171717",
+              color: "#ffffff",
+              borderRadius: "12px",
+              padding: "12px 16px",
+              textDecoration: "none",
+              fontWeight: 700,
+            }}
+          >
+            {isStaffWorkspace ? "New Intake" : "New Quote"}
+          </Link>
+        </div>
       </div>
 
       <section
