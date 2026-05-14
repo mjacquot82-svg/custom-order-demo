@@ -17,6 +17,7 @@ export default function AssignmentPanel({
   staffUsers = [],
   onAssign,
   onAdvanceStatus,
+  canManageAssignments = true,
 }) {
   const canAdvance = canAdvanceOperationalStatus(order.status);
   const nextStatus = canAdvance ? getNextOperationalStatus(order.status) : null;
@@ -63,27 +64,42 @@ export default function AssignmentPanel({
           </div>
         </div>
 
-        <label style={{ display: "grid", gap: "6px" }}>
-          Assign or Reassign
-          <select
-            value={order.assigned_to_staff_id || ""}
-            onChange={(event) => onAssign(event.target.value)}
+        {canManageAssignments ? (
+          <label style={{ display: "grid", gap: "6px" }}>
+            Assign or Reassign
+            <select
+              value={order.assigned_to_staff_id || ""}
+              onChange={(event) => onAssign(event.target.value)}
+              style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: "12px",
+                padding: "10px",
+              }}
+            >
+              <option value="">Unassigned</option>
+
+              {staffUsers.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.name}
+                  {staff.role ? ` (${staff.role})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <div
             style={{
-              border: "1px solid #cbd5e1",
-              borderRadius: "12px",
-              padding: "10px",
+              padding: "12px 14px",
+              borderRadius: "14px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              color: "#475569",
+              fontWeight: 700,
             }}
           >
-            <option value="">Unassigned</option>
-
-            {staffUsers.map((staff) => (
-              <option key={staff.id} value={staff.id}>
-                {staff.name}
-                {staff.role ? ` (${staff.role})` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+            Assignment changes are hidden in the staff workspace. Use this panel to track status movement for the job.
+          </div>
+        )}
 
         <div
           style={{
@@ -125,29 +141,31 @@ export default function AssignmentPanel({
           )}
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => onAssign("")}
-            disabled={!order.assigned_to_staff_id}
+        {canManageAssignments ? (
+          <div
             style={{
-              border: "1px solid #cbd5e1",
-              background: order.assigned_to_staff_id ? "#ffffff" : "#f8fafc",
-              color: order.assigned_to_staff_id ? "#171717" : "#94a3b8",
-              borderRadius: "12px",
-              padding: "10px 14px",
-              fontWeight: 700,
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
             }}
           >
-            Clear Assignment
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => onAssign("")}
+              disabled={!order.assigned_to_staff_id}
+              style={{
+                border: "1px solid #cbd5e1",
+                background: order.assigned_to_staff_id ? "#ffffff" : "#f8fafc",
+                color: order.assigned_to_staff_id ? "#171717" : "#94a3b8",
+                borderRadius: "12px",
+                padding: "10px 14px",
+                fontWeight: 700,
+              }}
+            >
+              Clear Assignment
+            </button>
+          </div>
+        ) : null}
       </div>
     </section>
   );

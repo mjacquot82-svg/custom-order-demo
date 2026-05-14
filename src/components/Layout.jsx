@@ -3,6 +3,11 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
 import { isActiveOperationalStatus } from "../orders/orderWorkflow";
 import {
+  canAccessOwnerWorkspace,
+  isOwnerView,
+  isStaffWorkspaceView,
+} from "../admin/adminRoleView";
+import {
   clearActiveStaffSession,
   getActiveStaffUser,
   subscribeToActiveStaffUser,
@@ -38,7 +43,7 @@ function InstagramIcon() {
   );
 }
 
-function getSidebarCounts(orders = []) {
+function getSidebarCounts(orders = [], { staffWorkspace = false } = {}) {
   const activeOrders = orders.filter(
     (order) =>
       order.operational_visible !== false && isActiveOperationalStatus(order.status)
@@ -46,15 +51,46 @@ function getSidebarCounts(orders = []) {
 
   return {
     productionOrders: activeOrders.length,
-    assignments: activeOrders.filter(
-      (order) =>
-        order.needs_assignment || !order.assigned_to_staff_id
-    ).length,
+    assignments: staffWorkspace
+      ? activeOrders.length
+      : activeOrders.filter(
+          (order) =>
+            order.needs_assignment || !order.assigned_to_staff_id
+        ).length,
   };
 }
 
 function getAdminSections(role) {
-  const canManageCatalog = role === "Owner";
+  if (role !== "Owner") {
+    return [
+      {
+        title: "My Workspace",
+        links: [
+          { to: "/admin", label: "My Dashboard", navKey: "dashboard" },
+          {
+            to: "/admin/assignments",
+            label: "My Assignments",
+            navKey: "assignments",
+            badgeKey: "assignments",
+          },
+          {
+            to: "/admin/orders",
+            label: "Assigned Orders",
+            navKey: "productionOrders",
+            badgeKey: "productionOrders",
+          },
+        ],
+      },
+      {
+        title: "Intake",
+        links: [
+          { to: "/admin/quotes", label: "Quote Intake", navKey: "quotes" },
+        ],
+      },
+    ];
+  }
+
+  const canManageCatalog = true;
 
   return [
     {
@@ -203,10 +239,24 @@ function SocialLinks({ compact = false }) {
 
 function AdminSidebar({ pathname, staffUser }) {
   const orders = useStoredOrders();
-  const badgeCounts = getSidebarCounts(orders);
+  const staffWorkspace = isStaffWorkspaceView(staffUser);
+  const visibleOrders = isOwnerView(staffUser)
+    ? orders
+    : orders.filter(
+        (order) =>
+          order.assigned_to_staff_id === staffUser?.id ||
+          order.assigned_to_staff_name === staffUser?.name
+      );
+  const badgeCounts = getSidebarCounts(
+    visibleOrders,
+    { staffWorkspace }
+  );
   const activeLink = getActiveSidebarLink(pathname);
   const role = staffUser?.role || "Staff";
   const adminSections = getAdminSections(role);
+  const workspaceLabel = staffWorkspace
+    ? "Staff Operations"
+    : "Central Operations";
 
   return (
     <aside
@@ -289,7 +339,7 @@ function AdminSidebar({ pathname, staffUser }) {
               whiteSpace: "nowrap",
             }}
           >
-            Central Operations
+            {workspaceLabel}
           </span>
         </div>
       </Link>
@@ -516,6 +566,7 @@ function AdminWorkspaceHeader({ staffUser }) {
   const initials = getUserInitials(staffUser?.name);
   const displayName = staffUser?.name || "No active user";
   const displayRole = staffUser?.role || "Not signed in";
+  const isStaffWorkspace = isStaffWorkspaceView(staffUser);
 
   function handleLogout() {
     clearActiveStaffSession();
@@ -573,6 +624,20 @@ function AdminWorkspaceHeader({ staffUser }) {
           </div>
 
           <div style={{ minWidth: 0 }}>
+            {isStaffWorkspace ? (
+              <p
+                style={{
+                  margin: "0 0 4px",
+                  color: "#64748b",
+                  fontSize: "11px",
+                  fontWeight: 900,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Operational Workspace
+              </p>
+            ) : null}
             <p
               style={{
                 margin: 0,
@@ -642,6 +707,7 @@ function AdminWorkspaceHeader({ staffUser }) {
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith("/admin");
   const [activeStaffUser, setActiveStaffUser] = useState(() => getActiveStaffUser());
 
@@ -652,6 +718,12 @@ export default function Layout() {
       setActiveStaffUser(nextStaffUser);
     });
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (canAccessOwnerWorkspace(location.pathname, activeStaffUser)) return;
+    navigate("/admin", { replace: true });
+  }, [activeStaffUser, isAdmin, location.pathname, navigate]);
 
   const visibleStaffUser = isAdmin ? activeStaffUser : null;
 

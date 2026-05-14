@@ -26,6 +26,8 @@ import {
   PRODUCTION_METHOD_FILTERS,
   PRODUCTION_STATUS_FILTERS,
 } from "../production/productionWorkspace";
+import { getActiveStaffUser } from "../lib/staffUsersStore";
+import { getAssignedOrdersForStaff, isStaffWorkspaceView } from "./adminRoleView";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -41,7 +43,13 @@ function getPaymentSummary(order) {
   return order.payment_status === "Paid" ? "Paid" : "No balance due";
 }
 
-function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
+function OrdersTable({
+  orders,
+  emptyMessage,
+  onAdvanceStatus,
+  showPayment = true,
+  statusActionLabel = "Mark",
+}) {
   return (
     <div
       style={{
@@ -61,7 +69,9 @@ function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Assigned Worker</th>
             <th style={{ padding: "12px 8px", textAlign: "left", minWidth: "120px" }}>Created</th>
             <th style={{ padding: "12px 8px", textAlign: "left", minWidth: "120px" }}>Due Date</th>
-            <th style={{ padding: "12px 8px", textAlign: "left" }}>Payment</th>
+            {showPayment ? (
+              <th style={{ padding: "12px 8px", textAlign: "left" }}>Payment</th>
+            ) : null}
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Status</th>
             <th style={{ padding: "12px 8px", textAlign: "left" }}>Action</th>
           </tr>
@@ -111,22 +121,24 @@ function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
                 {order.due_date ? formatShortDate(order.due_date) : "—"}
               </td>
 
-              <td style={{ padding: "14px 8px" }}>
-                <div style={{ display: "grid", gap: "6px" }}>
-                  <PaymentStatusBadge status={order.payment_status} />
-                  <span
-                    style={{
-                      color: order.balance_due > 0 ? "#991b1b" : "#64748b",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      lineHeight: 1.3,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {getPaymentSummary(order)}
-                  </span>
-                </div>
-              </td>
+              {showPayment ? (
+                <td style={{ padding: "14px 8px" }}>
+                  <div style={{ display: "grid", gap: "6px" }}>
+                    <PaymentStatusBadge status={order.payment_status} />
+                    <span
+                      style={{
+                        color: order.balance_due > 0 ? "#991b1b" : "#64748b",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        lineHeight: 1.3,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {getPaymentSummary(order)}
+                    </span>
+                  </div>
+                </td>
+              ) : null}
 
               <td style={{ padding: "14px 8px" }}>
                 <StatusBadge status={order.status} />
@@ -147,7 +159,7 @@ function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
                       cursor: "pointer",
                     }}
                   >
-                    Mark {getNextOperationalStatus(order.status)}
+                    {statusActionLabel} {getNextOperationalStatus(order.status)}
                   </button>
                 ) : (
                   <span style={{ color: "#64748b", fontWeight: 700 }}>Complete</span>
@@ -159,7 +171,7 @@ function OrdersTable({ orders, emptyMessage, onAdvanceStatus }) {
           {orders.length === 0 ? (
             <tr>
               <td
-                colSpan="10"
+                colSpan={showPayment ? 10 : 9}
                 style={{
                   padding: "24px 8px",
                   textAlign: "center",
@@ -256,6 +268,8 @@ function SummaryCard({ label, value, tone = "default" }) {
 
 export default function Orders() {
   const storedOrders = useStoredOrders();
+  const staffUser = getActiveStaffUser();
+  const isStaffWorkspace = isStaffWorkspaceView(staffUser);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeStatusFilter = searchParams.get("status") || "active";
   const activeMethodFilter = searchParams.get("workflow") || "all";
@@ -280,11 +294,15 @@ export default function Orders() {
     () => sortOrdersByOperationalStatus(storedOrders.map(normalizeProductionOrder)),
     [storedOrders]
   );
+  const workspaceOrders = useMemo(
+    () => (isStaffWorkspace ? getAssignedOrdersForStaff(orders, staffUser) : orders),
+    [isStaffWorkspace, orders, staffUser]
+  );
 
   const customerOptions = useMemo(() => {
     const uniqueCustomers = new Map();
 
-    orders.forEach((order) => {
+    workspaceOrders.forEach((order) => {
       const customerName = String(order.customer_name || "").trim();
       const normalizedCustomerName = normalizeLookup(customerName);
       if (!normalizedCustomerName || uniqueCustomers.has(normalizedCustomerName)) return;
@@ -294,7 +312,7 @@ export default function Orders() {
     return Array.from(uniqueCustomers.entries())
       .map(([normalizedName, name]) => ({ normalizedName, name }))
       .sort((left, right) => left.name.localeCompare(right.name));
-  }, [orders]);
+  }, [workspaceOrders]);
 
   const customerSuggestions = useMemo(() => {
     const normalizedInput = normalizeLookup(customerInput);
@@ -305,16 +323,16 @@ export default function Orders() {
     );
   }, [customerInput, customerOptions]);
 
-  const statusCounts = useMemo(() => getProductionStatusCounts(orders), [orders]);
-  const methodCounts = useMemo(() => getProductionMethodCounts(orders), [orders]);
+  const statusCounts = useMemo(() => getProductionStatusCounts(workspaceOrders), [workspaceOrders]);
+  const methodCounts = useMemo(() => getProductionMethodCounts(workspaceOrders), [workspaceOrders]);
   const workspaceSummary = useMemo(
-    () => buildProductionWorkspaceSummary(orders),
-    [orders]
+    () => buildProductionWorkspaceSummary(workspaceOrders),
+    [workspaceOrders]
   );
 
   const filteredOrders = useMemo(
     () =>
-      orders.filter(
+      workspaceOrders.filter(
         (order) =>
           matchesProductionStatus(order, activeStatusFilter) &&
           matchesProductionMethod(order, activeMethodFilter) &&
@@ -323,7 +341,7 @@ export default function Orders() {
           matchesSearch(order, searchTerm)
       ),
     [
-      orders,
+      workspaceOrders,
       activeStatusFilter,
       activeMethodFilter,
       activeDateFilter,
@@ -452,11 +470,15 @@ export default function Orders() {
                 textTransform: "uppercase",
               }}
             >
-              Production Workspace
+              {isStaffWorkspace ? "My Production Workspace" : "Production Workspace"}
             </p>
-            <h1 style={{ margin: "8px 0 6px" }}>Production Orders</h1>
+            <h1 style={{ margin: "8px 0 6px" }}>
+              {isStaffWorkspace ? "Assigned Orders" : "Production Orders"}
+            </h1>
             <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-              Production-first workspace for active jobs, stage flow, and fast order handling.
+              {isStaffWorkspace
+                ? "A simplified view of your assigned work, production movement, and due jobs."
+                : "Production-first workspace for active jobs, stage flow, and fast order handling."}
             </p>
           </div>
 
@@ -472,7 +494,7 @@ export default function Orders() {
                 fontWeight: 700,
               }}
             >
-              Open Quotes
+              {isStaffWorkspace ? "Quote Intake" : "Open Quotes"}
             </Link>
             <Link
               to="/admin/assignments"
@@ -498,16 +520,20 @@ export default function Orders() {
             gap: "10px",
           }}
         >
-          <SummaryCard label="Active Jobs" value={workspaceSummary.activeOrders} />
-          <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
+            <SummaryCard label="Active Jobs" value={workspaceSummary.activeOrders} />
+          {isStaffWorkspace ? null : (
+            <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
+          )}
           <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
         </section>
 
         <section style={{ display: "grid", gap: "16px" }}>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-            {PRODUCTION_STATUS_FILTERS.filter(
-              (filter) => !["unassigned", "urgent"].includes(filter.key)
-            ).map((filter) => (
+            {PRODUCTION_STATUS_FILTERS.filter((filter) => {
+              if (filter.key === "urgent") return false;
+              if (isStaffWorkspace && filter.key === "unassigned") return false;
+              return true;
+            }).map((filter) => (
               <FilterPill
                 key={filter.key}
                 active={activeStatusFilter === filter.key}
@@ -521,7 +547,7 @@ export default function Orders() {
 
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
               {PRODUCTION_STATUS_FILTERS.filter((filter) =>
-                ["unassigned", "urgent"].includes(filter.key)
+                isStaffWorkspace ? false : ["unassigned", "urgent"].includes(filter.key)
               ).map((filter) => (
                 <FilterPill
                   key={filter.key}
@@ -775,8 +801,14 @@ export default function Orders() {
 
           <OrdersTable
             orders={filteredOrders}
-            emptyMessage="No production orders match the current workspace filters."
+            emptyMessage={
+              isStaffWorkspace
+                ? "No assigned jobs match the current workspace filters."
+                : "No production orders match the current workspace filters."
+            }
             onAdvanceStatus={handleAdvanceStatus}
+            showPayment={!isStaffWorkspace}
+            statusActionLabel={isStaffWorkspace ? "Move to" : "Mark"}
           />
         </section>
       </div>

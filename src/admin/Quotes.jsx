@@ -16,6 +16,8 @@ import {
   buildDepositStatus,
   buildProductionReadiness,
 } from "../quotes/productionReadiness";
+import { getActiveStaffUser } from "../lib/staffUsersStore";
+import { isStaffWorkspaceView } from "./adminRoleView";
 
 const EXPANDED_QUOTES_STORAGE_KEY = "teeCoQuotesExpandedState";
 
@@ -220,6 +222,8 @@ function getCollapsedSummaryFields(quote, summary) {
 export default function Quotes() {
   const location = useLocation();
   const navigate = useNavigate();
+  const staffUser = getActiveStaffUser();
+  const isStaffWorkspace = isStaffWorkspaceView(staffUser);
   const orders = useStoredOrders();
   const cardRefs = useRef({});
   const [expandedQuotes, setExpandedQuotes] = useState(readExpandedQuotesState);
@@ -309,7 +313,7 @@ export default function Quotes() {
   function toggleQuote(orderNumber) {
     setExpandedQuotes((current) => ({
       ...current,
-      [orderNumber]: !Boolean(current[orderNumber]),
+      [orderNumber]: !current[orderNumber],
     }));
   }
 
@@ -336,11 +340,13 @@ export default function Quotes() {
               textTransform: "uppercase",
             }}
           >
-            Sales Workflow
+            {isStaffWorkspace ? "Quote Intake" : "Sales Workflow"}
           </p>
           <h1 style={{ margin: "8px 0 6px" }}>Quotes</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            Intake, approvals, artwork sign-off, and deposit readiness stay here until work is released into production.
+            {isStaffWorkspace
+              ? "Incoming quote work, approvals, and artwork readiness stay here until jobs move into production."
+              : "Intake, approvals, artwork sign-off, and deposit readiness stay here until work is released into production."}
           </p>
           <p style={{ margin: "8px 0 0", color: "#94a3b8", maxWidth: "760px", fontSize: "14px", fontWeight: 600 }}>
             Archived quotes are intentionally removed from this active workflow view.
@@ -358,7 +364,7 @@ export default function Quotes() {
             fontWeight: 700,
           }}
         >
-          New Quote
+          {isStaffWorkspace ? "New Intake" : "New Quote"}
         </Link>
       </div>
 
@@ -721,13 +727,27 @@ export default function Quotes() {
                           </div>
 
                           <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>
-                            <Field label="Pricing" value={`Deposit ${money(summary.depositTarget)} • Balance ${money(summary.balance)}`} />
-                            <div style={{ marginTop: "12px" }}>
-                              <Field label="Invoice State" value={formatValue(summary.financials.invoice_status, "Draft")} />
-                            </div>
-                            <div style={{ marginTop: "12px" }}>
-                              <Field label="Collection Step" value={formatValue(summary.financials.payment_collection_state, "Awaiting Payment")} />
-                            </div>
+                            {isStaffWorkspace ? (
+                              <>
+                                <Field label="Readiness" value={buildReadinessSummary(summary.readiness)} />
+                                <div style={{ marginTop: "12px" }}>
+                                  <Field label="Approval" value={summary.approvalStatus} />
+                                </div>
+                                <div style={{ marginTop: "12px" }}>
+                                  <Field label="Deposit Status" value={summary.depositStatus} />
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <Field label="Pricing" value={`Deposit ${money(summary.depositTarget)} • Balance ${money(summary.balance)}`} />
+                                <div style={{ marginTop: "12px" }}>
+                                  <Field label="Invoice State" value={formatValue(summary.financials.invoice_status, "Draft")} />
+                                </div>
+                                <div style={{ marginTop: "12px" }}>
+                                  <Field label="Collection Step" value={formatValue(summary.financials.payment_collection_state, "Awaiting Payment")} />
+                                </div>
+                              </>
+                            )}
                           </div>
 
                           <div style={{ border: "1px solid #e2e8f0", borderRadius: "14px", padding: "14px" }}>

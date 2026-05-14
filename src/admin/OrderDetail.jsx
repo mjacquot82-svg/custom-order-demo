@@ -20,6 +20,7 @@ import {
   getNextOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
+import { isOwnerView, isStaffWorkspaceView } from "./adminRoleView";
 
 const cardStyle = {
   background: "#ffffff",
@@ -61,6 +62,9 @@ export default function OrderDetail() {
     [orderNumber, storedOrders]
   );
   const staffUsers = getStoredStaffUsers().filter((staffUser) => staffUser.status !== "Inactive");
+  const activeStaffUser = getActiveStaffUser();
+  const isStaffWorkspace = isStaffWorkspaceView(activeStaffUser);
+  const canManageAssignments = isOwnerView(activeStaffUser);
 
   const selectedProduct = useMemo(() => {
     if (!order) return null;
@@ -98,11 +102,9 @@ export default function OrderDetail() {
   const urgency = buildOrderUrgency(order);
 
   function saveOrderUpdates(updates) {
-    const activeStaff = getActiveStaffUser();
-
     const updated = updateStoredOrder(orderNumber, {
-      updated_by_staff_name: activeStaff?.name || "Unknown Staff",
-      updated_by_staff_role: activeStaff?.role || "",
+      updated_by_staff_name: activeStaffUser?.name || "Unknown Staff",
+      updated_by_staff_role: activeStaffUser?.role || "",
       ...updates,
     });
 
@@ -236,7 +238,7 @@ export default function OrderDetail() {
               letterSpacing: "0.08em",
             }}
           >
-            Production Command Center
+            {isStaffWorkspace ? "Production Work Order" : "Production Command Center"}
           </p>
 
           <h1 style={{ margin: "6px 0" }}>
@@ -307,7 +309,7 @@ export default function OrderDetail() {
               fontWeight: 700,
             }}
           >
-            Orders
+            {isStaffWorkspace ? "Assigned Orders" : "Orders"}
           </Link>
 
           <button
@@ -453,29 +455,47 @@ export default function OrderDetail() {
         </div>
 
         <aside style={{ display: "grid", gap: "18px" }}>
-          <FinancialSummaryPanel
-            order={normalizedOrder}
-            onRecordPayment={handleRecordPayment}
-            onMarkPickedUp={handleMarkPickedUp}
-            onSendDepositRequest={handleSendDepositRequest}
-          />
+          {isStaffWorkspace ? null : (
+            <FinancialSummaryPanel
+              order={normalizedOrder}
+              onRecordPayment={handleRecordPayment}
+              onMarkPickedUp={handleMarkPickedUp}
+              onSendDepositRequest={handleSendDepositRequest}
+            />
+          )}
 
           <section style={cardStyle}>
-            <h2 style={{ marginTop: 0 }}>Quote Snapshot</h2>
+            <h2 style={{ marginTop: 0 }}>
+              {isStaffWorkspace ? "Production Snapshot" : "Quote Snapshot"}
+            </h2>
 
-            {quoteSnapshot ? (
+            {quoteSnapshot && !isStaffWorkspace ? (
               <PricingSummary
                 quote={quoteSnapshot}
                 quantity={quoteSnapshot.quantity || order.qty || 0}
                 compact
               />
+            ) : isStaffWorkspace ? (
+              <div style={{ display: "grid", gap: "14px" }}>
+                <div>
+                  <p style={sectionLabelStyle}>Production Type</p>
+                  <p style={sectionValueStyle}>{order.decoration_type || "Production"}</p>
+                </div>
+                <div>
+                  <p style={sectionLabelStyle}>Due Date</p>
+                  <p style={sectionValueStyle}>{order.due_date || "Not set"}</p>
+                </div>
+                <div>
+                  <p style={sectionLabelStyle}>Source</p>
+                  <p style={sectionValueStyle}>{order.source || "Operational intake"}</p>
+                </div>
+              </div>
             ) : (
               <p style={{ color: "#94a3b8" }}>
                 Quote snapshot unavailable.
               </p>
             )}
           </section>
-
         </aside>
       </div>
 
@@ -485,6 +505,7 @@ export default function OrderDetail() {
           staffUsers={staffUsers}
           onAssign={handleAssign}
           onAdvanceStatus={handleAdvanceStatus}
+          canManageAssignments={canManageAssignments}
         />
 
         <ActivityTimeline
