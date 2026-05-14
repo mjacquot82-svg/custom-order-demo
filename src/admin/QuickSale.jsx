@@ -8,11 +8,9 @@ import {
   updateStoredOrder,
   useStoredOrders,
 } from "../lib/ordersStore";
-import { getActiveStaffUser } from "../lib/staffUsersStore";
 import { validatePaymentAmount } from "../lib/financialValidation";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import { PAYMENT_METHOD_OPTIONS } from "../orders/orderFinancials";
-import { isStaffWorkspaceView } from "./adminRoleView";
 
 const taxRate = 0.13;
 const counterPaymentMethods = PAYMENT_METHOD_OPTIONS.filter((option) =>
@@ -515,9 +513,6 @@ export default function QuickSale() {
   const [searchParams] = useSearchParams();
   const completedSaleNumber = searchParams.get("completed");
   const productSelectRef = useRef(null);
-  const activeStaffUser = getActiveStaffUser();
-  const isStaffWorkspace = isStaffWorkspaceView(activeStaffUser);
-
   const products = useStoredProducts().filter((product) => product.status !== "Inactive");
   const storedOrders = useStoredOrders();
   const [customers] = useState(() => getStoredCustomers());
@@ -587,9 +582,13 @@ export default function QuickSale() {
   }, [activeMode, selectableItems]);
   const activeWorkspaceMode =
     transactionWorkspaceModes[activeMode] || transactionWorkspaceModes.payment;
+  const normalizedSelectedTransactionIds = useMemo(
+    () => filterSelectionIdsForMode(activeMode, selectedTransactionIds, selectableItems),
+    [activeMode, selectableItems, selectedTransactionIds]
+  );
   const selectedTransactionItems = useMemo(
-    () => selectableItems.filter((item) => selectedTransactionIds.includes(item.id)),
-    [selectableItems, selectedTransactionIds]
+    () => selectableItems.filter((item) => normalizedSelectedTransactionIds.includes(item.id)),
+    [normalizedSelectedTransactionIds, selectableItems]
   );
   const selectedPaymentSignature = useMemo(
     () =>
@@ -690,7 +689,6 @@ export default function QuickSale() {
     splitPrimaryAmountValue,
     splitSecondaryAmountValue,
     splitTotalMatches,
-    paymentAmount,
   ]);
 
   const handleGlobalEnter = useEffectEvent((event) => {
@@ -708,12 +706,6 @@ export default function QuickSale() {
     window.addEventListener("keydown", handleGlobalEnter);
     return () => window.removeEventListener("keydown", handleGlobalEnter);
   }, []);
-
-  useEffect(() => {
-    setSelectedTransactionIds((current) =>
-      filterSelectionIdsForMode(activeMode, current, selectableItems)
-    );
-  }, [activeMode, selectableItems]);
 
   function resetPaymentForm(nextAmount = "") {
     setPaymentAmountOverride(nextAmount);
@@ -1174,34 +1166,6 @@ export default function QuickSale() {
             }}
           >
             Start Another Quick Sale
-          </button>
-          {!isStaffWorkspace ? (
-            <button
-              onClick={() => navigate("/admin/sales")}
-              style={{
-                background: "#ffffff",
-                border: "1px solid #cbd5e1",
-                borderRadius: "14px",
-                padding: "14px 20px",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Open Sales History
-            </button>
-          ) : null}
-          <button
-            onClick={() => navigate("/admin")}
-            style={{
-              background: "#ffffff",
-              border: "1px solid #cbd5e1",
-              borderRadius: "14px",
-              padding: "14px 20px",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            {isStaffWorkspace ? "Return to Staff Workspace" : "Return to Dashboard"}
           </button>
         </div>
       </div>
@@ -1690,7 +1654,7 @@ export default function QuickSale() {
                   <div style={{ display: "grid", gap: "14px" }}>
                     {visibleSelectableItems.map((item) => {
                       const tones = getActionToneStyles(item.tone);
-                      const isSelected = selectedTransactionIds.includes(item.id);
+                      const isSelected = normalizedSelectedTransactionIds.includes(item.id);
 
                       return (
                         <article

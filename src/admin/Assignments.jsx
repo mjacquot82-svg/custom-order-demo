@@ -75,6 +75,27 @@ function SummaryMetric({ label, value, tone = "default" }) {
   );
 }
 
+function StaffQueueNote() {
+  return (
+    <section
+      style={{
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        borderRadius: "18px",
+        padding: "16px 18px",
+        display: "grid",
+        gap: "6px",
+      }}
+    >
+      <strong style={{ color: "#0f172a" }}>Personal execution queue</strong>
+      <p style={{ margin: 0, color: "#64748b" }}>
+        This workspace only tracks jobs assigned directly to you. Use Shop Production when you
+        need full-floor visibility or unassigned work.
+      </p>
+    </section>
+  );
+}
+
 function StaffAssignmentColumn({ title, description, orders = [], emptyMessage }) {
   return (
     <section style={{ ...cardStyle, display: "grid", gap: "14px" }}>
@@ -150,7 +171,6 @@ function OwnerAssignments({ allOrders, staffUsers, activeOrders, assignedOrders,
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "14px", flexWrap: "wrap", marginBottom: "18px" }}>
         <div><p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Production Dispatch</p><h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>Assignment Dispatch Board</h1><p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>Assign new work, watch overdue jobs, and balance worker load from one dispatch board.</p></div>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}><Link to="/admin/staff-users" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Manage Staff</Link><Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Production Orders</Link></div>
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "14px", marginBottom: "18px" }}>
@@ -181,15 +201,12 @@ function StaffAssignments({ allOrders, staffUser }) {
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px", display: "grid", gap: "18px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "14px", flexWrap: "wrap" }}>
         <div>
-          <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>My Assignments</p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>My Work</h1>
+          <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>My Assigned Work</p>
+          <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>My Assigned Work</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            This is your personal execution workspace. Focus on work assigned directly to you, update production actions, and leave the full shop view to the Shop Production Queue.
+            This is your personal execution workspace. Focus on jobs assigned directly to you and
+            update production actions without the noise of full-shop dashboards.
           </p>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>View Shop Production</Link>
         </div>
       </div>
 
@@ -198,24 +215,9 @@ function StaffAssignments({ allOrders, staffUser }) {
         <SummaryMetric label="Ready To Start" value={groupedOrders.ready.length} />
         <SummaryMetric label="In Production" value={groupedOrders.inProgress.length} tone="success" />
         <SummaryMetric label="Overdue" value={overdueOrders.length} tone="danger" />
-        <SummaryMetric label="Ready For Pickup" value={groupedOrders.paused.length} />
       </section>
 
-      <section
-        style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          borderRadius: "18px",
-          padding: "16px 18px",
-          display: "grid",
-          gap: "6px",
-        }}
-      >
-        <strong style={{ color: "#0f172a" }}>This queue is personal to you.</strong>
-        <p style={{ margin: 0, color: "#64748b" }}>
-          If this page is empty, there may still be production work in the shop. Use the Shop Production Queue for unassigned jobs and shared floor visibility.
-        </p>
-      </section>
+      <StaffQueueNote />
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
         <StaffAssignmentColumn

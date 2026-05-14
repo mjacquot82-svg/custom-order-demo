@@ -19,7 +19,7 @@ export default function SaleReceipt() {
       <div style={{ maxWidth: "720px", margin: "40px auto", padding: "24px" }}>
         <h1>Receipt not found</h1>
         <p>This sale could not be found in the current browser storage.</p>
-        <Link to="/admin/sales">Back to Counter Sales</Link>
+        <Link to="/admin/sales">Back to Sales History</Link>
       </div>
     );
   }
@@ -57,7 +57,7 @@ export default function SaleReceipt() {
           to="/admin/sales"
           style={{ color: "#475569", fontWeight: 700, textDecoration: "none" }}
         >
-          ← Back to Counter Sales
+          ← Back to Sales History
         </Link>
 
         <button

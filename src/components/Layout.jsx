@@ -83,13 +83,13 @@ function getAdminSections(staffUser) {
         links: [
           {
             to: "/admin/assignments",
-            label: "My Work",
+            label: "My Assigned Work",
             navKey: "assignments",
             badgeKey: "assignments",
           },
           {
             to: "/admin/orders",
-            label: "Shop Production Queue",
+            label: "Shop Production",
             navKey: "productionOrders",
             badgeKey: "productionOrders",
           },
@@ -275,6 +275,7 @@ function AdminSidebar({ pathname, staffUser }) {
   const workspaceLabel = staffWorkspace
     ? "Staff Operations"
     : "Central Operations";
+  const homeLink = staffWorkspace ? "/admin/assignments" : "/admin";
 
   return (
     <aside
@@ -297,7 +298,7 @@ function AdminSidebar({ pathname, staffUser }) {
       }}
     >
       <Link
-        to="/admin"
+        to={homeLink}
         style={{
           display: "flex",
           alignItems: "center",
