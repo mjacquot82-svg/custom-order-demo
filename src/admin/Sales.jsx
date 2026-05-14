@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { getStoredQuickSales } from "../lib/salesStore";
 
 function currency(value) {
@@ -38,14 +39,27 @@ export default function Sales() {
               textTransform: "uppercase",
             }}
           >
-            Records
+            Front Counter
           </p>
           <h1 style={{ margin: "6px 0 8px" }}>Sales History</h1>
           <p style={{ margin: 0, color: "#64748b" }}>
-            Review completed front-counter transactions without reopening the live transaction
-            workspace.
+            Review completed walk-in sales and in-person counter transactions.
           </p>
         </div>
+
+        <Link
+          to="/admin/sales/new"
+          style={{
+            background: "#171717",
+            color: "#ffffff",
+            textDecoration: "none",
+            borderRadius: "12px",
+            padding: "12px 16px",
+            fontWeight: 700,
+          }}
+        >
+          Open Front Counter
+        </Link>
       </div>
 
       <section

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import StatusBadge from "../components/StatusBadge";
 import { formatShortDate } from "../lib/dateFormatting";
@@ -339,6 +339,11 @@ export default function Orders() {
     () => buildProductionWorkspaceSummary(workspaceOrders),
     [workspaceOrders]
   );
+  const readyForPickupCount = useMemo(
+    () =>
+      workspaceOrders.filter((order) => order.status === "Ready for Pickup").length,
+    [workspaceOrders]
+  );
   const awaitingProductionCount = useMemo(
     () =>
       workspaceOrders.filter(
@@ -494,9 +499,41 @@ export default function Orders() {
             </h1>
             <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
               {isStaffWorkspace
-                ? "Global production visibility for the whole shop. Use this workspace to monitor shared floor activity, other staff assignments, and unassigned jobs waiting for action."
-                : "Global production visibility for active jobs, stage flow, and shared shop priorities."}
+                ? "This is the global production workspace. It shows active work across the floor, including your assignments, other staff assignments, and unassigned jobs still waiting for action."
+                : "Production-first workspace for active jobs, stage flow, and fast order handling."}
             </p>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <Link
+              to={isStaffWorkspace ? "/admin/assignments" : "/admin/quotes"}
+              style={{
+                background: "#171717",
+                color: "#ffffff",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              {isStaffWorkspace ? "View My Work" : "Open Quotes"}
+            </Link>
+            {!isStaffWorkspace ? (
+              <Link
+                to="/admin/assignments"
+                style={{
+                  background: "#ffffff",
+                  color: "#171717",
+                  border: "1px solid #d6dbe4",
+                  borderRadius: "12px",
+                  padding: "12px 16px",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                }}
+              >
+                Open Assignments
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -508,13 +545,16 @@ export default function Orders() {
           }}
         >
           <SummaryCard label={isStaffWorkspace ? "All Active Jobs" : "Active Jobs"} value={workspaceSummary.activeOrders} />
-          <SummaryCard
-            label={isStaffWorkspace ? "Unassigned Work" : "Unassigned"}
-            value={workspaceSummary.unassignedOrders}
-            tone="warning"
-          />
+          {isStaffWorkspace ? (
+            <SummaryCard label="Unassigned Work" value={workspaceSummary.unassignedOrders} tone="warning" />
+          ) : (
+            <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
+          )}
           {isStaffWorkspace ? (
             <SummaryCard label="Awaiting Production" value={awaitingProductionCount} />
+          ) : null}
+          {isStaffWorkspace ? (
+            <SummaryCard label="Ready For Pickup" value={readyForPickupCount} />
           ) : null}
           <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
           {!isStaffWorkspace ? (
@@ -535,9 +575,7 @@ export default function Orders() {
           >
             <strong style={{ color: "#0f172a" }}>How to read this workspace</strong>
             <p style={{ margin: 0, color: "#64748b" }}>
-              Use <strong>My Assigned Work</strong> for your personal queue. Use this workspace for
-              full-shop visibility, including jobs assigned to other staff and unassigned work
-              still waiting for assignment.
+              Use <strong>My Work</strong> for your personal queue. Use this workspace for full-shop visibility, including jobs assigned to other staff and unassigned work still waiting for assignment.
             </p>
           </section>
         ) : null}
