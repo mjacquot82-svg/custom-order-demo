@@ -28,6 +28,7 @@ import {
 } from "../production/productionWorkspace";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 import {
+  getAssignedOrdersForStaff,
   getOperationalOrdersForStaff,
   isStaffWorkspaceView,
 } from "./adminRoleView";
@@ -279,7 +280,8 @@ function SummaryCard({ label, value, tone = "default" }) {
 
 export default function Orders() {
   const storedOrders = useStoredOrders();
-  const isStaffWorkspace = isStaffWorkspaceView(getActiveStaffUser());
+  const staffUser = getActiveStaffUser();
+  const isStaffWorkspace = isStaffWorkspaceView(staffUser);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeStatusFilter = searchParams.get("status") || "active";
   const activeMethodFilter = searchParams.get("workflow") || "all";
@@ -339,17 +341,9 @@ export default function Orders() {
     () => buildProductionWorkspaceSummary(workspaceOrders),
     [workspaceOrders]
   );
-  const readyForPickupCount = useMemo(
-    () =>
-      workspaceOrders.filter((order) => order.status === "Ready for Pickup").length,
-    [workspaceOrders]
-  );
-  const awaitingProductionCount = useMemo(
-    () =>
-      workspaceOrders.filter(
-        (order) => order.status === "Awaiting Production" || order.status === "New"
-      ).length,
-    [workspaceOrders]
+  const assignedToMeCount = useMemo(
+    () => (isStaffWorkspace ? getAssignedOrdersForStaff(workspaceOrders, staffUser).length : 0),
+    [isStaffWorkspace, staffUser, workspaceOrders]
   );
 
   const filteredOrders = useMemo(
@@ -495,18 +489,18 @@ export default function Orders() {
               {isStaffWorkspace ? "My Production Workspace" : "Production Workspace"}
             </p>
             <h1 style={{ margin: "8px 0 6px" }}>
-              {isStaffWorkspace ? "Shop Production Queue" : "Production Orders"}
+              {isStaffWorkspace ? "Production Queue" : "Production Orders"}
             </h1>
             <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
               {isStaffWorkspace
-                ? "This is the global production workspace. It shows active work across the floor, including your assignments, other staff assignments, and unassigned jobs still waiting for action."
+                ? "Shop-wide production visibility for active work across the floor. This queue includes your assignments, other staff assignments, and unassigned jobs awaiting assignment."
                 : "Production-first workspace for active jobs, stage flow, and fast order handling."}
             </p>
           </div>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <Link
-              to={isStaffWorkspace ? "/admin/assignments" : "/admin/quotes"}
+              to={isStaffWorkspace ? "/admin/sales/new" : "/admin/quotes"}
               style={{
                 background: "#171717",
                 color: "#ffffff",
@@ -516,9 +510,23 @@ export default function Orders() {
                 fontWeight: 700,
               }}
             >
-              {isStaffWorkspace ? "View My Work" : "Open Quotes"}
+              {isStaffWorkspace ? "Front Counter" : "Open Quotes"}
             </Link>
-            {!isStaffWorkspace ? (
+            <Link
+              to={isStaffWorkspace ? "/admin/quotes" : "/admin/assignments"}
+              style={{
+                background: "#ffffff",
+                color: "#171717",
+                border: "1px solid #d6dbe4",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                textDecoration: "none",
+                fontWeight: 700,
+              }}
+            >
+              {isStaffWorkspace ? "Quote Intake" : "Open Assignments"}
+            </Link>
+            {isStaffWorkspace ? (
               <Link
                 to="/admin/assignments"
                 style={{
@@ -531,7 +539,7 @@ export default function Orders() {
                   fontWeight: 700,
                 }}
               >
-                Open Assignments
+                My Assigned Work
               </Link>
             ) : null}
           </div>
@@ -551,15 +559,13 @@ export default function Orders() {
             <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
           )}
           {isStaffWorkspace ? (
-            <SummaryCard label="Awaiting Production" value={awaitingProductionCount} />
-          ) : null}
-          {isStaffWorkspace ? (
-            <SummaryCard label="Ready For Pickup" value={readyForPickupCount} />
+            <SummaryCard
+              label="Assigned To Me"
+              value={assignedToMeCount}
+            />
           ) : null}
           <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
-          {!isStaffWorkspace ? (
-            <SummaryCard label="Canceled" value={workspaceSummary.canceledOrders || 0} tone="danger" />
-          ) : null}
+          <SummaryCard label="Canceled" value={workspaceSummary.canceledOrders || 0} tone="danger" />
         </section>
 
         {isStaffWorkspace ? (
@@ -575,7 +581,7 @@ export default function Orders() {
           >
             <strong style={{ color: "#0f172a" }}>How to read this workspace</strong>
             <p style={{ margin: 0, color: "#64748b" }}>
-              Use <strong>My Work</strong> for your personal queue. Use this workspace for full-shop visibility, including jobs assigned to other staff and unassigned work still waiting for assignment.
+              Use <strong>My Assigned Work</strong> for your personal queue. Use this Production Queue for the full shop view, including jobs assigned to other staff and unassigned work that is available or still waiting for assignment.
             </p>
           </section>
         ) : null}
