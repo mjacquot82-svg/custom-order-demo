@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStoredProducts } from "../lib/productsStore";
 import { createStoredQuickSale } from "../lib/salesStore";
 import { getStoredCustomers } from "../lib/customersStore";
+import { getActiveStaffUser } from "../lib/staffUsersStore";
+import { isStaffWorkspaceView } from "./adminRoleView";
 
 const taxRate = 0.13;
 
@@ -84,6 +86,8 @@ export default function QuickSale() {
   const [searchParams] = useSearchParams();
   const completedSaleNumber = searchParams.get("completed");
   const productSelectRef = useRef(null);
+  const activeStaffUser = getActiveStaffUser();
+  const isStaffWorkspace = isStaffWorkspaceView(activeStaffUser);
 
   const products = useStoredProducts().filter((product) => product.status !== "Inactive");
   const [customers] = useState(() => getStoredCustomers());
@@ -315,11 +319,13 @@ export default function QuickSale() {
           <button onClick={() => navigate("/admin/sales/new")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "14px", padding: "14px 20px", fontWeight: 800, cursor: "pointer" }}>
             Start Another Sale
           </button>
-          <button onClick={() => navigate("/admin/sales")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "14px", padding: "14px 20px", fontWeight: 700, cursor: "pointer" }}>
-            View Sales History
-          </button>
+          {isStaffWorkspace ? null : (
+            <button onClick={() => navigate("/admin/sales")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "14px", padding: "14px 20px", fontWeight: 700, cursor: "pointer" }}>
+              View Sales History
+            </button>
+          )}
           <button onClick={() => navigate("/admin")} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "14px", padding: "14px 20px", fontWeight: 700, cursor: "pointer" }}>
-            Return to Dashboard
+            {isStaffWorkspace ? "Return to Staff Workspace" : "Return to Dashboard"}
           </button>
         </div>
       </div>
@@ -335,7 +341,7 @@ export default function QuickSale() {
           </p>
           <h1 style={{ margin: "6px 0 8px", fontSize: "30px" }}>Quick Sale</h1>
           <p style={{ margin: 0, color: "#475569" }}>
-            Use this for walk-in purchases, stocked items, and payments taken at the counter. Customer name is optional.
+            Use this for walk-in purchases, stocked items, and rapid front-counter transactions. Customer name is optional.
           </p>
         </div>
 

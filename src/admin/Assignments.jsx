@@ -182,14 +182,15 @@ function StaffAssignments({ allOrders, staffUser }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "14px", flexWrap: "wrap" }}>
         <div>
           <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>My Assignments</p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>Assigned Work Queue</h1>
+          <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>My Work Queue</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            A simplified execution board for the jobs currently assigned to you.
+            Personal execution board for the jobs currently assigned to you.
           </p>
         </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Assigned Orders</Link>
+          <Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Production Queue</Link>
+          <Link to="/admin/sales/new" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Quick Sale</Link>
           <Link to="/admin/quotes" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Quote Intake</Link>
         </div>
       </div>

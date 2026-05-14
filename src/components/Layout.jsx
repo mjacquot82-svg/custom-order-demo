@@ -4,6 +4,8 @@ import { useStoredOrders } from "../lib/ordersStore";
 import { isActiveOperationalStatus } from "../orders/orderWorkflow";
 import {
   canAccessOwnerWorkspace,
+  getAssignedOrdersForStaff,
+  getOperationalOrdersForStaff,
   isAdminWorkspaceView,
   isStaffWorkspaceView,
 } from "../admin/adminRoleView";
@@ -43,17 +45,21 @@ function InstagramIcon() {
   );
 }
 
-function getSidebarCounts(orders = [], { staffWorkspace = false } = {}) {
-  const activeOrders = orders.filter(
+function getSidebarCounts({ operationalOrders = [], assignedOrders = [], staffWorkspace = false } = {}) {
+  const activeOperationalOrders = operationalOrders.filter(
+    (order) =>
+      order.operational_visible !== false && isActiveOperationalStatus(order.status)
+  );
+  const activeAssignedOrders = assignedOrders.filter(
     (order) =>
       order.operational_visible !== false && isActiveOperationalStatus(order.status)
   );
 
   return {
-    productionOrders: activeOrders.length,
+    productionOrders: activeOperationalOrders.length,
     assignments: staffWorkspace
-      ? activeOrders.length
-      : activeOrders.filter(
+      ? activeAssignedOrders.length
+      : activeOperationalOrders.filter(
           (order) =>
             order.needs_assignment || !order.assigned_to_staff_id
         ).length,
@@ -64,27 +70,33 @@ function getAdminSections(staffUser) {
   if (!isAdminWorkspaceView(staffUser)) {
     return [
       {
-        title: "My Workspace",
+        title: "My Work",
         links: [
           { to: "/admin", label: "My Dashboard", navKey: "dashboard" },
           {
             to: "/admin/assignments",
-            label: "My Assignments",
+            label: "My Work Queue",
             navKey: "assignments",
             badgeKey: "assignments",
-          },
-          {
-            to: "/admin/orders",
-            label: "Assigned Orders",
-            navKey: "productionOrders",
-            badgeKey: "productionOrders",
           },
         ],
       },
       {
-        title: "Intake",
+        title: "Front Counter",
         links: [
+          { to: "/admin/sales/new", label: "Quick Sale", navKey: "quickSale" },
           { to: "/admin/quotes", label: "Quote Intake", navKey: "quotes" },
+        ],
+      },
+      {
+        title: "Production",
+        links: [
+          {
+            to: "/admin/orders",
+            label: "Production Queue",
+            navKey: "productionOrders",
+            badgeKey: "productionOrders",
+          },
         ],
       },
     ];
@@ -165,6 +177,7 @@ function getActiveSidebarLink(pathname) {
   if (pathname.startsWith("/admin/quotes/")) return pathname === "/admin/quotes/new" ? "newQuote" : "quotes";
   if (pathname === "/admin/financial") return "financial";
   if (pathname === "/admin/sales/new") return "quickSale";
+  if (pathname.startsWith("/admin/sales/receipt/")) return "quickSale";
   if (pathname === "/admin/orders") return "productionOrders";
   if (pathname.startsWith("/admin/orders/")) return "productionOrders";
   if (pathname === "/admin") return "dashboard";
@@ -240,17 +253,17 @@ function SocialLinks({ compact = false }) {
 function AdminSidebar({ pathname, staffUser }) {
   const orders = useStoredOrders();
   const staffWorkspace = isStaffWorkspaceView(staffUser);
-  const visibleOrders = isAdminWorkspaceView(staffUser)
+  const operationalOrders = isAdminWorkspaceView(staffUser)
     ? orders
-    : orders.filter(
-        (order) =>
-          order.assigned_to_staff_id === staffUser?.id ||
-          order.assigned_to_staff_name === staffUser?.name
-      );
-  const badgeCounts = getSidebarCounts(
-    visibleOrders,
-    { staffWorkspace }
-  );
+    : getOperationalOrdersForStaff(orders);
+  const assignedOrders = isAdminWorkspaceView(staffUser)
+    ? orders
+    : getAssignedOrdersForStaff(orders, staffUser);
+  const badgeCounts = getSidebarCounts({
+    operationalOrders,
+    assignedOrders,
+    staffWorkspace,
+  });
   const activeLink = getActiveSidebarLink(pathname);
   const adminSections = getAdminSections(staffUser);
   const workspaceLabel = staffWorkspace

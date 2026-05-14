@@ -13,6 +13,7 @@ import {
 } from "../orders/orderWorkflow";
 import {
   getAssignedOrdersForStaff,
+  getOperationalOrdersForStaff,
   isStaffWorkspaceView,
 } from "./adminRoleView";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
@@ -282,6 +283,7 @@ function OwnerDashboard({ orders }) {
 }
 
 function StaffDashboard({ orders, staffUser }) {
+  const operationalOrders = getOperationalOrdersForStaff(orders);
   const assignedOrders = getAssignedOrdersForStaff(orders, staffUser);
   const summary = buildStaffWorkspaceSummary(assignedOrders);
   const activeAssignedOrders = assignedOrders.filter(
@@ -289,21 +291,31 @@ function StaffDashboard({ orders, staffUser }) {
   );
   const quoteIntakeOrders = orders.filter((order) => isActiveQuoteWorkflowOrder(order));
   const recentActivity = buildStaffActivity(assignedOrders);
+  const activeOperationalOrders = operationalOrders.filter(
+    (order) => !isCompletedOperationalStatus(normalizeOperationalStatus(order.status))
+  );
+  const readyForPickupOrders = activeOperationalOrders.filter(
+    (order) => normalizeOperationalStatus(order.status) === "Ready for Pickup"
+  );
+  const awaitingProductionOrders = activeOperationalOrders.filter((order) => {
+    const status = normalizeOperationalStatus(order.status);
+    return status === "Awaiting Production" || status === "New";
+  });
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", flexWrap: "wrap", marginBottom: "20px" }}>
         <div>
           <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Staff Workspace</p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>My Operational Dashboard</h1>
+          <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>Operational Staff Workspace</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            Focus on assigned jobs, production movement, and the next actions needed to keep work flowing.
+            Front-counter intake and production execution stay in one place here without exposing owner-only management areas.
           </p>
         </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <Link
-            to="/admin/assignments"
+            to="/admin/sales/new"
             style={{
               background: "#171717",
               color: "#ffffff",
@@ -313,7 +325,21 @@ function StaffDashboard({ orders, staffUser }) {
               fontWeight: 800,
             }}
           >
-            Open My Assignments
+            Start Quick Sale
+          </Link>
+          <Link
+            to="/admin/assignments"
+            style={{
+              background: "#ffffff",
+              color: "#171717",
+              border: "1px solid #d6dbe4",
+              borderRadius: "12px",
+              padding: "12px 16px",
+              textDecoration: "none",
+              fontWeight: 800,
+            }}
+          >
+            Open My Work
           </Link>
           <Link
             to="/admin/orders"
@@ -327,7 +353,7 @@ function StaffDashboard({ orders, staffUser }) {
               fontWeight: 800,
             }}
           >
-            Assigned Orders
+            Open Production Queue
           </Link>
         </div>
       </div>
@@ -340,6 +366,50 @@ function StaffDashboard({ orders, staffUser }) {
           <SummaryCard label="Due Soon" value={summary.dueSoon} tone="warning" />
           <SummaryCard label="Overdue" value={summary.overdue} tone="danger" />
           <SummaryCard label="Ready For Pickup" value={summary.readyForPickup} />
+        </div>
+      </Section>
+
+      <Section title="Front Counter" description="Use these workflows for walk-in transactions, quote capture, and pickup handoff without opening owner reporting or finance views.">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+          <SummaryCard label="Quick Sale Ready" value="Counter" />
+          <SummaryCard label="Open Quotes" value={quoteIntakeOrders.length} />
+          <SummaryCard label="Ready For Pickup" value={readyForPickupOrders.length} tone="success" />
+          <SummaryCard label="Awaiting Production" value={awaitingProductionOrders.length} tone="warning" />
+        </div>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
+          <Link
+            to="/admin/sales/new"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              padding: "12px 16px",
+              background: "#171717",
+              color: "#ffffff",
+              textDecoration: "none",
+              fontWeight: 800,
+            }}
+          >
+            Open Quick Sale
+          </Link>
+          <Link
+            to="/admin/quotes"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              padding: "12px 16px",
+              background: "#ffffff",
+              color: "#171717",
+              border: "1px solid #d6dbe4",
+              textDecoration: "none",
+              fontWeight: 800,
+            }}
+          >
+            Open Quote Intake
+          </Link>
         </div>
       </Section>
 
@@ -357,23 +427,15 @@ function StaffDashboard({ orders, staffUser }) {
         )}
       </Section>
 
-      <Section title="Quote Intake" description="Operational visibility for incoming quote work without exposing financial reporting or owner summaries.">
+      <Section title="Production Queue" description="A shared view of operational jobs across the shop floor so staff can follow movement beyond their personal assignments.">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          <SummaryCard label="Open Quotes" value={quoteIntakeOrders.length} />
-          <SummaryCard
-            label="Awaiting Approval"
-            value={quoteIntakeOrders.filter((order) => normalizeQuoteStatus(order.quote_status) === "Awaiting Approval").length}
-            tone="warning"
-          />
-          <SummaryCard
-            label="Ready For Production"
-            value={quoteIntakeOrders.filter((order) => normalizeQuoteStatus(order.quote_status) === "Ready For Production").length}
-            tone="success"
-          />
+          <SummaryCard label="Active Jobs" value={activeOperationalOrders.length} />
+          <SummaryCard label="Assigned To Me" value={activeAssignedOrders.length} />
+          <SummaryCard label="Ready For Pickup" value={readyForPickupOrders.length} />
         </div>
         <div style={{ marginTop: "16px" }}>
           <Link
-            to="/admin/quotes"
+            to="/admin/orders"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -387,7 +449,7 @@ function StaffDashboard({ orders, staffUser }) {
               fontWeight: 800,
             }}
           >
-            Open Quote Intake
+            Open Production Queue
           </Link>
         </div>
       </Section>

@@ -309,7 +309,7 @@ export default function OrderDetail() {
               fontWeight: 700,
             }}
           >
-            {isStaffWorkspace ? "Assigned Orders" : "Orders"}
+            {isStaffWorkspace ? "Production Queue" : "Orders"}
           </Link>
 
           <button

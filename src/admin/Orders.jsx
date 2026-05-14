@@ -27,7 +27,7 @@ import {
   PRODUCTION_STATUS_FILTERS,
 } from "../production/productionWorkspace";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
-import { getAssignedOrdersForStaff, isStaffWorkspaceView } from "./adminRoleView";
+import { getOperationalOrdersForStaff, isStaffWorkspaceView } from "./adminRoleView";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -295,8 +295,8 @@ export default function Orders() {
     [storedOrders]
   );
   const workspaceOrders = useMemo(
-    () => (isStaffWorkspace ? getAssignedOrdersForStaff(orders, staffUser) : orders),
-    [isStaffWorkspace, orders, staffUser]
+    () => (isStaffWorkspace ? getOperationalOrdersForStaff(orders) : orders),
+    [isStaffWorkspace, orders]
   );
 
   const customerOptions = useMemo(() => {
@@ -473,18 +473,18 @@ export default function Orders() {
               {isStaffWorkspace ? "My Production Workspace" : "Production Workspace"}
             </p>
             <h1 style={{ margin: "8px 0 6px" }}>
-              {isStaffWorkspace ? "Assigned Orders" : "Production Orders"}
+              {isStaffWorkspace ? "Production Queue" : "Production Orders"}
             </h1>
             <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
               {isStaffWorkspace
-                ? "A simplified view of your assigned work, production movement, and due jobs."
+                ? "Shared operational queue for production movement, ready jobs, and front-counter follow-through."
                 : "Production-first workspace for active jobs, stage flow, and fast order handling."}
             </p>
           </div>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <Link
-              to="/admin/quotes"
+              to={isStaffWorkspace ? "/admin/sales/new" : "/admin/quotes"}
               style={{
                 background: "#171717",
                 color: "#ffffff",
@@ -494,10 +494,10 @@ export default function Orders() {
                 fontWeight: 700,
               }}
             >
-              {isStaffWorkspace ? "Quote Intake" : "Open Quotes"}
+              {isStaffWorkspace ? "Quick Sale" : "Open Quotes"}
             </Link>
             <Link
-              to="/admin/assignments"
+              to={isStaffWorkspace ? "/admin/quotes" : "/admin/assignments"}
               style={{
                 background: "#ffffff",
                 color: "#171717",
@@ -508,8 +508,24 @@ export default function Orders() {
                 fontWeight: 700,
               }}
             >
-              Open Assignments
+              {isStaffWorkspace ? "Quote Intake" : "Open Assignments"}
             </Link>
+            {isStaffWorkspace ? (
+              <Link
+                to="/admin/assignments"
+                style={{
+                  background: "#ffffff",
+                  color: "#171717",
+                  border: "1px solid #d6dbe4",
+                  borderRadius: "12px",
+                  padding: "12px 16px",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                }}
+              >
+                My Work Queue
+              </Link>
+            ) : null}
           </div>
         </div>
 

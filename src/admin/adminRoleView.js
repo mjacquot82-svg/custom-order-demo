@@ -37,15 +37,26 @@ export function getAssignedOrdersForStaff(orders = [], staffUser = getActiveStaf
   return orders.filter((order) => matchesAssignedStaff(order, staffUser));
 }
 
+export function getOperationalOrdersForStaff(orders = []) {
+  return orders.filter((order) => order.operational_visible !== false);
+}
+
 export function canAccessOwnerWorkspace(pathname, staffUser = getActiveStaffUser()) {
   if (!isStaffWorkspaceView(staffUser)) return true;
 
-  return ![
+  const blockedExactPaths = [
     "/admin/financial",
     "/admin/staff-users",
+    "/admin/sales",
+  ];
+  const blockedPathPrefixes = [
     "/admin/customers",
     "/admin/products",
-    "/admin/sales",
     "/admin/quotes/archived",
-  ].some((prefix) => pathname.startsWith(prefix));
+  ];
+
+  return !(
+    blockedExactPaths.includes(pathname) ||
+    blockedPathPrefixes.some((prefix) => pathname.startsWith(prefix))
+  );
 }
