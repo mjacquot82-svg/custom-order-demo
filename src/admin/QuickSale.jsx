@@ -251,19 +251,37 @@ function buildPickupAction(order) {
   };
 }
 
-function buildActionItems(orders = []) {
-  const actions = orders.flatMap((order) => {
-    const items = [];
+function buildSelectableTransactionItems(orders = []) {
+  const items = orders.flatMap((order) => {
+    const transactionItems = [];
     const paymentAction = buildPaymentAction(order);
     const pickupAction = buildPickupAction(order);
 
-    if (paymentAction) items.push(paymentAction);
-    if (pickupAction) items.push(pickupAction);
+    if (paymentAction) {
+      transactionItems.push({
+        ...paymentAction,
+        order,
+        selectionLabel:
+          paymentAction.paymentKind === "deposit"
+            ? "Deposit Due"
+            : order.pickup_status === "Ready for Pickup"
+            ? "Balance Before Pickup"
+            : "Open Balance",
+      });
+    }
 
-    return items;
+    if (pickupAction) {
+      transactionItems.push({
+        ...pickupAction,
+        order,
+        selectionLabel: "Pickup Release",
+      });
+    }
+
+    return transactionItems;
   });
 
-  return actions.sort((left, right) => {
+  return items.sort((left, right) => {
     const leftPriority = left.kind === "pickup" ? 0 : left.paymentKind === "deposit" ? 1 : 2;
     const rightPriority = right.kind === "pickup" ? 0 : right.paymentKind === "deposit" ? 1 : 2;
 
@@ -273,6 +291,24 @@ function buildActionItems(orders = []) {
 
     return Number(right.amount || 0) - Number(left.amount || 0);
   });
+}
+
+function buildCustomerSummary(orders = []) {
+  const openOrders = orders.length;
+  const unpaidBalances = orders.filter((order) => Number(order.balance_due || 0) > 0).length;
+  const pickupReady = orders.filter((order) => order.pickup_status === "Ready for Pickup").length;
+  const releaseReady = orders.filter(
+    (order) => order.pickup_status === "Ready for Pickup" && Number(order.balance_due || 0) <= 0
+  ).length;
+  const outstandingBalance = sumValues(orders.map((order) => order.balance_due));
+
+  return {
+    openOrders,
+    unpaidBalances,
+    pickupReady,
+    releaseReady,
+    outstandingBalance,
+  };
 }
 
 function OperationalStat({ label, value, emphasis = "default" }) {
@@ -331,7 +367,7 @@ export default function QuickSale() {
   const [lookupQuery, setLookupQuery] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedActionId, setSelectedActionId] = useState("");
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState([]);
   const [transactionMessage, setTransactionMessage] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState(counterPaymentMethods[0] || "Cash");
@@ -367,38 +403,46 @@ export default function QuickSale() {
     return buildCustomerOrders(selectedCustomer, storedOrders);
   }, [selectedCustomer, storedOrders]);
 
-  const actionableItems = useMemo(() => buildActionItems(customerOrders), [customerOrders]);
-  const selectedAction = useMemo(
-    () => actionableItems.find((action) => action.id === selectedActionId) || null,
-    [actionableItems, selectedActionId]
+  const selectableItems = useMemo(
+    () => buildSelectableTransactionItems(customerOrders),
+    [customerOrders]
   );
-  const selectedActionOrder = useMemo(
-    () =>
-      selectedAction
-        ? customerOrders.find((order) => order.order_number === selectedAction.orderNumber) || null
-        : null,
-    [customerOrders, selectedAction]
-  );
+  const visibleSelectableItems = useMemo(() => {
+    if (activeMode === "payment") {
+      return selectableItems.filter((item) => item.kind === "payment");
+    }
 
-  const operationalSummary = useMemo(() => {
-    const outstandingOrders = customerOrders.filter((order) => Number(order.balance_due || 0) > 0);
-    const releaseReadyOrders = customerOrders.filter(
-      (order) => order.pickup_status === "Ready for Pickup" && Number(order.balance_due || 0) <= 0
-    );
+    if (activeMode === "pickup") {
+      return selectableItems.filter((item) => item.kind === "pickup");
+    }
+
+    return selectableItems;
+  }, [activeMode, selectableItems]);
+  const selectedTransactionItems = useMemo(
+    () => selectableItems.filter((item) => selectedTransactionIds.includes(item.id)),
+    [selectableItems, selectedTransactionIds]
+  );
+  const selectedTransactionKind = selectedTransactionItems[0]?.kind || "";
+  const selectedTransactionOrders = useMemo(() => {
+    const seen = new Set();
+    return selectedTransactionItems.filter((item) => {
+      if (seen.has(item.orderNumber)) return false;
+      seen.add(item.orderNumber);
+      return true;
+    });
+  }, [selectedTransactionItems]);
+  const transactionSummary = useMemo(() => {
+    const paymentItems = selectedTransactionItems.filter((item) => item.kind === "payment");
+    const pickupItems = selectedTransactionItems.filter((item) => item.kind === "pickup");
 
     return {
-      openItems: actionableItems.length,
-      amountDueNow: sumValues(
-        actionableItems
-          .filter((action) => action.kind === "payment")
-          .map((action) => action.amount)
-      ),
-      outstandingBalance: sumValues(outstandingOrders.map((order) => order.balance_due)),
-      pickupReady: customerOrders.filter((order) => order.pickup_status === "Ready for Pickup")
-        .length,
-      releaseReady: releaseReadyOrders.length,
+      selectedCount: selectedTransactionItems.length,
+      paymentCount: paymentItems.length,
+      pickupCount: pickupItems.length,
+      amountDue: sumValues(paymentItems.map((item) => item.amount)),
     };
-  }, [actionableItems, customerOrders]);
+  }, [selectedTransactionItems]);
+  const customerSummary = useMemo(() => buildCustomerSummary(customerOrders), [customerOrders]);
 
   const subtotal = useMemo(() => {
     return cart.reduce((total, item) => total + item.qty * item.unit_price, 0);
@@ -410,7 +454,7 @@ export default function QuickSale() {
   const canCompleteSale = cart.length > 0;
   const paymentValidation = validatePaymentAmount({
     amount: paymentAmount,
-    remainingBalance: selectedActionOrder?.balance_due || 0,
+    remainingBalance: transactionSummary.amountDue || 0,
   });
 
   const handleGlobalEnter = useEffectEvent((event) => {
@@ -429,6 +473,30 @@ export default function QuickSale() {
     return () => window.removeEventListener("keydown", handleGlobalEnter);
   }, []);
 
+  useEffect(() => {
+    setSelectedTransactionIds((current) =>
+      current.filter((id) => selectableItems.some((item) => item.id === id))
+    );
+  }, [selectableItems]);
+
+  useEffect(() => {
+    if (selectedTransactionKind !== "payment") {
+      if (paymentAmount) setPaymentAmount("");
+      return;
+    }
+
+    setPaymentAmount((current) => {
+      const normalizedCurrent = Number(current || 0);
+      const suggestedAmount = Number(transactionSummary.amountDue || 0);
+
+      if (!current || normalizedCurrent > suggestedAmount) {
+        return String(suggestedAmount || "");
+      }
+
+      return current;
+    });
+  }, [paymentAmount, selectedTransactionKind, transactionSummary.amountDue]);
+
   function resetPaymentForm(nextAmount = "") {
     setPaymentAmount(nextAmount);
     setPaymentMethod(counterPaymentMethods[0] || "Cash");
@@ -445,7 +513,7 @@ export default function QuickSale() {
     setSelectedCustomer(customer);
     setLookupQuery(customer.name || "");
     setCustomerMatches([]);
-    setSelectedActionId("");
+    setSelectedTransactionIds([]);
     setTransactionMessage("");
     setCustomerName(customer.name || "");
     setLinkedCustomerId(customer.source === "saved" ? customer.id : "");
@@ -454,22 +522,37 @@ export default function QuickSale() {
     resetPaymentForm("");
   }
 
-  function startAction(action) {
-    setSelectedActionId(action.id);
+  function toggleTransactionItem(item) {
     setTransactionMessage("");
+    setPaymentError("");
+    setSelectedTransactionIds((current) => {
+      const nextSet = new Set(current);
+      const alreadySelected = nextSet.has(item.id);
+      const currentItems = selectableItems.filter((entry) => nextSet.has(entry.id));
+      const currentKind = currentItems[0]?.kind;
 
-    if (action.kind === "payment") {
+      if (alreadySelected) {
+        nextSet.delete(item.id);
+        return Array.from(nextSet);
+      }
+
+      if (currentKind && currentKind !== item.kind) {
+        return [item.id];
+      }
+
+      nextSet.add(item.id);
+      return Array.from(nextSet);
+    });
+
+    if (item.kind === "payment") {
       setActiveMode("payment");
-      resetPaymentForm(String(action.amount || ""));
-      return;
+    } else if (item.kind === "pickup") {
+      setActiveMode("pickup");
     }
-
-    setActiveMode("pickup");
-    resetPaymentForm("");
   }
 
-  function clearSelectedAction() {
-    setSelectedActionId("");
+  function clearTransactionSelection() {
+    setSelectedTransactionIds([]);
     setTransactionMessage("");
     resetPaymentForm("");
   }
@@ -621,8 +704,8 @@ export default function QuickSale() {
   function handleRecordCounterPayment(event) {
     event.preventDefault();
 
-    if (!selectedActionOrder || selectedAction?.kind !== "payment") {
-      setPaymentError("Select a payment item before recording a counter payment.");
+    if (!selectedTransactionItems.length || selectedTransactionKind !== "payment") {
+      setPaymentError("Select at least one payment item before recording a counter payment.");
       return;
     }
 
@@ -637,13 +720,26 @@ export default function QuickSale() {
       return;
     }
 
-    let updatedOrder;
+    let remainingAmount = Number(paymentAmount || 0);
+    const updatedOrders = [];
 
     try {
-      updatedOrder = recordStoredOrderPayment(selectedActionOrder.order_number, {
-        amount: Number(paymentAmount),
-        method: paymentMethod,
-        note: paymentNote,
+      selectedTransactionItems.forEach((item) => {
+        if (remainingAmount <= 0) return;
+
+        const amountForOrder = Math.min(remainingAmount, Number(item.amount || 0));
+        if (amountForOrder <= 0) return;
+
+        const updatedOrder = recordStoredOrderPayment(item.orderNumber, {
+          amount: amountForOrder,
+          method: paymentMethod,
+          note: paymentNote,
+        });
+
+        if (updatedOrder) {
+          updatedOrders.push(updatedOrder);
+          remainingAmount -= amountForOrder;
+        }
       });
     } catch (error) {
       const message =
@@ -655,42 +751,58 @@ export default function QuickSale() {
       return;
     }
 
-    if (!updatedOrder) {
-      setPaymentError("Order could not be updated.");
+    if (!updatedOrders.length) {
+      setPaymentError("No selected orders could be updated.");
       return;
     }
 
-    if (updatedOrder.pickup_status === "Ready for Pickup" && Number(updatedOrder.balance_due || 0) <= 0) {
-      const releaseAction = buildPickupAction(updatedOrder);
-      setSelectedActionId(releaseAction?.id || "");
+    const readyForRelease = updatedOrders.filter(
+      (order) => order.pickup_status === "Ready for Pickup" && Number(order.balance_due || 0) <= 0
+    );
+    setSelectedTransactionIds([]);
+    setTransactionMessage(
+      readyForRelease.length
+        ? `Payment recorded across ${updatedOrders.length} selected item${
+            updatedOrders.length === 1 ? "" : "s"
+          }. ${readyForRelease.length} order${readyForRelease.length === 1 ? " is" : "s are"} now ready to release.`
+        : `Payment recorded across ${updatedOrders.length} selected item${
+            updatedOrders.length === 1 ? "" : "s"
+          }.`
+    );
+    if (readyForRelease.length) {
       setActiveMode("pickup");
-      setTransactionMessage(
-        `Payment recorded for ${updatedOrder.order_number}. The order is now ready to release.`
-      );
-    } else {
-      setSelectedActionId("");
-      setTransactionMessage(`Payment recorded for ${updatedOrder.order_number}.`);
     }
-
     resetPaymentForm("");
   }
 
-  function handleReleasePickup(order) {
-    if (!order) return;
+  function handleReleasePickupSelection() {
+    if (!selectedTransactionItems.length || selectedTransactionKind !== "pickup") return;
 
-    const balanceNote =
-      Number(order.balance_due || 0) > 0 ? ` Outstanding balance: ${currency(order.balance_due)}.` : "";
+    const releasedOrders = [];
 
-    updateStoredOrder(order.order_number, {
-      pickup_status: "Picked Up",
-      picked_up_at: order.picked_up_at || new Date().toISOString(),
-      status: order.status === "Ready for Pickup" ? "Picked Up" : order.status,
-      activity_type: "pickup",
-      activity_note: `Order marked as picked up.${balanceNote}`,
+    selectedTransactionItems.forEach((item) => {
+      const order = item.order;
+      if (!order) return;
+
+      const balanceNote =
+        Number(order.balance_due || 0) > 0 ? ` Outstanding balance: ${currency(order.balance_due)}.` : "";
+
+      updateStoredOrder(order.order_number, {
+        pickup_status: "Picked Up",
+        picked_up_at: order.picked_up_at || new Date().toISOString(),
+        status: order.status === "Ready for Pickup" ? "Picked Up" : order.status,
+        activity_type: "pickup",
+        activity_note: `Order marked as picked up.${balanceNote}`,
+      });
+      releasedOrders.push(order.order_number);
     });
 
-    setSelectedActionId("");
-    setTransactionMessage(`Pickup released for ${order.order_number}.`);
+    setSelectedTransactionIds([]);
+    setTransactionMessage(
+      `Pickup released for ${releasedOrders.length} selected order${
+        releasedOrders.length === 1 ? "" : "s"
+      }.`
+    );
   }
 
   if (completedSaleNumber) {
@@ -789,7 +901,7 @@ export default function QuickSale() {
   return (
     <div
       style={{
-        maxWidth: "1320px",
+        maxWidth: "1480px",
         margin: "0 auto",
         padding: "24px",
         fontFamily:
@@ -808,7 +920,7 @@ export default function QuickSale() {
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-            <div style={{ maxWidth: "760px" }}>
+            <div style={{ maxWidth: "780px" }}>
               <p
                 style={{
                   margin: 0,
@@ -825,9 +937,9 @@ export default function QuickSale() {
                 Front Counter
               </h1>
               <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-                Customer lookup drives the counter workflow here. Select a customer to surface
-                deposits, balances, pickup-ready orders, and release actions without leaving the
-                operational workspace.
+                Move through the counter workflow in sequence: lookup the customer, review a clean
+                summary, select the exact orders or pickup items involved, then generate a focused
+                transaction on the right.
               </p>
             </div>
 
@@ -860,7 +972,7 @@ export default function QuickSale() {
                   cursor: "pointer",
                 }}
               >
-                Open Customers
+                Open Customer Directory
               </button>
               <button
                 type="button"
@@ -875,20 +987,20 @@ export default function QuickSale() {
                   cursor: "pointer",
                 }}
               >
-                Production Queue
+                Open Production Queue
               </button>
             </div>
           </div>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button type="button" onClick={() => setActiveMode("lookup")} style={getModeButtonStyle(activeMode === "lookup")}>
-              Customer Lookup
+              All Transaction Items
             </button>
             <button type="button" onClick={() => setActiveMode("payment")} style={getModeButtonStyle(activeMode === "payment")}>
-              Payment Collection
+              Payment Items
             </button>
             <button type="button" onClick={() => setActiveMode("pickup")} style={getModeButtonStyle(activeMode === "pickup")}>
-              Pickup Release
+              Pickup Items
             </button>
             <button type="button" onClick={() => setActiveMode("quick-sale")} style={getModeButtonStyle(activeMode === "quick-sale")}>
               Quick Sale
@@ -896,306 +1008,8 @@ export default function QuickSale() {
           </div>
         </section>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(320px, 420px) minmax(0, 1fr)",
-            gap: "20px",
-            alignItems: "start",
-          }}
-        >
-          <aside style={{ display: "grid", gap: "18px" }}>
-            <section style={sectionCardStyle}>
-              <div>
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#78716c",
-                    fontSize: "12px",
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  Step 1
-                </p>
-                <h2 style={{ margin: "6px 0 8px", fontSize: "26px", color: "#0f172a" }}>
-                  Customer Lookup
-                </h2>
-                <p style={{ margin: 0, color: "#64748b", lineHeight: 1.5 }}>
-                  Search saved customers or existing order customers to drive the transaction
-                  workflow.
-                </p>
-              </div>
-
-              <div style={{ position: "relative" }}>
-                <input
-                  value={lookupQuery}
-                  onChange={(event) => handleLookupChange(event.target.value)}
-                  placeholder="Search name, phone, email, company, or order #"
-                  style={fieldStyle}
-                />
-
-                {customerMatches.length > 0 ? (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "54px",
-                      left: 0,
-                      right: 0,
-                      zIndex: 20,
-                      background: "#ffffff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "14px",
-                      boxShadow: "0 18px 30px rgba(15, 23, 42, 0.12)",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {customerMatches.map((customer) => (
-                      <button
-                        key={customer.id}
-                        type="button"
-                        onClick={() => selectCustomer(customer)}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          padding: "12px 14px",
-                          textAlign: "left",
-                          border: "none",
-                          borderBottom: "1px solid #f1f5f9",
-                          background: "#ffffff",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <strong>{customer.name}</strong>
-                        {customer.company ? ` - ${customer.company}` : ""}
-                        <span style={{ display: "block", marginTop: "4px", color: "#64748b", fontSize: "13px" }}>
-                          {[customer.phone, customer.email].filter(Boolean).join(" • ") ||
-                            `${customer.order_numbers?.length || 0} linked orders`}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-
-              {selectedCustomer ? (
-                <div
-                  style={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "18px",
-                    padding: "16px",
-                    background: "#f8fafc",
-                    display: "grid",
-                    gap: "12px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "start" }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: "22px", color: "#0f172a" }}>
-                        {selectedCustomer.name}
-                      </h3>
-                      <p style={{ margin: "4px 0 0", color: "#64748b" }}>
-                        {selectedCustomer.company || "Customer profile"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCustomer(null);
-                        setLookupQuery("");
-                        setCustomerMatches([]);
-                        clearSelectedAction();
-                      }}
-                      style={{
-                        border: "1px solid #cbd5e1",
-                        background: "#ffffff",
-                        borderRadius: "10px",
-                        padding: "8px 10px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Clear
-                    </button>
-                  </div>
-
-                  <div style={{ display: "grid", gap: "6px", color: "#475569", fontSize: "14px" }}>
-                    {selectedCustomer.phone ? <span>{selectedCustomer.phone}</span> : null}
-                    {selectedCustomer.email ? <span>{selectedCustomer.email}</span> : null}
-                    {selectedCustomer.order_numbers?.length ? (
-                      <span>{selectedCustomer.order_numbers.length} linked order records</span>
-                    ) : (
-                      <span>No linked order numbers stored yet.</span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    border: "1px dashed #cbd5e1",
-                    borderRadius: "18px",
-                    padding: "18px",
-                    color: "#64748b",
-                    background: "#f8fafc",
-                  }}
-                >
-                  Select a customer first. The workspace will then surface deposits due, remaining
-                  balances, open invoices, and pickup-release actions automatically.
-                </div>
-              )}
-            </section>
-
-            {selectedCustomer ? (
-              <section style={sectionCardStyle}>
-                <div>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "#78716c",
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
-                    Operational Snapshot
-                  </p>
-                  <h2 style={{ margin: "6px 0 8px", fontSize: "24px" }}>Action Queue</h2>
-                  <p style={{ margin: 0, color: "#64748b" }}>
-                    Actionable items tied to this customer. Staff does not need to calculate what is
-                    due manually.
-                  </p>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" }}>
-                  <OperationalStat label="Open Actions" value={operationalSummary.openItems} />
-                  <OperationalStat
-                    label="Due Now"
-                    value={currency(operationalSummary.amountDueNow)}
-                    emphasis={operationalSummary.amountDueNow > 0 ? "danger" : "success"}
-                  />
-                  <OperationalStat
-                    label="Outstanding"
-                    value={currency(operationalSummary.outstandingBalance)}
-                    emphasis={operationalSummary.outstandingBalance > 0 ? "danger" : "success"}
-                  />
-                  <OperationalStat
-                    label="Release Ready"
-                    value={operationalSummary.releaseReady}
-                    emphasis={operationalSummary.releaseReady > 0 ? "success" : "default"}
-                  />
-                </div>
-
-                {actionableItems.length ? (
-                  <div style={{ display: "grid", gap: "12px" }}>
-                    {actionableItems.map((action) => {
-                      const tones = getActionToneStyles(action.tone);
-                      const order = customerOrders.find((item) => item.order_number === action.orderNumber);
-
-                      return (
-                        <article
-                          key={action.id}
-                          style={{
-                            borderRadius: "18px",
-                            padding: "16px",
-                            background: tones.background,
-                            border: tones.border,
-                            display: "grid",
-                            gap: "10px",
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "start", flexWrap: "wrap" }}>
-                            <div>
-                              <p
-                                style={{
-                                  margin: 0,
-                                  color: tones.accent,
-                                  fontSize: "11px",
-                                  fontWeight: 800,
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.08em",
-                                }}
-                              >
-                                {action.kind === "pickup" ? "Pickup Release" : "Payment Action"}
-                              </p>
-                              <h3 style={{ margin: "6px 0 4px", fontSize: "18px", color: "#0f172a" }}>
-                                {action.label}
-                              </h3>
-                              <p style={{ margin: 0, color: "#475569", lineHeight: 1.5 }}>
-                                {action.summary}
-                              </p>
-                            </div>
-                            <div style={{ textAlign: "right" }}>
-                              <div style={{ fontWeight: 800, color: "#0f172a" }}>{action.orderNumber}</div>
-                              <div style={{ color: "#64748b", fontSize: "13px" }}>
-                                {action.amount > 0 ? currency(action.amount) : "Paid in full"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                            <PaymentStatusBadge status={order?.payment_status || "Draft"} />
-                            <PaymentStatusBadge status={order?.invoice_status || "Draft"} />
-                            <span style={{ color: "#475569", fontWeight: 700 }}>
-                              Pickup: {order?.pickup_status || "Pending"}
-                            </span>
-                          </div>
-
-                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                            <button
-                              type="button"
-                              onClick={() => startAction(action)}
-                              style={{
-                                background: "#0f172a",
-                                color: "#ffffff",
-                                border: "none",
-                                borderRadius: "12px",
-                                padding: "11px 14px",
-                                fontWeight: 800,
-                                cursor: "pointer",
-                              }}
-                            >
-                              {action.kind === "pickup" ? "Open Release Workflow" : "Open Payment Workflow"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/admin/orders/${action.orderNumber}`)}
-                              style={{
-                                background: "#ffffff",
-                                color: "#0f172a",
-                                border: "1px solid #cbd5e1",
-                                borderRadius: "12px",
-                                padding: "11px 14px",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                              }}
-                            >
-                              View Order
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      border: "1px dashed #cbd5e1",
-                      borderRadius: "18px",
-                      padding: "18px",
-                      background: "#f8fafc",
-                      color: "#64748b",
-                    }}
-                  >
-                    No open counter actions are tied to this customer right now.
-                  </div>
-                )}
-              </section>
-            ) : null}
-          </aside>
-
-          <main style={{ display: "grid", gap: "18px" }}>
+        {activeMode !== "quick-sale" ? (
+          <>
             {transactionMessage ? (
               <div
                 style={{
@@ -1211,8 +1025,225 @@ export default function QuickSale() {
               </div>
             ) : null}
 
-            {activeMode === "lookup" ? (
-              <section style={sectionCardStyle}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(280px, 340px) minmax(0, 1fr) minmax(320px, 380px)",
+                gap: "20px",
+                alignItems: "start",
+              }}
+            >
+              <aside style={{ display: "grid", gap: "18px" }}>
+                <section style={sectionCardStyle}>
+                  <div>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "#78716c",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                      }}
+                    >
+                      Step 1
+                    </p>
+                    <h2 style={{ margin: "6px 0 8px", fontSize: "26px", color: "#0f172a" }}>
+                      Customer Lookup
+                    </h2>
+                    <p style={{ margin: 0, color: "#64748b", lineHeight: 1.5 }}>
+                      Search by customer, phone, email, company, or order number to start a
+                      transaction.
+                    </p>
+                  </div>
+
+                  <div style={{ position: "relative" }}>
+                    <input
+                      value={lookupQuery}
+                      onChange={(event) => handleLookupChange(event.target.value)}
+                      placeholder="Search name, phone, email, company, or order #"
+                      style={fieldStyle}
+                    />
+
+                    {customerMatches.length > 0 ? (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "54px",
+                          left: 0,
+                          right: 0,
+                          zIndex: 20,
+                          background: "#ffffff",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "14px",
+                          boxShadow: "0 18px 30px rgba(15, 23, 42, 0.12)",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {customerMatches.map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            onClick={() => selectCustomer(customer)}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              padding: "12px 14px",
+                              textAlign: "left",
+                              border: "none",
+                              borderBottom: "1px solid #f1f5f9",
+                              background: "#ffffff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <strong>{customer.name}</strong>
+                            {customer.company ? ` - ${customer.company}` : ""}
+                            <span style={{ display: "block", marginTop: "4px", color: "#64748b", fontSize: "13px" }}>
+                              {[customer.phone, customer.email].filter(Boolean).join(" • ") ||
+                                `${customer.order_numbers?.length || 0} linked orders`}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {selectedCustomer ? (
+                    <div
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "18px",
+                        padding: "16px",
+                        background: "#f8fafc",
+                        display: "grid",
+                        gap: "12px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "start" }}>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: "22px", color: "#0f172a" }}>
+                            {selectedCustomer.name}
+                          </h3>
+                          <p style={{ margin: "4px 0 0", color: "#64748b" }}>
+                            {selectedCustomer.company || "Customer profile"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomer(null);
+                            setLookupQuery("");
+                            setCustomerMatches([]);
+                            clearTransactionSelection();
+                          }}
+                          style={{
+                            border: "1px solid #cbd5e1",
+                            background: "#ffffff",
+                            borderRadius: "10px",
+                            padding: "8px 10px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      <div style={{ display: "grid", gap: "6px", color: "#475569", fontSize: "14px" }}>
+                        {selectedCustomer.phone ? <span>{selectedCustomer.phone}</span> : null}
+                        {selectedCustomer.email ? <span>{selectedCustomer.email}</span> : null}
+                        {selectedCustomer.order_numbers?.length ? (
+                          <span>{selectedCustomer.order_numbers.length} linked order records</span>
+                        ) : (
+                          <span>No linked order numbers stored yet.</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        border: "1px dashed #cbd5e1",
+                        borderRadius: "18px",
+                        padding: "18px",
+                        color: "#64748b",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      Select a customer first. Financial totals and payment actions stay collapsed
+                      until staff intentionally chooses transaction items.
+                    </div>
+                  )}
+                </section>
+
+                <section style={sectionCardStyle}>
+                  <div>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "#78716c",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                      }}
+                    >
+                      Step 2
+                    </p>
+                    <h2 style={{ margin: "6px 0 8px", fontSize: "24px" }}>Customer Summary</h2>
+                    <p style={{ margin: 0, color: "#64748b" }}>
+                      Start with a compact summary instead of opening every balance, card, and
+                      action panel at once.
+                    </p>
+                  </div>
+
+                  {selectedCustomer ? (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" }}>
+                        <OperationalStat label="Open Orders" value={customerSummary.openOrders} />
+                        <OperationalStat label="Unpaid Balances" value={customerSummary.unpaidBalances} />
+                        <OperationalStat label="Pickup Ready" value={customerSummary.pickupReady} />
+                        <OperationalStat
+                          label="Outstanding"
+                          value={currency(customerSummary.outstandingBalance)}
+                          emphasis={customerSummary.outstandingBalance > 0 ? "danger" : "success"}
+                        />
+                      </div>
+
+                      <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "14px", display: "grid", gap: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                          <span style={{ color: "#475569", fontWeight: 700 }}>Release-ready orders</span>
+                          <strong style={{ color: "#166534" }}>{customerSummary.releaseReady}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                          <span style={{ color: "#475569", fontWeight: 700 }}>Current filter</span>
+                          <strong style={{ color: "#0f172a" }}>
+                            {activeMode === "payment"
+                              ? "Payment Items"
+                              : activeMode === "pickup"
+                              ? "Pickup Items"
+                              : "All Transaction Items"}
+                          </strong>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      style={{
+                        border: "1px dashed #cbd5e1",
+                        borderRadius: "18px",
+                        padding: "18px",
+                        background: "#f8fafc",
+                        color: "#64748b",
+                      }}
+                    >
+                      Customer summary appears here after lookup so staff can decide what to work on
+                      before any totals are generated.
+                    </div>
+                  )}
+                </section>
+              </aside>
+
+              <section style={{ ...sectionCardStyle, minHeight: "520px" }}>
                 <div>
                   <p
                     style={{
@@ -1224,93 +1255,18 @@ export default function QuickSale() {
                       letterSpacing: "0.08em",
                     }}
                   >
-                    Customer-Driven Workflow
+                    Step 3
                   </p>
-                  <h2 style={{ margin: "6px 0 8px", fontSize: "30px", color: "#0f172a" }}>
-                    Lookup First, Then Act
+                  <h2 style={{ margin: "6px 0 8px", fontSize: "28px", color: "#0f172a" }}>
+                    Select Orders And Items
                   </h2>
                   <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-                    Front Counter now centers on the selected customer. Use the action queue on the
-                    left to jump directly into payment collection or pickup release once the customer
-                    is identified.
+                    Select only what the customer is paying for or picking up. Totals on the right
+                    are generated from this selection only.
                   </p>
                 </div>
 
-                {selectedCustomer ? (
-                  <div style={{ display: "grid", gap: "16px" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
-                      <OperationalStat label="Open Orders" value={customerOrders.length} />
-                      <OperationalStat label="Pickup Ready" value={operationalSummary.pickupReady} />
-                      <OperationalStat
-                        label="Balance Due"
-                        value={currency(operationalSummary.outstandingBalance)}
-                        emphasis={operationalSummary.outstandingBalance > 0 ? "danger" : "success"}
-                      />
-                    </div>
-
-                    {customerOrders.length ? (
-                      <div style={{ display: "grid", gap: "12px" }}>
-                        {customerOrders.map((order) => (
-                          <article
-                            key={order.order_number}
-                            style={{
-                              border: "1px solid #e2e8f0",
-                              borderRadius: "18px",
-                              padding: "16px",
-                              background: "#ffffff",
-                              display: "grid",
-                              gap: "10px",
-                            }}
-                          >
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                              <div>
-                                <h3 style={{ margin: 0, fontSize: "18px", color: "#0f172a" }}>
-                                  {order.order_number}
-                                </h3>
-                                <p style={{ margin: "4px 0 0", color: "#64748b" }}>
-                                  {order.garment || order.item || "Custom order"} • Qty {order.qty || 0}
-                                </p>
-                              </div>
-                              <div style={{ textAlign: "right" }}>
-                                <div style={{ fontWeight: 800, color: "#0f172a" }}>
-                                  {currency(order.amount_due_now)}
-                                </div>
-                                <div style={{ color: "#64748b", fontSize: "13px" }}>Amount due now</div>
-                              </div>
-                            </div>
-
-                            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                              <PaymentStatusBadge status={order.payment_status} />
-                              <PaymentStatusBadge status={order.invoice_status} />
-                              <span style={{ color: "#475569", fontWeight: 700 }}>
-                                Pickup: {order.pickup_status}
-                              </span>
-                              <span style={{ color: "#475569", fontWeight: 700 }}>
-                                Paid to date: {currency(order.paid_to_date)}
-                              </span>
-                            </div>
-
-                            <p style={{ margin: 0, color: "#475569" }}>
-                              {order.deposit_credited_message} {order.balance_summary}
-                            </p>
-                          </article>
-                        ))}
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          border: "1px dashed #cbd5e1",
-                          borderRadius: "18px",
-                          padding: "18px",
-                          background: "#f8fafc",
-                          color: "#64748b",
-                        }}
-                      >
-                        This customer does not have order records in the current operational store.
-                      </div>
-                    )}
-                  </div>
-                ) : (
+                {!selectedCustomer ? (
                   <div
                     style={{
                       border: "1px dashed #cbd5e1",
@@ -1320,180 +1276,289 @@ export default function QuickSale() {
                       color: "#64748b",
                     }}
                   >
-                    Use the customer lookup to begin. Once selected, operational items appear here
-                    automatically instead of forcing staff to jump between dashboards.
+                    Begin with customer lookup. Transaction items stay hidden until a customer is
+                    selected.
+                  </div>
+                ) : !visibleSelectableItems.length ? (
+                  <div
+                    style={{
+                      border: "1px dashed #cbd5e1",
+                      borderRadius: "18px",
+                      padding: "20px",
+                      background: "#f8fafc",
+                      color: "#64748b",
+                    }}
+                  >
+                    No transaction items match this view for the selected customer.
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gap: "14px" }}>
+                    {visibleSelectableItems.map((item) => {
+                      const tones = getActionToneStyles(item.tone);
+                      const isSelected = selectedTransactionIds.includes(item.id);
+
+                      return (
+                        <article
+                          key={item.id}
+                          style={{
+                            borderRadius: "18px",
+                            padding: "16px",
+                            background: isSelected ? "#fff7ed" : "#ffffff",
+                            border: isSelected ? "1px solid #f59e0b" : "1px solid #e2e8f0",
+                            display: "grid",
+                            gap: "12px",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "start", flexWrap: "wrap" }}>
+                            <div>
+                              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                                <span
+                                  style={{
+                                    color: tones.accent,
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.08em",
+                                  }}
+                                >
+                                  {item.selectionLabel}
+                                </span>
+                                <span
+                                  style={{
+                                    background: tones.background,
+                                    border: tones.border,
+                                    borderRadius: "999px",
+                                    padding: "4px 8px",
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    color: "#0f172a",
+                                  }}
+                                >
+                                  {item.kind === "pickup" ? "Pickup" : "Payment"}
+                                </span>
+                              </div>
+                              <h3 style={{ margin: "6px 0 4px", fontSize: "20px", color: "#0f172a" }}>
+                                {item.orderNumber}
+                              </h3>
+                              <p style={{ margin: 0, color: "#475569", lineHeight: 1.5 }}>
+                                {item.summary}
+                              </p>
+                            </div>
+
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "20px" }}>
+                                {item.amount > 0 ? currency(item.amount) : "Release"}
+                              </div>
+                              <div style={{ color: "#64748b", fontSize: "13px" }}>
+                                {item.order.garment || item.order.item || "Custom order"} • Qty {item.order.qty || 0}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                            <PaymentStatusBadge status={item.order.payment_status || "Draft"} />
+                            <PaymentStatusBadge status={item.order.invoice_status || "Draft"} />
+                            <span style={{ color: "#475569", fontWeight: 700 }}>
+                              Pickup: {item.order.pickup_status || "Pending"}
+                            </span>
+                            <span style={{ color: "#475569", fontWeight: 700 }}>
+                              Paid to date: {currency(item.order.paid_to_date)}
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                            <p style={{ margin: 0, color: "#475569" }}>
+                              {item.order.deposit_credited_message} {item.order.balance_summary}
+                            </p>
+
+                            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                onClick={() => toggleTransactionItem(item)}
+                                style={{
+                                  background: isSelected ? "#0f172a" : "#ffffff",
+                                  color: isSelected ? "#ffffff" : "#0f172a",
+                                  border: isSelected ? "1px solid #0f172a" : "1px solid #cbd5e1",
+                                  borderRadius: "12px",
+                                  padding: "11px 14px",
+                                  fontWeight: 800,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {isSelected ? "Selected" : "Select"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/admin/orders/${item.orderNumber}`)}
+                                style={{
+                                  background: "#ffffff",
+                                  color: "#0f172a",
+                                  border: "1px solid #cbd5e1",
+                                  borderRadius: "12px",
+                                  padding: "11px 14px",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                View Order
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
               </section>
-            ) : null}
 
-            {activeMode === "payment" ? (
-              <section style={sectionCardStyle}>
-                <div>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "#78716c",
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
-                    Counter Transaction
-                  </p>
-                  <h2 style={{ margin: "6px 0 8px", fontSize: "30px", color: "#0f172a" }}>
-                    Payment Collection
-                  </h2>
-                  <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-                    Manual counter payments record against the selected order and update balances,
-                    payment status, invoice state, and financial history automatically.
-                  </p>
-                </div>
+              <aside style={{ display: "grid", gap: "18px" }}>
+                <section style={sectionCardStyle}>
+                  <div>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "#78716c",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                      }}
+                    >
+                      Step 4
+                    </p>
+                    <h2 style={{ margin: "6px 0 8px", fontSize: "24px", color: "#0f172a" }}>
+                      Transaction Summary
+                    </h2>
+                    <p style={{ margin: 0, color: "#64748b" }}>
+                      This panel stays empty until staff intentionally selects transaction items.
+                    </p>
+                  </div>
 
-                {!selectedCustomer ? (
-                  <div
-                    style={{
-                      border: "1px dashed #cbd5e1",
-                      borderRadius: "18px",
-                      padding: "18px",
-                      background: "#f8fafc",
-                      color: "#64748b",
-                    }}
-                  >
-                    Select a customer first, then choose a payment action from the action queue.
-                  </div>
-                ) : !selectedActionOrder || selectedAction?.kind !== "payment" ? (
-                  <div
-                    style={{
-                      border: "1px dashed #cbd5e1",
-                      borderRadius: "18px",
-                      padding: "18px",
-                      background: "#f8fafc",
-                      color: "#64748b",
-                    }}
-                  >
-                    Choose `Collect Deposit` or `Collect Remaining Balance` from the customer action
-                    queue to auto-populate this transaction.
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gap: "18px" }}>
+                  {!selectedTransactionItems.length ? (
                     <div
                       style={{
-                        border: "1px solid #e2e8f0",
+                        border: "1px dashed #cbd5e1",
                         borderRadius: "18px",
                         padding: "18px",
                         background: "#f8fafc",
-                        display: "grid",
-                        gap: "12px",
+                        color: "#64748b",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                        <div>
-                          <p
-                            style={{
-                              margin: 0,
-                              color: "#9a3412",
-                              fontSize: "11px",
-                              fontWeight: 800,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.08em",
-                            }}
-                          >
-                            Selected Action
-                          </p>
-                          <h3 style={{ margin: "6px 0 4px", fontSize: "22px", color: "#0f172a" }}>
-                            {selectedAction.label}
-                          </h3>
-                          <p style={{ margin: 0, color: "#475569" }}>
-                            {selectedActionOrder.customer_name} • {selectedActionOrder.order_number}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={clearSelectedAction}
-                          style={{
-                            background: "#ffffff",
-                            color: "#0f172a",
-                            border: "1px solid #cbd5e1",
-                            borderRadius: "12px",
-                            padding: "10px 12px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Clear Action
-                        </button>
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
-                        <OperationalStat
-                          label="Auto Total"
-                          value={currency(selectedAction.amount)}
-                          emphasis={selectedAction.amount > 0 ? "danger" : "success"}
-                        />
-                        <OperationalStat label="Paid To Date" value={currency(selectedActionOrder.paid_to_date)} />
-                        <OperationalStat
-                          label="Balance Due"
-                          value={currency(selectedActionOrder.balance_due)}
-                          emphasis={selectedActionOrder.balance_due > 0 ? "danger" : "success"}
-                        />
-                        <OperationalStat
-                          label="Deposit Outstanding"
-                          value={currency(selectedActionOrder.deposit_outstanding)}
-                          emphasis={selectedActionOrder.deposit_outstanding > 0 ? "danger" : "success"}
-                        />
-                      </div>
-
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                        <PaymentStatusBadge status={selectedActionOrder.payment_status} />
-                        <PaymentStatusBadge status={selectedActionOrder.invoice_status} />
-                        <span style={{ color: "#475569", fontWeight: 700 }}>
-                          Pickup: {selectedActionOrder.pickup_status}
-                        </span>
-                        <span style={{ color: "#475569", fontWeight: 700 }}>
-                          Due date: {selectedActionOrder.invoice_due_date ? formatShortDate(selectedActionOrder.invoice_due_date) : "—"}
-                        </span>
-                      </div>
+                      Select one or more payment items, or pickup releases, to generate a focused
+                      transaction summary.
                     </div>
-
-                    <form onSubmit={handleRecordCounterPayment} style={{ display: "grid", gap: "16px" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" }}>
-                        <label style={labelStyle}>
-                          Payment Amount
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={paymentAmount}
-                            onChange={(event) => {
-                              setPaymentAmount(event.target.value);
-                              setPaymentError("");
-                            }}
-                            style={{
-                              ...fieldStyle,
-                              border: paymentError || !paymentValidation.valid ? "1px solid #dc2626" : fieldStyle.border,
-                              background:
-                                paymentError || !paymentValidation.valid ? "#fff1f2" : fieldStyle.background,
-                            }}
-                          />
-                        </label>
-
-                        <label style={labelStyle}>
-                          Payment Method
-                          <select
-                            value={paymentMethod}
-                            onChange={(event) => setPaymentMethod(event.target.value)}
-                            style={fieldStyle}
-                          >
-                            {counterPaymentMethods.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                  ) : (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" }}>
+                        <OperationalStat label="Selected Items" value={transactionSummary.selectedCount} />
+                        <OperationalStat
+                          label="Transaction Total"
+                          value={currency(transactionSummary.amountDue)}
+                          emphasis={transactionSummary.amountDue > 0 ? "danger" : "success"}
+                        />
                       </div>
+
+                      <div style={{ display: "grid", gap: "10px" }}>
+                        {selectedTransactionItems.map((item) => (
+                          <article
+                            key={`summary-${item.id}`}
+                            style={{
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "14px",
+                              padding: "12px 14px",
+                              background: "#f8fafc",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                              <strong style={{ color: "#0f172a" }}>{item.orderNumber}</strong>
+                              <strong style={{ color: "#0f172a" }}>
+                                {item.amount > 0 ? currency(item.amount) : "Release"}
+                              </strong>
+                            </div>
+                            <div style={{ marginTop: "4px", color: "#64748b", fontSize: "13px" }}>
+                              {item.label}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={clearTransactionSelection}
+                        style={{
+                          background: "#ffffff",
+                          color: "#0f172a",
+                          border: "1px solid #cbd5e1",
+                          borderRadius: "12px",
+                          padding: "11px 14px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Clear Selection
+                      </button>
+                    </>
+                  )}
+                </section>
+
+                <section style={sectionCardStyle}>
+                  <div>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "#78716c",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                      }}
+                    >
+                      Step 5
+                    </p>
+                    <h2 style={{ margin: "6px 0 8px", fontSize: "24px", color: "#0f172a" }}>
+                      Record Transaction
+                    </h2>
+                    <p style={{ margin: 0, color: "#64748b" }}>
+                      Payment and pickup actions stay focused on the current selection.
+                    </p>
+                  </div>
+
+                  {selectedTransactionKind === "payment" ? (
+                    <form onSubmit={handleRecordCounterPayment} style={{ display: "grid", gap: "16px" }}>
+                      <label style={labelStyle}>
+                        Payment Amount
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={paymentAmount}
+                          onChange={(event) => {
+                            setPaymentAmount(event.target.value);
+                            setPaymentError("");
+                          }}
+                          style={{
+                            ...fieldStyle,
+                            border: paymentError || !paymentValidation.valid ? "1px solid #dc2626" : fieldStyle.border,
+                            background:
+                              paymentError || !paymentValidation.valid ? "#fff1f2" : fieldStyle.background,
+                          }}
+                        />
+                      </label>
+
+                      <label style={labelStyle}>
+                        Payment Method
+                        <select
+                          value={paymentMethod}
+                          onChange={(event) => setPaymentMethod(event.target.value)}
+                          style={fieldStyle}
+                        >
+                          {counterPaymentMethods.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
 
                       <label style={labelStyle}>
                         Counter Note
@@ -1501,7 +1566,7 @@ export default function QuickSale() {
                           value={paymentNote}
                           onChange={(event) => setPaymentNote(event.target.value)}
                           rows={3}
-                          placeholder="Optional note for the payment record"
+                          placeholder="Optional note for this selected transaction"
                           style={{ ...fieldStyle, resize: "vertical" }}
                         />
                       </label>
@@ -1512,263 +1577,87 @@ export default function QuickSale() {
                         </p>
                       ) : null}
 
-                      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                        <button
-                          type="submit"
-                          disabled={!paymentValidation.valid}
-                          style={{
-                            background: paymentValidation.valid ? "#171717" : "#a8a29e",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "12px",
-                            padding: "13px 18px",
-                            cursor: paymentValidation.valid ? "pointer" : "not-allowed",
-                            fontWeight: 800,
-                          }}
-                        >
-                          Record Payment
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/admin/orders/${selectedActionOrder.order_number}`)}
-                          style={{
-                            background: "#ffffff",
-                            border: "1px solid #cbd5e1",
-                            borderRadius: "12px",
-                            padding: "13px 18px",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                          }}
-                        >
-                          View Full Order
-                        </button>
-                      </div>
-                    </form>
-
-                    <div
-                      style={{
-                        borderTop: "1px solid #e2e8f0",
-                        paddingTop: "18px",
-                        display: "grid",
-                        gap: "10px",
-                      }}
-                    >
-                      <h3 style={{ margin: 0, fontSize: "18px", color: "#0f172a" }}>
-                        Existing Payment History
-                      </h3>
-                      {selectedActionOrder.payment_history?.length ? (
-                        <div style={{ display: "grid", gap: "10px" }}>
-                          {selectedActionOrder.payment_history.map((payment) => (
-                            <article
-                              key={payment.id}
-                              style={{
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "14px",
-                                padding: "12px 14px",
-                                background: "#f8fafc",
-                              }}
-                            >
-                              <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-                                <strong>{currency(payment.amount)}</strong>
-                                <span style={{ color: "#475569", fontWeight: 700 }}>{payment.method}</span>
-                              </div>
-                              <div style={{ marginTop: "4px", color: "#64748b", fontSize: "13px" }}>
-                                {payment.staff_member} • {formatDateTime(payment.timestamp)}
-                              </div>
-                              {payment.note ? (
-                                <p style={{ margin: "6px 0 0", color: "#334155", fontSize: "14px" }}>
-                                  {payment.note}
-                                </p>
-                              ) : null}
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <p style={{ margin: 0, color: "#64748b" }}>No payments recorded yet.</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </section>
-            ) : null}
-
-            {activeMode === "pickup" ? (
-              <section style={sectionCardStyle}>
-                <div>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "#78716c",
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                    }}
-                  >
-                    Counter Handoff
-                  </p>
-                  <h2 style={{ margin: "6px 0 8px", fontSize: "30px", color: "#0f172a" }}>
-                    Pickup Release
-                  </h2>
-                  <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-                    Release actions only appear once pickup is ready and balance is fully paid. If
-                    money is still owing, staff is pushed back into payment collection first.
-                  </p>
-                </div>
-
-                {!selectedCustomer ? (
-                  <div
-                    style={{
-                      border: "1px dashed #cbd5e1",
-                      borderRadius: "18px",
-                      padding: "18px",
-                      background: "#f8fafc",
-                      color: "#64748b",
-                    }}
-                  >
-                    Select a customer to see pickup-ready orders and release eligibility.
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gap: "14px" }}>
-                    {customerOrders.filter((order) => order.pickup_status === "Ready for Pickup").length ? (
-                      customerOrders
-                        .filter((order) => order.pickup_status === "Ready for Pickup")
-                        .map((order) => {
-                          const canRelease = Number(order.balance_due || 0) <= 0;
-                          const isSelected = selectedAction?.orderNumber === order.order_number;
-
-                          return (
-                            <article
-                              key={order.order_number}
-                              style={{
-                                border: isSelected ? "1px solid #0f172a" : "1px solid #e2e8f0",
-                                borderRadius: "18px",
-                                padding: "18px",
-                                background: canRelease ? "#f0fdf4" : "#fff7ed",
-                                display: "grid",
-                                gap: "12px",
-                              }}
-                            >
-                              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                                <div>
-                                  <h3 style={{ margin: 0, fontSize: "20px", color: "#0f172a" }}>
-                                    {order.order_number}
-                                  </h3>
-                                  <p style={{ margin: "4px 0 0", color: "#475569" }}>
-                                    {order.garment || order.item || "Custom order"} • Qty {order.qty || 0}
-                                  </p>
-                                </div>
-                                <div style={{ textAlign: "right" }}>
-                                  <div
-                                    style={{
-                                      color: canRelease ? "#166534" : "#c2410c",
-                                      fontWeight: 800,
-                                      fontSize: "20px",
-                                    }}
-                                  >
-                                    {canRelease ? "Ready To Release" : currency(order.balance_due)}
-                                  </div>
-                                  <div style={{ color: "#64748b", fontSize: "13px" }}>
-                                    {canRelease ? "Balance clear" : "Still due before release"}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                                <PaymentStatusBadge status={order.payment_status} />
-                                <PaymentStatusBadge status={order.invoice_status} />
-                                <span style={{ color: "#475569", fontWeight: 700 }}>
-                                  Pickup: {order.pickup_status}
-                                </span>
-                              </div>
-
-                              <p style={{ margin: 0, color: "#475569" }}>
-                                {canRelease
-                                  ? "This order can be handed off now. Releasing it will mark pickup complete and add a timeline event."
-                                  : `Collect ${currency(order.balance_due)} first. Once paid, this order can be released immediately.`}
-                              </p>
-
-                              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                                {canRelease ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReleasePickup(order)}
-                                    style={{
-                                      background: "#166534",
-                                      color: "#ffffff",
-                                      border: "none",
-                                      borderRadius: "12px",
-                                      padding: "12px 16px",
-                                      fontWeight: 800,
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    Release Pickup Order
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      startAction(
-                                        buildPaymentAction(order) || {
-                                          id: `${order.order_number}-payment-balance`,
-                                          kind: "payment",
-                                          paymentKind: "balance",
-                                          label: "Collect Remaining Balance",
-                                          orderNumber: order.order_number,
-                                          amount: order.balance_due,
-                                        }
-                                      )
-                                    }
-                                    style={{
-                                      background: "#0f172a",
-                                      color: "#ffffff",
-                                      border: "none",
-                                      borderRadius: "12px",
-                                      padding: "12px 16px",
-                                      fontWeight: 800,
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    Collect Balance First
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => navigate(`/admin/orders/${order.order_number}`)}
-                                  style={{
-                                    background: "#ffffff",
-                                    color: "#0f172a",
-                                    border: "1px solid #cbd5e1",
-                                    borderRadius: "12px",
-                                    padding: "12px 16px",
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  View Order
-                                </button>
-                              </div>
-                            </article>
-                          );
-                        })
-                    ) : (
-                      <div
+                      <button
+                        type="submit"
+                        disabled={!paymentValidation.valid}
                         style={{
-                          border: "1px dashed #cbd5e1",
-                          borderRadius: "18px",
-                          padding: "18px",
-                          background: "#f8fafc",
-                          color: "#64748b",
+                          background: paymentValidation.valid ? "#171717" : "#a8a29e",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: "12px",
+                          padding: "13px 18px",
+                          cursor: paymentValidation.valid ? "pointer" : "not-allowed",
+                          fontWeight: 800,
                         }}
                       >
-                        No pickup-ready orders are tied to this customer yet.
+                        Record Selected Payment
+                      </button>
+
+                      {selectedTransactionOrders.length ? (
+                        <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "14px", display: "grid", gap: "10px" }}>
+                          <h3 style={{ margin: 0, fontSize: "17px", color: "#0f172a" }}>Selected Orders</h3>
+                          {selectedTransactionOrders.map((item) => (
+                            <div key={`payment-order-${item.orderNumber}`} style={{ color: "#475569", fontSize: "14px" }}>
+                              <strong style={{ color: "#0f172a" }}>{item.orderNumber}</strong>
+                              {" • "}
+                              Due now {currency(item.order.amount_due_now)}
+                              {" • "}
+                              Due date {item.order.invoice_due_date ? formatShortDate(item.order.invoice_due_date) : "—"}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </form>
+                  ) : selectedTransactionKind === "pickup" ? (
+                    <div style={{ display: "grid", gap: "16px" }}>
+                      <div
+                        style={{
+                          border: "1px solid #bbf7d0",
+                          background: "#f0fdf4",
+                          color: "#166534",
+                          borderRadius: "16px",
+                          padding: "14px 16px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {transactionSummary.pickupCount} pickup item{transactionSummary.pickupCount === 1 ? "" : "s"} selected and ready to release.
                       </div>
-                    )}
-                  </div>
-                )}
-              </section>
-            ) : null}
+
+                      <button
+                        type="button"
+                        onClick={handleReleasePickupSelection}
+                        style={{
+                          background: "#166534",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: "12px",
+                          padding: "13px 18px",
+                          cursor: "pointer",
+                          fontWeight: 800,
+                        }}
+                      >
+                        Release Selected Pickup
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        border: "1px dashed #cbd5e1",
+                        borderRadius: "18px",
+                        padding: "18px",
+                        background: "#f8fafc",
+                        color: "#64748b",
+                      }}
+                    >
+                      Select transaction items first. Payment totals and pickup release actions stay
+                      inactive until selection is made.
+                    </div>
+                  )}
+                </section>
+              </aside>
+            </div>
+          </>
+        ) : null}
 
             {activeMode === "quick-sale" ? (
               <form onSubmit={completeSale} style={{ display: "grid", gap: "18px" }}>
@@ -2110,9 +1999,7 @@ export default function QuickSale() {
                 </section>
               </form>
             ) : null}
-          </main>
         </div>
-      </div>
     </div>
   );
 }
