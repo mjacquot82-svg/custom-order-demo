@@ -7,6 +7,7 @@ import {
   getAdminViewer,
   getAssignedOrdersForStaff,
   getOperationalOrdersForStaff,
+  hasOperationalSession,
   isAdminWorkspaceView,
   isStaffWorkspaceView,
 } from "../admin/adminRoleView";
@@ -746,11 +747,19 @@ export default function Layout() {
 
   useEffect(() => {
     if (!isAdmin) return;
+    if (!hasOperationalSession(activeStaffUser)) {
+      navigate("/login", { replace: true });
+      return;
+    }
     if (canAccessOwnerWorkspace(location.pathname, activeStaffUser)) return;
     navigate("/admin", { replace: true });
   }, [activeStaffUser, isAdmin, location.pathname, navigate]);
 
   const visibleStaffUser = isAdmin ? activeStaffUser : null;
+
+  if (isAdmin && !visibleStaffUser) {
+    return null;
+  }
 
   return (
     <div>

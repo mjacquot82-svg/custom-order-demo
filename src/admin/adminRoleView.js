@@ -1,31 +1,24 @@
-import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
-
-function getDefaultOperationalViewer() {
-  return (
-    getStoredStaffUsers().find(
-      (user) =>
-        user?.status !== "Inactive" &&
-        (user.role === "Owner" || user.role === "Manager")
-    ) || null
-  );
-}
+import { getActiveStaffUser } from "../lib/staffUsersStore";
 
 export function getAdminViewer(staffUser = getActiveStaffUser()) {
-  return staffUser || getDefaultOperationalViewer();
+  return staffUser || null;
 }
 
 export function isAdminWorkspaceView(staffUser = getActiveStaffUser()) {
-  const role = getAdminViewer(staffUser)?.role;
+  const role = staffUser?.role;
   return role === "Owner" || role === "Manager";
 }
 
 export function isOwnerView(staffUser = getActiveStaffUser()) {
-  return getAdminViewer(staffUser)?.role === "Owner";
+  return staffUser?.role === "Owner";
 }
 
 export function isStaffWorkspaceView(staffUser = getActiveStaffUser()) {
-  const viewer = getAdminViewer(staffUser);
-  return Boolean(viewer) && viewer.role === "Staff";
+  return staffUser?.role === "Staff";
+}
+
+export function hasOperationalSession(staffUser = getActiveStaffUser()) {
+  return Boolean(staffUser?.id);
 }
 
 export function canManageArchivedQuotes(staffUser = getActiveStaffUser()) {
@@ -60,6 +53,7 @@ export function getOperationalOrdersForStaff(orders = []) {
 }
 
 export function canAccessOwnerWorkspace(pathname, staffUser = getActiveStaffUser()) {
+  if (!hasOperationalSession(staffUser)) return false;
   if (!isStaffWorkspaceView(staffUser)) return true;
 
   const blockedExactPaths = [

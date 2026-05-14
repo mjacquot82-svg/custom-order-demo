@@ -254,6 +254,7 @@ export function setActiveStaffUser(user) {
   });
 
   setRawStorageItem(ACTIVE_STAFF_KEY, nextActiveUser);
+  setRawStorageItem(ACTIVE_STAFF_KEY, nextActiveUser, { storage: "session" });
   emitActiveStaffUpdated();
 }
 
@@ -265,9 +266,9 @@ export function getActiveStaffUser() {
   if (!hasBrowserStorage()) return null;
 
   try {
-    const parsedUser =
-      getJsonStorageItem(ACTIVE_STAFF_KEY, null) ||
-      getJsonStorageItem(ACTIVE_STAFF_KEY, null, { storage: "session" });
+    const persistedUser = getJsonStorageItem(ACTIVE_STAFF_KEY, null);
+    const sessionUser = getJsonStorageItem(ACTIVE_STAFF_KEY, null, { storage: "session" });
+    const parsedUser = persistedUser || sessionUser;
 
     if (!parsedUser?.id) {
       return null;
