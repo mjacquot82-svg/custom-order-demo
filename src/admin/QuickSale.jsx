@@ -10,7 +10,6 @@ import {
 } from "../lib/ordersStore";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 import { validatePaymentAmount } from "../lib/financialValidation";
-import { formatShortDate } from "../lib/dateFormatting";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import { PAYMENT_METHOD_OPTIONS } from "../orders/orderFinancials";
 import { isStaffWorkspaceView } from "./adminRoleView";
@@ -27,37 +26,30 @@ const paymentWorkflowActions = [
     title: "Charge Card",
     recordMethod: "Card",
     shortLabel: "Card",
-    summary: "Use for counter card transactions today and terminal-push handoff later.",
-    detail:
-      "This is the future terminal action point. For V1, staff can still record manual card entry or a standalone terminal result here.",
-    buttonLabel: "Record Card Payment",
-    notePlaceholder: "Optional terminal note, approval ref, last four, or manual card note.",
+    buttonLabel: "Record Card",
+    notePlaceholder: "Optional terminal note or reference.",
     accent: "#1d4ed8",
     background: "#eff6ff",
     border: "1px solid #bfdbfe",
   },
   {
     id: "cash",
-    title: "Record Cash Payment",
+    title: "Cash",
     recordMethod: "Cash",
     shortLabel: "Cash",
-    summary: "Use when cash is received at the counter and needs to be logged immediately.",
-    detail: "Staff can capture tendered cash as a full or partial payment without leaving the counter workflow.",
-    buttonLabel: "Record Cash Payment",
-    notePlaceholder: "Optional drawer note, change note, or cash handling detail.",
+    buttonLabel: "Record Cash",
+    notePlaceholder: "Optional cash note.",
     accent: "#047857",
     background: "#ecfdf5",
     border: "1px solid #a7f3d0",
   },
   {
     id: "etransfer",
-    title: "Record E-Transfer",
+    title: "E-Transfer",
     recordMethod: "E-Transfer",
     shortLabel: "E-Transfer",
-    summary: "Use when staff has confirmed the transfer and needs to post it to the order.",
-    detail: "Good for manual confirmation workflows where payment arrived outside a terminal or gateway integration.",
     buttonLabel: "Record E-Transfer",
-    notePlaceholder: "Optional sender name, transfer note, or confirmation reference.",
+    notePlaceholder: "Optional transfer reference.",
     accent: "#7c3aed",
     background: "#f5f3ff",
     border: "1px solid #ddd6fe",
@@ -67,10 +59,8 @@ const paymentWorkflowActions = [
     title: "Split Payment",
     recordMethod: "Split Payment",
     shortLabel: "Split",
-    summary: "Break the counter transaction into two payment legs with separate methods.",
-    detail: "Use this when the customer is combining cash, card, e-transfer, or another manual method in the same transaction.",
     buttonLabel: "Record Split Payment",
-    notePlaceholder: "Optional note describing how the split was handled at the counter.",
+    notePlaceholder: "Optional split payment note.",
     accent: "#c2410c",
     background: "#fff7ed",
     border: "1px solid #fdba74",
@@ -477,30 +467,17 @@ function PaymentWorkflowActionButton({ action, active, onSelect }) {
       type="button"
       onClick={() => onSelect(action.id)}
       style={{
-        borderRadius: "18px",
-        padding: "16px",
+        borderRadius: "999px",
+        padding: "10px 14px",
         border: active ? `1px solid ${action.accent}` : action.border,
         background: active ? action.background : "#ffffff",
-        textAlign: "left",
-        display: "grid",
-        gap: "8px",
+        color: active ? action.accent : "#0f172a",
+        fontWeight: 800,
         cursor: "pointer",
         boxShadow: active ? `0 0 0 2px ${action.background}` : "none",
       }}
     >
-      <span
-        style={{
-          color: action.accent,
-          fontSize: "11px",
-          fontWeight: 800,
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-        }}
-      >
-        Payment Action
-      </span>
-      <strong style={{ color: "#0f172a", fontSize: "18px" }}>{action.title}</strong>
-      <span style={{ color: "#475569", lineHeight: 1.5 }}>{action.summary}</span>
+      {action.title}
     </button>
   );
 }
@@ -596,14 +573,6 @@ export default function QuickSale() {
     [selectedTransactionItems]
   );
   const selectedTransactionKind = selectedTransactionItems[0]?.kind || "";
-  const selectedTransactionOrders = useMemo(() => {
-    const seen = new Set();
-    return selectedTransactionItems.filter((item) => {
-      if (seen.has(item.orderNumber)) return false;
-      seen.add(item.orderNumber);
-      return true;
-    });
-  }, [selectedTransactionItems]);
   const transactionSummary = useMemo(() => {
     const paymentItems = selectedTransactionItems.filter((item) => item.kind === "payment");
     const pickupItems = selectedTransactionItems.filter((item) => item.kind === "pickup");
@@ -1758,7 +1727,7 @@ export default function QuickSale() {
                       Transaction Summary
                     </h2>
                     <p style={{ margin: 0, color: "#64748b" }}>
-                      This panel stays empty until staff intentionally selects transaction items.
+                      Review the active items, total due, and complete the counter action from one place.
                     </p>
                   </div>
 
@@ -1784,11 +1753,6 @@ export default function QuickSale() {
                           value={currency(transactionSummary.amountDue)}
                           emphasis={transactionSummary.amountDue > 0 ? "danger" : "success"}
                         />
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" }}>
-                        <OperationalStat label="Payment Items" value={transactionSummary.paymentCount} />
-                        <OperationalStat label="Pickup Releases" value={transactionSummary.pickupCount} />
                       </div>
 
                       <div style={{ display: "grid", gap: "10px" }}>
@@ -1850,346 +1814,249 @@ export default function QuickSale() {
                       >
                         Clear Selection
                       </button>
-                    </>
-                  )}
-                </section>
-
-                <section style={sectionCardStyle}>
-                  <div>
-                    <p
-                      style={{
-                        margin: 0,
-                        color: "#78716c",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                      }}
-                    >
-                      Step 5
-                    </p>
-                    <h2 style={{ margin: "6px 0 8px", fontSize: "24px", color: "#0f172a" }}>
-                      Record Transaction
-                    </h2>
-                    <p style={{ margin: 0, color: "#64748b" }}>
-                      Payment and pickup actions stay focused on the current selection.
-                    </p>
-                  </div>
-
-                  {selectedTransactionKind === "payment" ? (
-                    <form onSubmit={handleRecordCounterPayment} style={{ display: "grid", gap: "16px" }}>
-                      <div
-                        style={{
-                          border: "1px solid #e2e8f0",
-                          borderRadius: "14px",
-                          padding: "14px 16px",
-                          background: "#f8fafc",
-                          display: "grid",
-                          gap: "8px",
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-                          <span style={{ color: "#475569", fontWeight: 700 }}>Selected transaction total</span>
-                          <strong style={{ color: "#0f172a" }}>{currency(transactionSummary.amountDue)}</strong>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-                          <span style={{ color: "#475569", fontWeight: 700 }}>Remaining after entered payment</span>
-                          <strong
-                            style={{
-                              color: outstandingBalanceAfterPayment > 0 ? "#b45309" : "#166534",
-                            }}
-                          >
-                            {currency(outstandingBalanceAfterPayment)}
-                          </strong>
-                        </div>
-                        <p style={{ margin: 0, color: "#64748b", fontSize: "13px", lineHeight: 1.5 }}>
-                          The amount auto-fills from the current selection and can still be edited for
-                          partial or split payments.
-                        </p>
-                      </div>
-
-                      <div style={{ display: "grid", gap: "12px" }}>
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: "17px", color: "#0f172a" }}>
-                            Choose Payment Action
-                          </h3>
-                          <p style={{ margin: "6px 0 0", color: "#64748b", lineHeight: 1.5 }}>
-                            Select how staff is processing this counter transaction. Actions reveal the
-                            operational workflow instead of a static payment-method field.
-                          </p>
-                        </div>
-
-                        <div style={{ display: "grid", gap: "12px" }}>
-                          {paymentWorkflowActions.map((action) => (
-                            <PaymentWorkflowActionButton
-                              key={action.id}
-                              action={action}
-                              active={selectedPaymentAction === action.id}
-                              onSelect={selectPaymentWorkflowAction}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <label style={labelStyle}>
-                        Transaction Amount
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={paymentAmount}
-                          onChange={(event) => {
-                            setPaymentAmountOverride(event.target.value);
-                            setPaymentAmountOverrideSelection(paymentSelectionKey);
-                            setPaymentError("");
-                          }}
-                          style={{
-                            ...fieldStyle,
-                            border:
-                              paymentError || !paymentValidation.valid || !splitPaymentValidation.valid
-                                ? "1px solid #dc2626"
-                                : fieldStyle.border,
-                            background:
-                              paymentError || !paymentValidation.valid || !splitPaymentValidation.valid
-                                ? "#fff1f2"
-                                : fieldStyle.background,
-                          }}
-                        />
-                      </label>
-
-                      {activePaymentAction ? (
-                        <div
-                          style={{
-                            borderRadius: "18px",
-                            padding: "16px",
-                            border: activePaymentAction.border,
-                            background: activePaymentAction.background,
-                            display: "grid",
-                            gap: "12px",
-                          }}
+                      {selectedTransactionKind === "payment" ? (
+                        <form
+                          onSubmit={handleRecordCounterPayment}
+                          style={{ display: "grid", gap: "14px", borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}
                         >
-                          <div style={{ display: "grid", gap: "6px" }}>
-                            <span
-                              style={{
-                                color: activePaymentAction.accent,
-                                fontSize: "11px",
-                                fontWeight: 800,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.08em",
-                              }}
-                            >
-                              Active Workflow
-                            </span>
-                            <h3 style={{ margin: 0, fontSize: "20px", color: "#0f172a" }}>
-                              {activePaymentAction.title}
-                            </h3>
-                            <p style={{ margin: 0, color: "#334155", lineHeight: 1.6 }}>
-                              {activePaymentAction.detail}
-                            </p>
+                          <div style={{ display: "grid", gap: "10px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                              <h3 style={{ margin: 0, fontSize: "17px", color: "#0f172a" }}>
+                                Payment Actions
+                              </h3>
+                              <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+                                Remaining {currency(outstandingBalanceAfterPayment)}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                              {paymentWorkflowActions.map((action) => (
+                                <PaymentWorkflowActionButton
+                                  key={action.id}
+                                  action={action}
+                                  active={selectedPaymentAction === action.id}
+                                  onSelect={selectPaymentWorkflowAction}
+                                />
+                              ))}
+                            </div>
                           </div>
 
-                          {selectedPaymentAction === "card" ? (
+                          {activePaymentAction ? (
                             <div
                               style={{
-                                border: "1px dashed #93c5fd",
-                                borderRadius: "14px",
-                                padding: "14px 16px",
-                                background: "#ffffff",
-                                color: "#1e3a8a",
-                                lineHeight: 1.5,
+                                borderRadius: "18px",
+                                padding: "16px",
+                                border: activePaymentAction.border,
+                                background: activePaymentAction.background,
+                                display: "grid",
+                                gap: "14px",
                               }}
                             >
-                              Future POS terminal handoff starts here. In V1, use this action to log a
-                              manual card entry or a completed standalone terminal charge.
-                            </div>
-                          ) : null}
+                              <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                                <div style={{ display: "grid", gap: "4px" }}>
+                                  <span
+                                    style={{
+                                      color: activePaymentAction.accent,
+                                      fontSize: "11px",
+                                      fontWeight: 800,
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.08em",
+                                    }}
+                                  >
+                                    Active Action
+                                  </span>
+                                  <strong style={{ color: "#0f172a", fontSize: "18px" }}>
+                                    {activePaymentAction.title}
+                                  </strong>
+                                </div>
+                                <div style={{ textAlign: "right", display: "grid", gap: "4px" }}>
+                                  <span style={{ color: "#475569", fontSize: "12px", fontWeight: 700 }}>
+                                    Total Due
+                                  </span>
+                                  <strong style={{ color: "#0f172a", fontSize: "18px" }}>
+                                    {currency(transactionSummary.amountDue)}
+                                  </strong>
+                                </div>
+                              </div>
 
-                          {isSplitPaymentAction ? (
-                            <div style={{ display: "grid", gap: "14px" }}>
-                              <div style={{ display: "grid", gap: "8px" }}>
-                                <span style={{ color: "#292524", fontWeight: 700 }}>Payment Leg 1</span>
+                              <label style={labelStyle}>
+                                Amount
                                 <input
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  value={splitPrimaryAmount}
+                                  value={paymentAmount}
                                   onChange={(event) => {
-                                    setSplitPrimaryAmount(event.target.value);
+                                    setPaymentAmountOverride(event.target.value);
+                                    setPaymentAmountOverrideSelection(paymentSelectionKey);
                                     setPaymentError("");
                                   }}
-                                  placeholder="Enter first payment amount"
-                                  style={fieldStyle}
+                                  style={{
+                                    ...fieldStyle,
+                                    border:
+                                      paymentError || !paymentValidation.valid || !splitPaymentValidation.valid
+                                        ? "1px solid #dc2626"
+                                        : fieldStyle.border,
+                                    background:
+                                      paymentError || !paymentValidation.valid || !splitPaymentValidation.valid
+                                        ? "#fff1f2"
+                                        : fieldStyle.background,
+                                  }}
                                 />
-                                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                                  {splitPaymentMethods.map((method) => (
-                                    <button
-                                      key={`split-primary-${method}`}
-                                      type="button"
-                                      onClick={() => setSplitPrimaryMethod(method)}
-                                      style={getSplitMethodButtonStyle(splitPrimaryMethod === method)}
-                                    >
-                                      {method}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
+                              </label>
 
-                              <div
+                              {isSplitPaymentAction ? (
+                                <div style={{ display: "grid", gap: "14px" }}>
+                                  <div style={{ display: "grid", gap: "8px" }}>
+                                    <span style={{ color: "#292524", fontWeight: 700 }}>Payment Leg 1</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={splitPrimaryAmount}
+                                      onChange={(event) => {
+                                        setSplitPrimaryAmount(event.target.value);
+                                        setPaymentError("");
+                                      }}
+                                      placeholder="Enter first payment amount"
+                                      style={fieldStyle}
+                                    />
+                                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                      {splitPaymentMethods.map((method) => (
+                                        <button
+                                          key={`split-primary-${method}`}
+                                          type="button"
+                                          onClick={() => setSplitPrimaryMethod(method)}
+                                          style={getSplitMethodButtonStyle(splitPrimaryMethod === method)}
+                                        >
+                                          {method}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      border: "1px solid #fed7aa",
+                                      borderRadius: "14px",
+                                      padding: "14px 16px",
+                                      background: "#ffffff",
+                                      display: "grid",
+                                      gap: "10px",
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                                      <span style={{ color: "#475569", fontWeight: 700 }}>Payment Leg 2</span>
+                                      <strong style={{ color: "#0f172a" }}>
+                                        {currency(splitSecondaryAmountValue)}
+                                      </strong>
+                                    </div>
+                                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                      {splitPaymentMethods.map((method) => (
+                                        <button
+                                          key={`split-secondary-${method}`}
+                                          type="button"
+                                          onClick={() => setSplitSecondaryMethod(method)}
+                                          style={getSplitMethodButtonStyle(splitSecondaryMethod === method)}
+                                        >
+                                          {method}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  style={{
+                                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                                    borderRadius: "14px",
+                                    padding: "12px 14px",
+                                    background: "#ffffff",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    gap: "10px",
+                                    flexWrap: "wrap",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <span style={{ color: "#475569", fontWeight: 700 }}>Method</span>
+                                  <strong style={{ color: "#0f172a" }}>{activePaymentAction.shortLabel}</strong>
+                                </div>
+                              )}
+
+                              <label style={labelStyle}>
+                                Notes
+                                <textarea
+                                  value={paymentNote}
+                                  onChange={(event) => setPaymentNote(event.target.value)}
+                                  rows={3}
+                                  placeholder={activePaymentAction.notePlaceholder}
+                                  style={{ ...fieldStyle, resize: "vertical" }}
+                                />
+                              </label>
+
+                              {paymentError || !paymentValidation.valid || !splitPaymentValidation.valid ? (
+                                <p style={{ margin: 0, color: "#b91c1c", fontWeight: 700 }}>
+                                  {paymentError || splitPaymentValidation.message || paymentValidation.message}
+                                </p>
+                              ) : null}
+
+                              <button
+                                type="submit"
+                                disabled={!paymentValidation.valid || !splitPaymentValidation.valid}
                                 style={{
-                                  border: "1px solid #fed7aa",
-                                  borderRadius: "14px",
-                                  padding: "14px 16px",
-                                  background: "#ffffff",
-                                  display: "grid",
-                                  gap: "10px",
+                                  background:
+                                    paymentValidation.valid && splitPaymentValidation.valid
+                                      ? "#171717"
+                                      : "#a8a29e",
+                                  color: "#ffffff",
+                                  border: "none",
+                                  borderRadius: "12px",
+                                  padding: "13px 18px",
+                                  cursor:
+                                    paymentValidation.valid && splitPaymentValidation.valid
+                                      ? "pointer"
+                                      : "not-allowed",
+                                  fontWeight: 800,
                                 }}
                               >
-                                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-                                  <span style={{ color: "#475569", fontWeight: 700 }}>Payment Leg 2</span>
-                                  <strong style={{ color: "#0f172a" }}>
-                                    {currency(splitSecondaryAmountValue)}
-                                  </strong>
-                                </div>
-                                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                                  {splitPaymentMethods.map((method) => (
-                                    <button
-                                      key={`split-secondary-${method}`}
-                                      type="button"
-                                      onClick={() => setSplitSecondaryMethod(method)}
-                                      style={getSplitMethodButtonStyle(splitSecondaryMethod === method)}
-                                    >
-                                      {method}
-                                    </button>
-                                  ))}
-                                </div>
-                                <p style={{ margin: 0, color: "#64748b", fontSize: "13px", lineHeight: 1.5 }}>
-                                  The second leg auto-balances the remaining amount from the current
-                                  transaction total.
-                                </p>
-                              </div>
+                                {activePaymentAction.buttonLabel}
+                              </button>
                             </div>
-                          ) : (
-                            <div
-                              style={{
-                                border: "1px solid rgba(15, 23, 42, 0.08)",
-                                borderRadius: "14px",
-                                padding: "14px 16px",
-                                background: "#ffffff",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                gap: "10px",
-                                flexWrap: "wrap",
-                                alignItems: "center",
-                              }}
-                            >
-                              <span style={{ color: "#475569", fontWeight: 700 }}>Posting Method</span>
-                              <strong style={{ color: "#0f172a" }}>{activePaymentAction.shortLabel}</strong>
-                            </div>
-                          )}
+                          ) : null}
+                        </form>
+                      ) : selectedTransactionKind === "pickup" ? (
+                        <div style={{ display: "grid", gap: "16px", borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
+                          <div
+                            style={{
+                              border: "1px solid #bbf7d0",
+                              background: "#f0fdf4",
+                              color: "#166534",
+                              borderRadius: "16px",
+                              padding: "14px 16px",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {transactionSummary.pickupCount} pickup item{transactionSummary.pickupCount === 1 ? "" : "s"} selected and ready to release.
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleReleasePickupSelection}
+                            style={{
+                              background: "#166534",
+                              color: "#ffffff",
+                              border: "none",
+                              borderRadius: "12px",
+                              padding: "13px 18px",
+                              cursor: "pointer",
+                              fontWeight: 800,
+                            }}
+                          >
+                            Release Selected Pickup
+                          </button>
                         </div>
                       ) : null}
-
-                      <label style={labelStyle}>
-                        Counter Note
-                        <textarea
-                          value={paymentNote}
-                          onChange={(event) => setPaymentNote(event.target.value)}
-                          rows={3}
-                          placeholder={
-                            activePaymentAction?.notePlaceholder ||
-                            "Optional note for this selected transaction"
-                          }
-                          style={{ ...fieldStyle, resize: "vertical" }}
-                        />
-                      </label>
-
-                      {paymentError || !paymentValidation.valid || !splitPaymentValidation.valid ? (
-                        <p style={{ margin: 0, color: "#b91c1c", fontWeight: 700 }}>
-                          {paymentError || splitPaymentValidation.message || paymentValidation.message}
-                        </p>
-                      ) : null}
-
-                      <button
-                        type="submit"
-                        disabled={!paymentValidation.valid || !splitPaymentValidation.valid || !activePaymentAction}
-                        style={{
-                          background:
-                            paymentValidation.valid && splitPaymentValidation.valid && activePaymentAction
-                              ? "#171717"
-                              : "#a8a29e",
-                          color: "#ffffff",
-                          border: "none",
-                          borderRadius: "12px",
-                          padding: "13px 18px",
-                          cursor:
-                            paymentValidation.valid && splitPaymentValidation.valid && activePaymentAction
-                              ? "pointer"
-                              : "not-allowed",
-                          fontWeight: 800,
-                        }}
-                      >
-                        {activePaymentAction?.buttonLabel || "Choose Payment Action"}
-                      </button>
-
-                      {selectedTransactionOrders.length ? (
-                        <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "14px", display: "grid", gap: "10px" }}>
-                          <h3 style={{ margin: 0, fontSize: "17px", color: "#0f172a" }}>Selected Orders</h3>
-                          {selectedTransactionOrders.map((item) => (
-                            <div key={`payment-order-${item.orderNumber}`} style={{ color: "#475569", fontSize: "14px" }}>
-                              <strong style={{ color: "#0f172a" }}>{item.orderNumber}</strong>
-                              {" • "}
-                              Due now {currency(item.order.amount_due_now)}
-                              {" • "}
-                              Due date {item.order.invoice_due_date ? formatShortDate(item.order.invoice_due_date) : "—"}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </form>
-                  ) : selectedTransactionKind === "pickup" ? (
-                    <div style={{ display: "grid", gap: "16px" }}>
-                      <div
-                        style={{
-                          border: "1px solid #bbf7d0",
-                          background: "#f0fdf4",
-                          color: "#166534",
-                          borderRadius: "16px",
-                          padding: "14px 16px",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {transactionSummary.pickupCount} pickup item{transactionSummary.pickupCount === 1 ? "" : "s"} selected and ready to release.
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleReleasePickupSelection}
-                        style={{
-                          background: "#166534",
-                          color: "#ffffff",
-                          border: "none",
-                          borderRadius: "12px",
-                          padding: "13px 18px",
-                          cursor: "pointer",
-                          fontWeight: 800,
-                        }}
-                      >
-                        Release Selected Pickup
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        border: "1px dashed #cbd5e1",
-                        borderRadius: "18px",
-                        padding: "18px",
-                        background: "#f8fafc",
-                        color: "#64748b",
-                      }}
-                    >
-                      Select transaction items first. Payment totals and pickup release actions stay
-                      inactive until selection is made.
-                    </div>
+                    </>
                   )}
                 </section>
               </aside>
