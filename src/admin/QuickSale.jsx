@@ -78,48 +78,36 @@ const paymentWorkflowActions = [
 ];
 
 const transactionWorkspaceModes = {
-  all: {
-    id: "all",
-    label: "All Transaction Items",
-    title: "All Transaction Items",
-    description:
-      "Show every actionable counter item for the selected customer, including deposits, unpaid balances, and pickup-ready releases.",
-    selectionHeading: "Select Orders And Items",
-    selectionDescription:
-      "Review the full customer transaction queue, then select only the payment items or pickup releases being handled at the counter right now.",
-    emptySelectedCustomerMessage:
-      "No transaction items are currently available for this customer. Deposit requests, open balances, and release-ready pickups appear here when actionable.",
-  },
   payment: {
     id: "payment",
     label: "Payment Items",
     title: "Payment Collection",
     description:
-      "Focus the workspace on deposits, unpaid balances, and release-blocking amounts that staff can collect now.",
+      "Work only the counter balances that need payment now, including deposits, unpaid invoices, and pickup-blocking balances.",
     selectionHeading: "Select Payment Items",
     selectionDescription:
-      "Show only payment actions so staff can collect deposits, close unpaid balances, and clear pickup-blocking amounts without extra workspace clutter.",
+      "Select the exact balances to collect so staff can record payment without sorting through release-only work.",
     emptySelectedCustomerMessage:
-      "No payment items are currently due for this customer. Deposits and unpaid balances will appear here when collection is needed.",
+      "No payment items are due for this customer right now. Deposits and unpaid balances appear here when collection is needed.",
   },
   pickup: {
     id: "pickup",
     label: "Pickup Items",
     title: "Pickup Release",
     description:
-      "Focus the workspace on paid, release-ready orders so staff can hand off items without sorting through payment-only work.",
+      "Work only release-ready orders so staff can hand off completed jobs without payment-only noise.",
     selectionHeading: "Select Pickup Releases",
     selectionDescription:
-      "Show only release-ready pickup items so staff can confirm handoff and complete the counter release flow quickly.",
+      "Select the ready orders being handed to the customer so the release workflow stays fast and unambiguous.",
     emptySelectedCustomerMessage:
-      "No pickup releases are ready for this customer. Paid, release-ready orders will appear here when they can be handed off.",
+      "No pickup releases are ready for this customer. Paid, release-ready orders appear here when they can be handed off.",
   },
   "quick-sale": {
     id: "quick-sale",
     label: "Quick Sale",
     title: "Quick Counter Sale",
     description:
-      "Switch into the direct walk-in sale workflow for immediate over-the-counter purchases without loading a customer order queue.",
+      "Use the direct walk-in sale workflow for immediate over-the-counter transactions without loading a customer order queue.",
   },
 };
 
@@ -225,7 +213,7 @@ function filterSelectionIdsForMode(mode, selectedIds, items) {
       .filter((item) => {
         if (mode === "payment") return item.kind === "payment";
         if (mode === "pickup") return item.kind === "pickup";
-        return true;
+        return false;
       })
       .map((item) => item.id)
   );
@@ -533,7 +521,7 @@ export default function QuickSale() {
     [customers, storedOrders]
   );
 
-  const [activeMode, setActiveMode] = useState("all");
+  const [activeMode, setActiveMode] = useState("payment");
   const [lookupQuery, setLookupQuery] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -593,7 +581,7 @@ export default function QuickSale() {
     return selectableItems;
   }, [activeMode, selectableItems]);
   const activeWorkspaceMode =
-    transactionWorkspaceModes[activeMode] || transactionWorkspaceModes.all;
+    transactionWorkspaceModes[activeMode] || transactionWorkspaceModes.payment;
   const selectedTransactionItems = useMemo(
     () => selectableItems.filter((item) => selectedTransactionIds.includes(item.id)),
     [selectableItems, selectedTransactionIds]
@@ -768,7 +756,7 @@ export default function QuickSale() {
     setCustomerName(customer.name || "");
     setLinkedCustomerId(customer.source === "saved" ? customer.id : "");
     setLinkedCustomerName(customer.name || "");
-    setActiveMode("all");
+    setActiveMode("payment");
     resetPaymentForm("");
   }
 
@@ -1254,9 +1242,9 @@ export default function QuickSale() {
                 Front Counter
               </h1>
               <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-                Move through the counter workflow in sequence: lookup the customer, review a clean
-                summary, select the exact orders or pickup items involved, then generate a focused
-                transaction on the right.
+                Move through the counter workflow in sequence: find the customer, choose the
+                payment or pickup action, then complete the transaction without extra workspace
+                noise.
               </p>
             </div>
 
@@ -1310,9 +1298,6 @@ export default function QuickSale() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => activateWorkspaceMode("all")} style={getModeButtonStyle(activeMode === "all")}>
-              All Transaction Items
-            </button>
             <button type="button" onClick={() => activateWorkspaceMode("payment")} style={getModeButtonStyle(activeMode === "payment")}>
               Payment Items
             </button>
@@ -1398,8 +1383,8 @@ export default function QuickSale() {
                       Customer Lookup
                     </h2>
                     <p style={{ margin: 0, color: "#64748b", lineHeight: 1.5 }}>
-                      Search by customer, phone, email, company, or order number to start a
-                      transaction.
+                      Search by customer, phone, email, company, or order number to begin the
+                      counter action.
                     </p>
                   </div>
 
@@ -1537,8 +1522,8 @@ export default function QuickSale() {
                     </p>
                     <h2 style={{ margin: "6px 0 8px", fontSize: "24px" }}>Customer Summary</h2>
                     <p style={{ margin: 0, color: "#64748b" }}>
-                      Pickup readiness here reflects the customer-facing shop state, separate from
-                      personal worker assignment.
+                      Use this snapshot to decide whether staff should collect payment or release a
+                      pickup next.
                     </p>
                   </div>
 
@@ -1565,7 +1550,7 @@ export default function QuickSale() {
                           <strong style={{ color: "#b45309" }}>{customerSummary.pickupAwaitingPayment}</strong>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                          <span style={{ color: "#475569", fontWeight: 700 }}>Current filter</span>
+                          <span style={{ color: "#475569", fontWeight: 700 }}>Current workflow</span>
                           <strong style={{ color: "#0f172a" }}>{activeWorkspaceMode.label}</strong>
                         </div>
                       </div>
@@ -1580,8 +1565,8 @@ export default function QuickSale() {
                         color: "#64748b",
                       }}
                     >
-                      Customer summary appears here after lookup so staff can decide what to work on
-                      before any totals are generated.
+                      Customer summary appears here after lookup so staff can choose the next
+                      counter action before any totals are generated.
                     </div>
                   )}
                 </section>
@@ -1618,11 +1603,11 @@ export default function QuickSale() {
                       background: "#f8fafc",
                       color: "#64748b",
                     }}
-                  >
-                    Begin with customer lookup. Transaction items stay hidden until a customer is
-                    selected.
-                  </div>
-                ) : !visibleSelectableItems.length ? (
+                    >
+                      Begin with customer lookup. Transaction items stay hidden until a customer is
+                      selected.
+                    </div>
+                  ) : !visibleSelectableItems.length ? (
                   <div
                     style={{
                       border: "1px dashed #cbd5e1",
@@ -1787,8 +1772,8 @@ export default function QuickSale() {
                         color: "#64748b",
                       }}
                     >
-                      Select one or more payment items, or pickup releases, to generate a focused
-                      transaction summary.
+                      Select one or more payment items or pickup releases to build the active
+                      counter transaction.
                     </div>
                   ) : (
                     <>
