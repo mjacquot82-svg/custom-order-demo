@@ -39,11 +39,11 @@ export default function Sales() {
               textTransform: "uppercase",
             }}
           >
-            Counter Sales
+            Front Counter
           </p>
           <h1 style={{ margin: "6px 0 8px" }}>Sales History</h1>
           <p style={{ margin: 0, color: "#64748b" }}>
-            Review completed walk‑in sales and counter transactions.
+            Review completed walk-in sales and in-person counter transactions.
           </p>
         </div>
 
@@ -58,7 +58,7 @@ export default function Sales() {
             fontWeight: 700,
           }}
         >
-          New Quick Sale
+          Open Front Counter
         </Link>
       </div>
 
@@ -134,7 +134,7 @@ export default function Sales() {
           </table>
         ) : (
           <div style={{ padding: "20px", color: "#64748b" }}>
-            No quick sales recorded yet.
+            No front-counter sales recorded yet.
           </div>
         )}
       </section>

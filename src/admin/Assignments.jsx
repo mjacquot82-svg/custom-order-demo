@@ -190,7 +190,7 @@ function StaffAssignments({ allOrders, staffUser }) {
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Open Shop Production</Link>
-          <Link to="/admin/sales/new" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Quick Sale</Link>
+          <Link to="/admin/sales/new" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Front Counter</Link>
           <Link to="/admin/quotes" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Quote Intake</Link>
         </div>
       </div>

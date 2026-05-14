@@ -502,7 +502,7 @@ export default function Orders() {
                 fontWeight: 700,
               }}
             >
-              {isStaffWorkspace ? "Quick Sale" : "Open Quotes"}
+              {isStaffWorkspace ? "Front Counter" : "Open Quotes"}
             </Link>
             <Link
               to={isStaffWorkspace ? "/admin/quotes" : "/admin/assignments"}

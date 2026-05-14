@@ -328,7 +328,7 @@ function StaffDashboard({ orders, staffUser }) {
               fontWeight: 800,
             }}
           >
-            Start Quick Sale
+            Open Front Counter
           </Link>
           <Link
             to="/admin/assignments"
@@ -374,7 +374,7 @@ function StaffDashboard({ orders, staffUser }) {
 
       <Section title="Front Counter" description="Use these workflows for walk-in transactions, quote capture, and pickup handoff without opening owner reporting or finance views.">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          <SummaryCard label="Quick Sale Ready" value="Counter" />
+          <SummaryCard label="Quick Sale Workflow" value="Live" />
           <SummaryCard label="Open Quotes" value={quoteIntakeOrders.length} />
           <SummaryCard label="Ready For Pickup" value={readyForPickupOrders.length} tone="success" />
           <SummaryCard label="Awaiting Production" value={awaitingProductionOrders.length} tone="warning" />
@@ -394,7 +394,7 @@ function StaffDashboard({ orders, staffUser }) {
               fontWeight: 800,
             }}
           >
-            Open Quick Sale
+            Open Front Counter
           </Link>
           <Link
             to="/admin/quotes"
