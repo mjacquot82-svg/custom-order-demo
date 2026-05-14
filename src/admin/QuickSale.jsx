@@ -77,6 +77,52 @@ const paymentWorkflowActions = [
   },
 ];
 
+const transactionWorkspaceModes = {
+  all: {
+    id: "all",
+    label: "All Transaction Items",
+    title: "All Transaction Items",
+    description:
+      "Show every actionable counter item for the selected customer, including deposits, unpaid balances, and pickup-ready releases.",
+    selectionHeading: "Select Orders And Items",
+    selectionDescription:
+      "Review the full customer transaction queue, then select only the payment items or pickup releases being handled at the counter right now.",
+    emptySelectedCustomerMessage:
+      "No transaction items are currently available for this customer. Deposit requests, open balances, and release-ready pickups appear here when actionable.",
+  },
+  payment: {
+    id: "payment",
+    label: "Payment Items",
+    title: "Payment Collection",
+    description:
+      "Focus the workspace on deposits, unpaid balances, and release-blocking amounts that staff can collect now.",
+    selectionHeading: "Select Payment Items",
+    selectionDescription:
+      "Show only payment actions so staff can collect deposits, close unpaid balances, and clear pickup-blocking amounts without extra workspace clutter.",
+    emptySelectedCustomerMessage:
+      "No payment items are currently due for this customer. Deposits and unpaid balances will appear here when collection is needed.",
+  },
+  pickup: {
+    id: "pickup",
+    label: "Pickup Items",
+    title: "Pickup Release",
+    description:
+      "Focus the workspace on paid, release-ready orders so staff can hand off items without sorting through payment-only work.",
+    selectionHeading: "Select Pickup Releases",
+    selectionDescription:
+      "Show only release-ready pickup items so staff can confirm handoff and complete the counter release flow quickly.",
+    emptySelectedCustomerMessage:
+      "No pickup releases are ready for this customer. Paid, release-ready orders will appear here when they can be handed off.",
+  },
+  "quick-sale": {
+    id: "quick-sale",
+    label: "Quick Sale",
+    title: "Quick Counter Sale",
+    description:
+      "Switch into the direct walk-in sale workflow for immediate over-the-counter purchases without loading a customer order queue.",
+  },
+};
+
 const fieldStyle = {
   border: "1px solid #cbd5e1",
   borderRadius: "12px",
@@ -169,6 +215,22 @@ function getSplitMethodButtonStyle(active) {
     fontWeight: 700,
     cursor: "pointer",
   };
+}
+
+function filterSelectionIdsForMode(mode, selectedIds, items) {
+  if (mode === "quick-sale") return [];
+
+  const allowedIds = new Set(
+    items
+      .filter((item) => {
+        if (mode === "payment") return item.kind === "payment";
+        if (mode === "pickup") return item.kind === "pickup";
+        return true;
+      })
+      .map((item) => item.id)
+  );
+
+  return selectedIds.filter((id) => allowedIds.has(id));
 }
 
 function buildCustomerDirectory(customers, orders) {
@@ -471,7 +533,7 @@ export default function QuickSale() {
     [customers, storedOrders]
   );
 
-  const [activeMode, setActiveMode] = useState("lookup");
+  const [activeMode, setActiveMode] = useState("all");
   const [lookupQuery, setLookupQuery] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -530,6 +592,8 @@ export default function QuickSale() {
 
     return selectableItems;
   }, [activeMode, selectableItems]);
+  const activeWorkspaceMode =
+    transactionWorkspaceModes[activeMode] || transactionWorkspaceModes.all;
   const selectedTransactionItems = useMemo(
     () => selectableItems.filter((item) => selectedTransactionIds.includes(item.id)),
     [selectableItems, selectedTransactionIds]
@@ -656,6 +720,12 @@ export default function QuickSale() {
     return () => window.removeEventListener("keydown", handleGlobalEnter);
   }, []);
 
+  useEffect(() => {
+    setSelectedTransactionIds((current) =>
+      filterSelectionIdsForMode(activeMode, current, selectableItems)
+    );
+  }, [activeMode, selectableItems]);
+
   function resetPaymentForm(nextAmount = "") {
     setPaymentAmountOverride(nextAmount);
     setPaymentAmountOverrideSelection(nextAmount ? paymentSelectionKey : "");
@@ -672,6 +742,23 @@ export default function QuickSale() {
     setCustomerMatches(findCustomerMatches(customerDirectory, value));
   }
 
+  function activateWorkspaceMode(mode) {
+    setTransactionMessage("");
+    setPaymentError("");
+    setActiveMode(mode);
+
+    if (mode === "quick-sale") {
+      setSelectedTransactionIds([]);
+      resetPaymentForm("");
+      return;
+    }
+
+    setSelectedTransactionIds((current) =>
+      filterSelectionIdsForMode(mode, current, selectableItems)
+    );
+    resetPaymentForm("");
+  }
+
   function selectCustomer(customer) {
     setSelectedCustomer(customer);
     setLookupQuery(customer.name || "");
@@ -681,7 +768,7 @@ export default function QuickSale() {
     setCustomerName(customer.name || "");
     setLinkedCustomerId(customer.source === "saved" ? customer.id : "");
     setLinkedCustomerName(customer.name || "");
-    setActiveMode("lookup");
+    setActiveMode("all");
     resetPaymentForm("");
   }
 
@@ -1108,7 +1195,7 @@ export default function QuickSale() {
               cursor: "pointer",
             }}
           >
-            View Counter Sales
+            Open Sales History
           </button>
           <button
             onClick={() => navigate("/admin")}
@@ -1176,7 +1263,7 @@ export default function QuickSale() {
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               <button
                 type="button"
-                onClick={() => navigate("/admin/sales")}
+                onClick={() => activateWorkspaceMode("quick-sale")}
                 style={{
                   background: "#171717",
                   color: "#ffffff",
@@ -1187,7 +1274,7 @@ export default function QuickSale() {
                   cursor: "pointer",
                 }}
               >
-                View Counter Sales
+                New Counter Sale
               </button>
               <button
                 type="button"
@@ -1223,18 +1310,47 @@ export default function QuickSale() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setActiveMode("lookup")} style={getModeButtonStyle(activeMode === "lookup")}>
+            <button type="button" onClick={() => activateWorkspaceMode("all")} style={getModeButtonStyle(activeMode === "all")}>
               All Transaction Items
             </button>
-            <button type="button" onClick={() => setActiveMode("payment")} style={getModeButtonStyle(activeMode === "payment")}>
+            <button type="button" onClick={() => activateWorkspaceMode("payment")} style={getModeButtonStyle(activeMode === "payment")}>
               Payment Items
             </button>
-            <button type="button" onClick={() => setActiveMode("pickup")} style={getModeButtonStyle(activeMode === "pickup")}>
+            <button type="button" onClick={() => activateWorkspaceMode("pickup")} style={getModeButtonStyle(activeMode === "pickup")}>
               Pickup Items
             </button>
-            <button type="button" onClick={() => setActiveMode("quick-sale")} style={getModeButtonStyle(activeMode === "quick-sale")}>
+            <button type="button" onClick={() => activateWorkspaceMode("quick-sale")} style={getModeButtonStyle(activeMode === "quick-sale")}>
               Quick Sale
             </button>
+          </div>
+          <div
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: "18px",
+              background: "#ffffffcc",
+              padding: "16px 18px",
+              display: "grid",
+              gap: "6px",
+              maxWidth: "860px",
+            }}
+          >
+            <span
+              style={{
+                color: "#78716c",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              Active Workflow Mode
+            </span>
+            <strong style={{ color: "#0f172a", fontSize: "20px" }}>
+              {activeWorkspaceMode.title}
+            </strong>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+              {activeWorkspaceMode.description}
+            </p>
           </div>
         </section>
 
@@ -1450,13 +1566,7 @@ export default function QuickSale() {
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
                           <span style={{ color: "#475569", fontWeight: 700 }}>Current filter</span>
-                          <strong style={{ color: "#0f172a" }}>
-                            {activeMode === "payment"
-                              ? "Payment Items"
-                              : activeMode === "pickup"
-                              ? "Pickup Items"
-                              : "All Transaction Items"}
-                          </strong>
+                          <strong style={{ color: "#0f172a" }}>{activeWorkspaceMode.label}</strong>
                         </div>
                       </div>
                     </>
@@ -1492,12 +1602,10 @@ export default function QuickSale() {
                     Step 3
                   </p>
                   <h2 style={{ margin: "6px 0 8px", fontSize: "28px", color: "#0f172a" }}>
-                    Select Orders And Items
+                    {activeWorkspaceMode.selectionHeading}
                   </h2>
                   <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-                    Select only what the customer is paying for or picking up. Totals on the right
-                    are generated from this selection only. Pickup visibility remains based on
-                    customer-ready shop state, not worker assignment.
+                    {activeWorkspaceMode.selectionDescription}
                   </p>
                 </div>
 
@@ -1524,7 +1632,7 @@ export default function QuickSale() {
                       color: "#64748b",
                     }}
                   >
-                    No transaction items match this view for the selected customer.
+                    {activeWorkspaceMode.emptySelectedCustomerMessage}
                   </div>
                 ) : (
                   <div style={{ display: "grid", gap: "14px" }}>
