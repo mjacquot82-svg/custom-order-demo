@@ -14,7 +14,6 @@ import {
 } from "../orders/orderWorkflow";
 import {
   getAssignedOrdersForStaff,
-  getOperationalOrdersForStaff,
   isStaffWorkspaceView,
 } from "./adminRoleView";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
@@ -234,18 +233,149 @@ function StaffJobCard({ order }) {
   );
 }
 
+function WorkspaceCountLink({ label, count, description, to, tone = "default" }) {
+  const tones = {
+    default: { background: "#f8fafc", border: "#e2e8f0", count: "#0f172a", label: "#0f172a" },
+    warning: { background: "#fff7ed", border: "#fed7aa", count: "#9a3412", label: "#7c2d12" },
+    success: { background: "#ecfdf5", border: "#bbf7d0", count: "#166534", label: "#166534" },
+    danger: { background: "#fef2f2", border: "#fecaca", count: "#b91c1c", label: "#991b1b" },
+  };
+  const palette = tones[tone] || tones.default;
+
+  return (
+    <Link
+      to={to}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "auto minmax(0, 1fr) auto",
+        gap: "14px",
+        alignItems: "center",
+        borderRadius: "18px",
+        padding: "16px 18px",
+        background: palette.background,
+        border: `1px solid ${palette.border}`,
+        color: "#171717",
+        textDecoration: "none",
+      }}
+    >
+      <strong style={{ fontSize: "28px", lineHeight: 1, color: palette.count }}>{count}</strong>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ margin: 0, fontWeight: 800, color: palette.label }}>{label}</p>
+        <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "14px", lineHeight: 1.4 }}>
+          {description}
+        </p>
+      </div>
+      <span style={{ color: "#64748b", fontWeight: 700, whiteSpace: "nowrap" }}>Open</span>
+    </Link>
+  );
+}
+
+function buildOwnerWorkspaceQueues(orders = []) {
+  const snapshot = buildWorkflowSnapshotCards(orders);
+  const lookup = Object.fromEntries(snapshot.map((card) => [card.label, card.value]));
+  const activeOrders = orders.filter((order) => {
+    const status = normalizeOperationalStatus(order.status);
+    return !isCompletedOperationalStatus(status) && !isCanceledOperationalStatus(status);
+  });
+  const unassignedOrders = activeOrders.filter(
+    (order) => order.needs_assignment || !order.assigned_to_staff_id
+  );
+  const readyForPickup = activeOrders.filter(
+    (order) => normalizeOperationalStatus(order.status) === "Ready for Pickup"
+  );
+
+  return [
+    {
+      label: "Awaiting Approval",
+      count: lookup["Awaiting Approval"] || 0,
+      description: "Quotes still waiting on customer approval.",
+      to: "/admin/quotes",
+      tone: "warning",
+    },
+    {
+      label: "Awaiting Deposit",
+      count: lookup["Awaiting Deposit"] || 0,
+      description: "Quote work blocked until deposit is collected.",
+      to: "/admin/quotes",
+      tone: "warning",
+    },
+    {
+      label: "Artwork Needed",
+      count: lookup["Artwork Needed"] || 0,
+      description: "Quotes waiting on art files or approvals.",
+      to: "/admin/quotes",
+      tone: "warning",
+    },
+    {
+      label: "Need Assignment",
+      count: unassignedOrders.length,
+      description: "Production work that still needs dispatch.",
+      to: "/admin/assignments",
+      tone: "default",
+    },
+    {
+      label: "Ready For Pickup",
+      count: readyForPickup.length,
+      description: "Completed jobs waiting at the counter.",
+      to: "/admin/orders?status=ready-for-pickup",
+      tone: "success",
+    },
+  ];
+}
+
+function buildUpcomingOperationalOrders(orders = []) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return orders
+    .filter((order) => {
+      const status = normalizeOperationalStatus(order.status);
+      return (
+        !isCompletedOperationalStatus(status) &&
+        !isCanceledOperationalStatus(status) &&
+        order.due_date
+      );
+    })
+    .sort((left, right) => {
+      const leftDate = new Date(`${left.due_date}T00:00:00`).getTime();
+      const rightDate = new Date(`${right.due_date}T00:00:00`).getTime();
+      return leftDate - rightDate;
+    })
+    .slice(0, 6)
+    .map((order) => {
+      const dueDate = new Date(`${order.due_date}T00:00:00`);
+      const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      let dueLabel = `Due ${formatShortDate(order.due_date)}`;
+      if (diffDays < 0) {
+        dueLabel = `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} overdue`;
+      } else if (diffDays === 0) {
+        dueLabel = "Due today";
+      } else if (diffDays === 1) {
+        dueLabel = "Due tomorrow";
+      }
+
+      return {
+        orderNumber: order.order_number,
+        customerName: order.customer_name || "Walk-in Customer",
+        garment: order.garment || order.item || "Custom garment",
+        status: normalizeOperationalStatus(order.status),
+        dueLabel,
+      };
+    });
+}
+
 function OwnerDashboard({ orders }) {
   const metrics = buildOperationalMetrics(orders);
-  const operationsSnapshotCards = buildWorkflowSnapshotCards(orders);
-  const productionTypes = Object.entries(metrics.productionTypes).filter(([, total]) => total > 0);
-  const workerLoad = Object.entries(metrics.workerLoad).sort((left, right) => right[1] - left[1]);
+  const workspaceQueues = buildOwnerWorkspaceQueues(orders);
+  const upcomingOrders = buildUpcomingOperationalOrders(orders);
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
       <div style={{ marginBottom: "20px" }}>
         <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Owner Operations</p>
-        <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>Operations Dashboard</h1>
-        <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>Monitor production, dispatch assignments, identify overdue work, and manage daily shop operations from one command center.</p>
+        <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>Dashboard</h1>
+        <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>Global operational overview for the owner workspace. Use this page to spot pressure points, then move into the dedicated workspace that handles the work.</p>
       </div>
 
       <div style={{ marginBottom: "22px" }}>
@@ -253,121 +383,82 @@ function OwnerDashboard({ orders }) {
       </div>
 
       <Section
-        title="Operations Snapshot"
-        description="Workflow visibility stays separate from the KPI row here. Use this section to spot what is still waiting on approval, deposit, artwork, production release, or assignment before work can move."
+        title="Priority Queues"
+        description="This page surfaces what needs intervention across intake, production, dispatch, and pickup without duplicating the full working views."
       >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          {operationsSnapshotCards.map((card) => (
-            <SummaryCard key={card.label} label={card.label} value={card.value} tone={card.tone} />
+        <div style={{ display: "grid", gap: "12px" }}>
+          {workspaceQueues.map((queue) => (
+            <WorkspaceCountLink
+              key={queue.label}
+              label={queue.label}
+              count={queue.count}
+              description={queue.description}
+              to={queue.to}
+              tone={queue.tone}
+            />
           ))}
         </div>
       </Section>
 
-      <Section title="Production Types">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          {productionTypes.map(([type, total]) => (
-            <SummaryCard key={type} label={type} value={total} />
-          ))}
-          {!productionTypes.length ? (
-            <article style={{ background: "#f8fafc", borderRadius: "18px", padding: "18px", border: "1px solid #e2e8f0", color: "#64748b", fontWeight: 700 }}>
-              No active production mix yet.
-            </article>
-          ) : null}
-        </div>
-      </Section>
-
-      <Section title="Worker Load Summary">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          {workerLoad.map(([worker, total]) => (
-            <SummaryCard key={worker} label={worker} value={`${total} jobs`} />
-          ))}
-          {!workerLoad.length ? (
-            <article style={{ background: "#f8fafc", borderRadius: "18px", padding: "18px", border: "1px solid #e2e8f0", color: "#64748b", fontWeight: 700 }}>
-              No jobs are currently assigned.
-            </article>
-          ) : null}
-        </div>
+      <Section title="Upcoming Deadlines" description="A short operational cut of the next due jobs so the owner overview stays useful without becoming another production board.">
+        {upcomingOrders.length ? (
+          <div style={{ display: "grid", gap: "12px" }}>
+            {upcomingOrders.map((order) => (
+              <Link
+                key={order.orderNumber}
+                to={`/admin/orders/${order.orderNumber}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) auto",
+                  gap: "12px",
+                  alignItems: "center",
+                  borderRadius: "18px",
+                  padding: "16px 18px",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  textDecoration: "none",
+                  color: "#171717",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                    <strong>{order.orderNumber}</strong>
+                    <span style={{ color: "#475569", fontWeight: 700, fontSize: "13px" }}>{order.status}</span>
+                  </div>
+                  <p style={{ margin: "6px 0 0", fontWeight: 700 }}>{order.customerName}</p>
+                  <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "14px" }}>{order.garment}</p>
+                </div>
+                <strong style={{ color: "#0f172a", whiteSpace: "nowrap" }}>{order.dueLabel}</strong>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
+            No active jobs with due dates are in the operational queue.
+          </p>
+        )}
       </Section>
     </div>
   );
 }
 
 function StaffDashboard({ orders, staffUser }) {
-  const operationalOrders = getOperationalOrdersForStaff(orders);
   const assignedOrders = getAssignedOrdersForStaff(orders, staffUser);
   const summary = buildStaffWorkspaceSummary(assignedOrders);
   const activeAssignedOrders = assignedOrders.filter(
     (order) => !isCompletedOperationalStatus(normalizeOperationalStatus(order.status))
   );
-  const quoteIntakeOrders = orders.filter((order) => isActiveQuoteWorkflowOrder(order));
   const recentActivity = buildStaffActivity(assignedOrders);
-  const activeOperationalOrders = operationalOrders.filter(
-    (order) => !isCompletedOperationalStatus(normalizeOperationalStatus(order.status))
-  );
-  const readyForPickupOrders = activeOperationalOrders.filter(
-    (order) => normalizeOperationalStatus(order.status) === "Ready for Pickup"
-  );
-  const unassignedOrders = activeOperationalOrders.filter(
-    (order) => order.needs_assignment || !order.assigned_to_staff_id
-  );
-  const awaitingProductionOrders = activeOperationalOrders.filter((order) => {
-    const status = normalizeOperationalStatus(order.status);
-    return status === "Awaiting Production" || status === "New";
-  });
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", flexWrap: "wrap", marginBottom: "20px" }}>
+      <div style={{ marginBottom: "20px" }}>
         <div>
           <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Staff Workspace</p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>Operational Staff Workspace</h1>
+          <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>Dashboard</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            Front-counter intake and production execution stay in one place here without exposing owner-only management areas.
+            Personal overview for today. This page stays focused on your workload, while production, quotes, and front-counter execution each happen in their dedicated workspace.
           </p>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link
-            to="/admin/sales/new"
-            style={{
-              background: "#171717",
-              color: "#ffffff",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              textDecoration: "none",
-              fontWeight: 800,
-            }}
-          >
-            Open Front Counter
-          </Link>
-          <Link
-            to="/admin/assignments"
-            style={{
-              background: "#ffffff",
-              color: "#171717",
-              border: "1px solid #d6dbe4",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              textDecoration: "none",
-              fontWeight: 800,
-            }}
-          >
-            Open My Work
-          </Link>
-          <Link
-            to="/admin/orders"
-            style={{
-              background: "#ffffff",
-              color: "#171717",
-              border: "1px solid #d6dbe4",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              textDecoration: "none",
-              fontWeight: 800,
-            }}
-          >
-            Open Production Queue
-          </Link>
         </div>
       </div>
 
@@ -379,50 +470,6 @@ function StaffDashboard({ orders, staffUser }) {
           <SummaryCard label="Due Soon" value={summary.dueSoon} tone="warning" />
           <SummaryCard label="Overdue" value={summary.overdue} tone="danger" />
           <SummaryCard label="Ready For Pickup" value={summary.readyForPickup} />
-        </div>
-      </Section>
-
-      <Section title="Front Counter" description="Use these workflows for walk-in transactions, quote capture, and pickup handoff without opening owner reporting or finance views.">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          <SummaryCard label="Quick Sale Workflow" value="Live" />
-          <SummaryCard label="Open Quotes" value={quoteIntakeOrders.length} />
-          <SummaryCard label="Ready For Pickup" value={readyForPickupOrders.length} tone="success" />
-          <SummaryCard label="Awaiting Production" value={awaitingProductionOrders.length} tone="warning" />
-        </div>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
-          <Link
-            to="/admin/sales/new"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              background: "#171717",
-              color: "#ffffff",
-              textDecoration: "none",
-              fontWeight: 800,
-            }}
-          >
-            Open Front Counter
-          </Link>
-          <Link
-            to="/admin/quotes"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              background: "#ffffff",
-              color: "#171717",
-              border: "1px solid #d6dbe4",
-              textDecoration: "none",
-              fontWeight: 800,
-            }}
-          >
-            Open Quote Intake
-          </Link>
         </div>
       </Section>
 
@@ -438,34 +485,6 @@ function StaffDashboard({ orders, staffUser }) {
             No jobs are currently assigned to you. Shop production work may still be active or unassigned.
           </p>
         )}
-      </Section>
-
-      <Section title="Shop Production" description="This is the shop-wide production view. It includes work assigned to you, work assigned to other staff, and unassigned jobs still awaiting assignment.">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          <SummaryCard label="All Active Jobs" value={activeOperationalOrders.length} />
-          <SummaryCard label="Assigned To Me" value={activeAssignedOrders.length} />
-          <SummaryCard label="Unassigned Work" value={unassignedOrders.length} tone="warning" />
-          <SummaryCard label="Ready For Pickup" value={readyForPickupOrders.length} />
-        </div>
-        <div style={{ marginTop: "16px" }}>
-          <Link
-            to="/admin/orders"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "12px",
-              padding: "12px 16px",
-              background: "#ffffff",
-              color: "#171717",
-              border: "1px solid #d6dbe4",
-              textDecoration: "none",
-              fontWeight: 800,
-            }}
-          >
-            Open Shop Production Queue
-          </Link>
-        </div>
       </Section>
 
       <Section title="Recent Activity" description="A compact timeline of the latest work changes tied to your assigned jobs.">

@@ -384,7 +384,7 @@ export default function Quotes() {
               textTransform: "uppercase",
             }}
           >
-            {isStaffWorkspace ? "Quote Intake" : "Sales Workflow"}
+            Quotes Workspace
           </p>
           <h1 style={{ margin: "8px 0 6px" }}>Quotes</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
@@ -556,10 +556,10 @@ export default function Quotes() {
                               textTransform: "uppercase",
                             }}
                           >
-                            Quotes List View
+                            Quote Summary
                           </p>
                           <p style={{ margin: "6px 0 0", color: "#0f172a", fontSize: "16px", fontWeight: 800 }}>
-                            Compact scan summary
+                            {quote.order_number}
                           </p>
                           {isHighlighted ? (
                             <p style={{ margin: "8px 0 0", color: "#166534", fontSize: "13px", fontWeight: 800 }}>
@@ -614,7 +614,7 @@ export default function Quotes() {
                           minHeight: canViewArchivedQuotes ? "56px" : "100%",
                         }}
                       >
-                        Open Workspace
+                        Open Quote
                       </Link>
                       {canViewArchivedQuotes ? (
                         <button

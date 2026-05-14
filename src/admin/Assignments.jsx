@@ -118,7 +118,7 @@ function StaffAssignmentColumn({ title, description, orders = [], emptyMessage }
   );
 }
 
-function OwnerAssignments({ allOrders, staffUsers, activeOrders, assignedOrders, completedOrders, overdueOrders }) {
+function OwnerAssignments({ allOrders, staffUsers, activeOrders, assignedOrders, overdueOrders }) {
   const unassignedOrders = activeOrders.filter((order) => !order.assigned_to_staff_id);
 
   function handleAssign(order, staffId) {
@@ -148,17 +148,16 @@ function OwnerAssignments({ allOrders, staffUsers, activeOrders, assignedOrders,
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "14px", flexWrap: "wrap", marginBottom: "18px" }}>
-        <div><p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Production Dispatch</p><h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>Assignment Dispatch Board</h1><p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>Assign new work, watch overdue jobs, and balance worker load from one dispatch board.</p></div>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}><Link to="/admin/staff-users" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Manage Staff</Link><Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Production Orders</Link></div>
+      <div style={{ marginBottom: "18px" }}>
+        <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Production Dispatch</p>
+        <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>Assignment Dispatch Board</h1>
+        <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>Dispatch production work, resolve unassigned jobs, and rebalance worker load. This workspace is for assignment decisions, not for reviewing the whole production dashboard.</p>
       </div>
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "14px", marginBottom: "18px" }}>
-        <SummaryMetric label="Open Jobs" value={activeOrders.length} />
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "14px", marginBottom: "18px" }}>
         <SummaryMetric label="Need Assignment" value={unassignedOrders.length} tone="warning" />
         <SummaryMetric label="Overdue" value={overdueOrders.length} tone="danger" />
         <SummaryMetric label="Assigned" value={assignedOrders.length} tone="success" />
-        <SummaryMetric label="Completed" value={completedOrders.length} />
       </section>
 
       <AssignmentDispatchBoard
@@ -179,44 +178,21 @@ function StaffAssignments({ allOrders, staffUser }) {
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px", display: "grid", gap: "18px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "14px", flexWrap: "wrap" }}>
+      <div>
         <div>
           <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>My Assignments</p>
           <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>My Work Queue</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            Only jobs assigned directly to you appear here. Unassigned shop work and jobs assigned to other staff stay in the Shop Production Queue.
+            Personal execution queue for jobs assigned directly to you. Shop-wide production and intake stay in their own workspaces.
           </p>
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Open Shop Production</Link>
-          <Link to="/admin/sales/new" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Front Counter</Link>
-          <Link to="/admin/quotes" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Quote Intake</Link>
         </div>
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "14px" }}>
-        <SummaryMetric label="Assigned To Me" value={activeAssignedOrders.length} />
         <SummaryMetric label="Ready To Start" value={groupedOrders.ready.length} />
         <SummaryMetric label="In Production" value={groupedOrders.inProgress.length} tone="success" />
         <SummaryMetric label="Ready For Pickup" value={groupedOrders.paused.length} />
         <SummaryMetric label="Overdue" value={overdueOrders.length} tone="danger" />
-      </section>
-
-      <section
-        style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          borderRadius: "18px",
-          padding: "16px 18px",
-          display: "grid",
-          gap: "6px",
-        }}
-      >
-        <strong style={{ color: "#0f172a" }}>This queue is personal to you.</strong>
-        <p style={{ margin: 0, color: "#64748b" }}>
-          If this page is empty, there may still be production work in the shop. Check the Shop Production Queue to view unassigned jobs and overall production activity.
-        </p>
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
@@ -263,7 +239,6 @@ export default function Assignments() {
   );
   const activeOrders = useMemo(() => allOrders.filter(isOpenOrder), [allOrders]);
   const assignedOrders = activeOrders.filter((order) => order.assigned_to_staff_id);
-  const completedOrders = allOrders.filter((order) => isCompletedOperationalStatus(order.status));
   const overdueOrders = activeOrders.filter(isOverdue);
 
   if (isStaffWorkspaceView(staffUser)) {
@@ -276,7 +251,6 @@ export default function Assignments() {
       staffUsers={staffUsers}
       activeOrders={activeOrders}
       assignedOrders={assignedOrders}
-      completedOrders={completedOrders}
       overdueOrders={overdueOrders}
     />
   );

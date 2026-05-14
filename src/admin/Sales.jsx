@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { getStoredQuickSales } from "../lib/salesStore";
 
 function currency(value) {
@@ -47,19 +46,6 @@ export default function Sales() {
           </p>
         </div>
 
-        <Link
-          to="/admin/sales/new"
-          style={{
-            background: "#171717",
-            color: "#ffffff",
-            textDecoration: "none",
-            borderRadius: "12px",
-            padding: "12px 16px",
-            fontWeight: 700,
-          }}
-        >
-          Open Front Counter
-        </Link>
       </div>
 
       <section

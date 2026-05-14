@@ -72,9 +72,9 @@ function getAdminSections(staffUser) {
   if (!isAdminWorkspaceView(staffUser)) {
     return [
       {
-        title: "My Work",
+        title: "Overview",
         links: [
-          { to: "/admin", label: "My Dashboard", navKey: "dashboard" },
+          { to: "/admin", label: "Dashboard", navKey: "dashboard" },
           {
             to: "/admin/assignments",
             label: "My Assigned Work",
@@ -84,12 +84,12 @@ function getAdminSections(staffUser) {
         ],
       },
       {
-        title: "Front Counter",
+        title: "Sales And Intake",
         links: [
           { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
-          { to: "/admin/sales", label: "Counter Sales", navKey: "counterSales" },
-          { to: "/admin/quotes", label: "Quote Intake", navKey: "quotes" },
+          { to: "/admin/quotes", label: "Quotes", navKey: "quotes" },
           { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
+          { to: "/admin/sales", label: "Sales History", navKey: "counterSales" },
         ],
       },
       {
@@ -97,7 +97,7 @@ function getAdminSections(staffUser) {
         links: [
           {
             to: "/admin/orders",
-            label: "Shop Production Queue",
+            label: "Shop Production",
             navKey: "productionOrders",
             badgeKey: "productionOrders",
           },
@@ -110,39 +110,33 @@ function getAdminSections(staffUser) {
 
   return [
     {
-      title: "Actions",
-      links: [
-        { to: "/admin/quotes/new", label: "New Quote", navKey: "newQuote" },
-        { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
-      ],
-    },
-    {
-      title: "Management",
+      title: "Overview",
       links: [
         { to: "/admin", label: "Dashboard", navKey: "dashboard" },
-        { to: "/admin/staff-users", label: "Manage Staff", navKey: "staffUsers" },
+        { to: "/admin/staff-users", label: "Staff", navKey: "staffUsers" },
       ],
     },
     {
-      title: "Front Counter",
+      title: "Sales And Intake",
       links: [
-        { to: "/admin/sales", label: "Counter Sales", navKey: "counterSales" },
-        { to: "/admin/quotes", label: "Quote Intake", navKey: "quotes" },
+        { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
+        { to: "/admin/quotes", label: "Quotes", navKey: "quotes" },
         { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
+        { to: "/admin/sales", label: "Sales History", navKey: "counterSales" },
       ],
     },
     {
-      title: "Production",
+      title: "Shop Production",
       links: [
         {
           to: "/admin/orders",
-          label: "Production Orders",
+          label: "Shop Production",
           navKey: "productionOrders",
           badgeKey: "productionOrders",
         },
         {
           to: "/admin/assignments",
-          label: "Assignments",
+          label: "Assignment Dispatch",
           navKey: "assignments",
           badgeKey: "assignments",
         },

@@ -1176,19 +1176,6 @@ export default function QuickSale() {
             Start Another Quick Sale
           </button>
           <button
-            onClick={() => navigate("/admin/sales")}
-            style={{
-              background: "#ffffff",
-              border: "1px solid #cbd5e1",
-              borderRadius: "14px",
-              padding: "14px 20px",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Open Sales History
-          </button>
-          <button
             onClick={() => navigate("/admin")}
             style={{
               background: "#ffffff",
@@ -1251,53 +1238,6 @@ export default function QuickSale() {
               </p>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => activateWorkspaceMode("quick-sale")}
-                style={{
-                  background: "#171717",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                New Counter Sale
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/admin/customers")}
-                style={{
-                  background: "#ffffff",
-                  color: "#171717",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Open Customer Directory
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/admin/orders")}
-                style={{
-                  background: "#ffffff",
-                  color: "#171717",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Open Production Queue
-              </button>
-            </div>
           </div>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>

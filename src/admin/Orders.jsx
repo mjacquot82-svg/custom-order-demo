@@ -28,7 +28,6 @@ import {
 } from "../production/productionWorkspace";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 import {
-  getAssignedOrdersForStaff,
   getOperationalOrdersForStaff,
   isStaffWorkspaceView,
 } from "./adminRoleView";
@@ -341,10 +340,6 @@ export default function Orders() {
     () => buildProductionWorkspaceSummary(workspaceOrders),
     [workspaceOrders]
   );
-  const assignedToMeCount = useMemo(
-    () => (isStaffWorkspace ? getAssignedOrdersForStaff(workspaceOrders, staffUser).length : 0),
-    [isStaffWorkspace, staffUser, workspaceOrders]
-  );
 
   const filteredOrders = useMemo(
     () =>
@@ -486,62 +481,14 @@ export default function Orders() {
                 textTransform: "uppercase",
               }}
             >
-              {isStaffWorkspace ? "My Production Workspace" : "Production Workspace"}
+              Shop Production
             </p>
-            <h1 style={{ margin: "8px 0 6px" }}>
-              {isStaffWorkspace ? "Production Queue" : "Production Orders"}
-            </h1>
+            <h1 style={{ margin: "8px 0 6px" }}>Shop Production</h1>
             <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
               {isStaffWorkspace
-                ? "Shop-wide production visibility for active work across the floor. This queue includes your assignments, other staff assignments, and unassigned jobs awaiting assignment."
-                : "Production-first workspace for active jobs, stage flow, and fast order handling."}
+                ? "Global production visibility across the floor. Use this workspace for the shared shop queue; your personal job execution stays in My Assigned Work."
+                : "Global production visibility for active jobs, queue state, and shop-wide order handling."}
             </p>
-          </div>
-
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <Link
-              to={isStaffWorkspace ? "/admin/sales/new" : "/admin/quotes"}
-              style={{
-                background: "#171717",
-                color: "#ffffff",
-                borderRadius: "12px",
-                padding: "12px 16px",
-                textDecoration: "none",
-                fontWeight: 700,
-              }}
-            >
-              {isStaffWorkspace ? "Front Counter" : "Open Quotes"}
-            </Link>
-            <Link
-              to={isStaffWorkspace ? "/admin/quotes" : "/admin/assignments"}
-              style={{
-                background: "#ffffff",
-                color: "#171717",
-                border: "1px solid #d6dbe4",
-                borderRadius: "12px",
-                padding: "12px 16px",
-                textDecoration: "none",
-                fontWeight: 700,
-              }}
-            >
-              {isStaffWorkspace ? "Quote Intake" : "Open Assignments"}
-            </Link>
-            {isStaffWorkspace ? (
-              <Link
-                to="/admin/assignments"
-                style={{
-                  background: "#ffffff",
-                  color: "#171717",
-                  border: "1px solid #d6dbe4",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  textDecoration: "none",
-                  fontWeight: 700,
-                }}
-              >
-                My Assigned Work
-              </Link>
-            ) : null}
           </div>
         </div>
 
@@ -552,39 +499,13 @@ export default function Orders() {
             gap: "10px",
           }}
         >
-          <SummaryCard label={isStaffWorkspace ? "All Active Jobs" : "Active Jobs"} value={workspaceSummary.activeOrders} />
-          {isStaffWorkspace ? (
-            <SummaryCard label="Unassigned Work" value={workspaceSummary.unassignedOrders} tone="warning" />
-          ) : (
-            <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
-          )}
-          {isStaffWorkspace ? (
-            <SummaryCard
-              label="Assigned To Me"
-              value={assignedToMeCount}
-            />
-          ) : null}
+          <SummaryCard label="Active Jobs" value={workspaceSummary.activeOrders} />
+          <SummaryCard label="Awaiting Production" value={statusCounts["awaiting-production"] || 0} />
+          <SummaryCard label="In Production" value={statusCounts["in-production"] || 0} tone="success" />
+          <SummaryCard label="Ready For Pickup" value={statusCounts["ready-for-pickup"] || 0} />
+          <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
           <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
-          <SummaryCard label="Canceled" value={workspaceSummary.canceledOrders || 0} tone="danger" />
         </section>
-
-        {isStaffWorkspace ? (
-          <section
-            style={{
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: "18px",
-              padding: "16px 18px",
-              display: "grid",
-              gap: "6px",
-            }}
-          >
-            <strong style={{ color: "#0f172a" }}>How to read this workspace</strong>
-            <p style={{ margin: 0, color: "#64748b" }}>
-              Use <strong>My Assigned Work</strong> for your personal queue. Use this Production Queue for the full shop view, including jobs assigned to other staff and unassigned work that is available or still waiting for assignment.
-            </p>
-          </section>
-        ) : null}
 
         <section style={{ display: "grid", gap: "16px" }}>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
