@@ -1175,19 +1175,21 @@ export default function QuickSale() {
           >
             Start Another Quick Sale
           </button>
-          <button
-            onClick={() => navigate("/admin/sales")}
-            style={{
-              background: "#ffffff",
-              border: "1px solid #cbd5e1",
-              borderRadius: "14px",
-              padding: "14px 20px",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Open Sales History
-          </button>
+          {!isStaffWorkspace ? (
+            <button
+              onClick={() => navigate("/admin/sales")}
+              style={{
+                background: "#ffffff",
+                border: "1px solid #cbd5e1",
+                borderRadius: "14px",
+                padding: "14px 20px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Open Sales History
+            </button>
+          ) : null}
           <button
             onClick={() => navigate("/admin")}
             style={{
@@ -1245,58 +1247,9 @@ export default function QuickSale() {
                 Front Counter
               </h1>
               <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-                Move through the counter workflow in sequence: find the customer, choose the
-                payment or pickup action, then complete the transaction without extra workspace
-                noise.
+                Use the workflow modes below to look up customers, collect payment, handle pickup,
+                or complete a counter sale without leaving the transaction workspace.
               </p>
-            </div>
-
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => activateWorkspaceMode("quick-sale")}
-                style={{
-                  background: "#171717",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                New Counter Sale
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/admin/customers")}
-                style={{
-                  background: "#ffffff",
-                  color: "#171717",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Open Customer Directory
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/admin/orders")}
-                style={{
-                  background: "#ffffff",
-                  color: "#171717",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "12px",
-                  padding: "12px 16px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Open Production Queue
-              </button>
             </div>
           </div>
 

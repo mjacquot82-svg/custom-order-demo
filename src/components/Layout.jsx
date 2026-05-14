@@ -72,29 +72,21 @@ function getAdminSections(staffUser) {
   if (!isAdminWorkspaceView(staffUser)) {
     return [
       {
-        title: "My Work",
-        links: [
-          { to: "/admin", label: "My Dashboard", navKey: "dashboard" },
-          {
-            to: "/admin/assignments",
-            label: "My Assigned Work",
-            navKey: "assignments",
-            badgeKey: "assignments",
-          },
-        ],
-      },
-      {
         title: "Front Counter",
         links: [
           { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
-          { to: "/admin/sales", label: "Counter Sales", navKey: "counterSales" },
           { to: "/admin/quotes", label: "Quote Intake", navKey: "quotes" },
-          { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
         ],
       },
       {
-        title: "Shop Production",
+        title: "Production",
         links: [
+          {
+            to: "/admin/assignments",
+            label: "My Work",
+            navKey: "assignments",
+            badgeKey: "assignments",
+          },
           {
             to: "/admin/orders",
             label: "Shop Production Queue",
@@ -126,9 +118,7 @@ function getAdminSections(staffUser) {
     {
       title: "Front Counter",
       links: [
-        { to: "/admin/sales", label: "Counter Sales", navKey: "counterSales" },
         { to: "/admin/quotes", label: "Quote Intake", navKey: "quotes" },
-        { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
       ],
     },
     {
@@ -161,6 +151,8 @@ function getAdminSections(staffUser) {
     {
       title: "Records",
       links: [
+        { to: "/admin/customers", label: "Customers", navKey: "customers" },
+        { to: "/admin/sales", label: "Sales History", navKey: "salesHistory" },
         ...(canManageCatalog
           ? [{ to: "/admin/products", label: "Products", navKey: "products" }]
           : []),
@@ -189,9 +181,9 @@ function getActiveSidebarLink(pathname) {
   if (pathname === "/admin/quotes") return "quotes";
   if (pathname.startsWith("/admin/quotes/")) return pathname === "/admin/quotes/new" ? "newQuote" : "quotes";
   if (pathname === "/admin/financial") return "financial";
-  if (pathname === "/admin/sales") return "counterSales";
+  if (pathname === "/admin/sales") return "salesHistory";
   if (pathname === "/admin/sales/new") return "frontCounter";
-  if (pathname.startsWith("/admin/sales/receipt/")) return "counterSales";
+  if (pathname.startsWith("/admin/sales/receipt/")) return "salesHistory";
   if (pathname === "/admin/orders") return "productionOrders";
   if (pathname.startsWith("/admin/orders/")) return "productionOrders";
   if (pathname === "/admin") return "dashboard";
