@@ -28,6 +28,7 @@ export const PAYMENT_METHOD_OPTIONS = [
   "Debit",
   "Credit",
   "E-Transfer",
+  "Cheque",
   "Square Terminal",
   "Other",
 ];
