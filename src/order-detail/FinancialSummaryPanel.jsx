@@ -60,6 +60,7 @@ export default function FinancialSummaryPanel({
   onMarkPickedUp,
   onSendDepositRequest,
 }) {
+  const canceled = order.status === "Canceled";
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
   const [depositRequestOpen, setDepositRequestOpen] = useState(false);
   const [depositRequestStatus, setDepositRequestStatus] = useState("");
@@ -73,9 +74,11 @@ export default function FinancialSummaryPanel({
     remainingBalance: order.balance_due,
   });
   const paymentError = error || (!paymentValidation.valid ? paymentValidation.message : "");
-  const canSendDepositRequest = Number(order.deposit_amount || 0) > 0 || Number(order.balance_due || 0) > 0;
+  const canSendDepositRequest =
+    !canceled && (Number(order.deposit_amount || 0) > 0 || Number(order.balance_due || 0) > 0);
 
   const canMarkPickedUp =
+    !canceled &&
     order.pickup_status !== "Picked Up" &&
     ["Ready for Pickup", "Picked Up", "Completed"].includes(order.status);
 
@@ -149,7 +152,7 @@ export default function FinancialSummaryPanel({
         body: depositRequest.body,
       });
       setDepositRequestStatus("Deposit request copied to clipboard.");
-    } catch (copyError) {
+    } catch {
       setDepositRequestStatus("Clipboard unavailable. Use the email draft action instead.");
     }
   }
@@ -242,6 +245,23 @@ export default function FinancialSummaryPanel({
           </button>
         </div>
       </div>
+
+      {canceled ? (
+        <div
+          style={{
+            marginBottom: "18px",
+            borderRadius: "16px",
+            padding: "14px 16px",
+            border: "1px solid #fecaca",
+            background: "#fff5f5",
+            color: "#7f1d1d",
+            fontWeight: 700,
+            lineHeight: 1.6,
+          }}
+        >
+          This order is canceled. Financial history is preserved for review, but deposit requests and pickup actions are disabled.
+        </div>
+      ) : null}
 
       <div
         style={{

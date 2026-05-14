@@ -194,7 +194,15 @@ function OrdersTable({
 
 function FilterPill({ active, children, count, tone = "default", onClick }) {
   const activeBackground =
-    tone === "warning" ? "#9a3412" : tone === "success" ? "#166534" : "#111827";
+    tone === "warning"
+      ? "#9a3412"
+      : tone === "success"
+      ? "#166534"
+      : tone === "danger"
+      ? "#b91c1c"
+      : "#111827";
+  const inactiveBackground =
+    tone === "warning" ? "#fff7ed" : tone === "danger" ? "#fef2f2" : "#ffffff";
 
   return (
     <button
@@ -202,7 +210,7 @@ function FilterPill({ active, children, count, tone = "default", onClick }) {
       onClick={onClick}
       style={{
         border: active ? `1px solid ${activeBackground}` : "1px solid #d6dbe4",
-        background: active ? activeBackground : tone === "warning" ? "#fff7ed" : "#ffffff",
+        background: active ? activeBackground : inactiveBackground,
         color: active ? "#ffffff" : "#111827",
         borderRadius: "999px",
         padding: tone === "warning" || tone === "success" ? "8px 11px" : "10px 14px",
@@ -557,6 +565,7 @@ export default function Orders() {
             />
           ) : null}
           <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
+          <SummaryCard label="Canceled" value={workspaceSummary.canceledOrders || 0} tone="danger" />
         </section>
 
         {isStaffWorkspace ? (
@@ -587,7 +596,13 @@ export default function Orders() {
                 key={filter.key}
                 active={activeStatusFilter === filter.key}
                 count={statusCounts[filter.key] || 0}
-                tone={filter.key === "completed" ? "success" : "default"}
+                tone={
+                  filter.key === "completed"
+                    ? "success"
+                    : filter.key === "canceled"
+                    ? "danger"
+                    : "default"
+                }
                 onClick={() => updateFilters({ status: filter.key })}
               >
                 {filter.label}

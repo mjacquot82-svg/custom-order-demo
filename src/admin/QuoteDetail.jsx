@@ -10,6 +10,7 @@ import {
   canAdvanceQuoteStatus,
   getNextQuoteStatus,
   isQuoteArchived,
+  isQuoteCanceled,
   isQuoteReadyForProduction,
 } from "../quotes/quoteWorkflow";
 import {
@@ -60,6 +61,7 @@ function StatusPill({ children, tone = "default" }) {
     default: { background: "#f8fafc", border: "#e2e8f0", color: "#0f172a" },
     warning: { background: "#fff7ed", border: "#fed7aa", color: "#9a3412" },
     success: { background: "#ecfdf5", border: "#bbf7d0", color: "#166534" },
+    danger: { background: "#fef2f2", border: "#fecaca", color: "#b91c1c" },
   };
   const palette = tones[tone] || tones.default;
 
@@ -118,13 +120,14 @@ function ReferenceTimeline({ events = [], compact = false, embedded = false }) {
             <article
               key={event.id || index}
               style={{
-                borderLeft: "3px solid #d6d3d1",
+                borderLeft: event.type === "canceled" ? "3px solid #b91c1c" : "3px solid #d6d3d1",
                 borderRadius: "14px",
-                background: "#f5f5f4",
+                background: event.type === "canceled" ? "#fff5f5" : "#f5f5f4",
                 padding: compact ? "12px 14px" : "14px 16px",
               }}
             >
               <strong style={{ color: "#1c1917", display: "block" }}>
+                {event.type === "canceled" ? "Canceled: " : ""}
                 {event.note || "Quote activity recorded."}
               </strong>
               <span
@@ -339,7 +342,11 @@ export default function QuoteDetail() {
     timeline: false,
   });
   const archived = isQuoteArchived(order);
+  const canceled = isQuoteCanceled(order);
   const archivedAt = archived ? formatDateTime(order.quote_archived_at, " • ") : "—";
+  const canceledAt = canceled
+    ? formatDateTime(order.canceled_at || order.quote_canceled_at || order.updated_at, " • ")
+    : "—";
   const historyEvents = useMemo(
     () => financials?.connected_timeline || buildTimelineEvents(order),
     [financials, order]
@@ -349,20 +356,13 @@ export default function QuoteDetail() {
     : `${productionReadiness.remainingRequirements} requirement${productionReadiness.remainingRequirements === 1 ? "" : "s"} remaining`;
   const nextStep = archived
     ? "Archived from active workflow"
+    : canceled
+    ? "Workflow canceled"
     : canAdvanceQuoteStatus(order?.quote_status)
     ? `Mark ${getNextQuoteStatus(order.quote_status)}`
     : isQuoteReadyForProduction(order?.quote_status)
     ? "Release to Production"
     : "Await remaining quote requirements";
-
-  if (!order) {
-    return (
-      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px" }}>
-        <h1>Quote not found</h1>
-        <Link to="/admin/quotes">Back to Quotes</Link>
-      </div>
-    );
-  }
 
   useEffect(() => {
     if (!archived || !isStaffWorkspace) return;
@@ -376,8 +376,17 @@ export default function QuoteDetail() {
     });
   }, [archived, isStaffWorkspace, navigate]);
 
+  if (!order) {
+    return (
+      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px" }}>
+        <h1>Quote not found</h1>
+        <Link to="/admin/quotes">Back to Quotes</Link>
+      </div>
+    );
+  }
+
   function handleAdvanceQuote() {
-    if (archived) return;
+    if (archived || canceled) return;
     if (!canAdvanceQuoteStatus(order.quote_status)) return;
 
     const nextQuoteStatus = getNextQuoteStatus(order.quote_status);
@@ -389,7 +398,7 @@ export default function QuoteDetail() {
   }
 
   function handleReleaseToProduction() {
-    if (archived) return;
+    if (archived || canceled) return;
     if (!isQuoteReadyForProduction(order.quote_status)) return;
 
     updateStoredOrder(order.order_number, {
@@ -403,7 +412,7 @@ export default function QuoteDetail() {
   }
 
   function handleArchiveQuote() {
-    if (archived) return;
+    if (archived || canceled) return;
 
     updateStoredOrder(order.order_number, {
       quote_archived: true,
@@ -437,6 +446,28 @@ export default function QuoteDetail() {
       replace: true,
       state: {
         flashMessage: `Quote ${order.order_number} was restored to active workflow.`,
+        flashTone: "success",
+      },
+    });
+  }
+
+  function handleCancelQuote() {
+    if (archived || canceled) return;
+
+    updateStoredOrder(order.order_number, {
+      status: "Canceled",
+      quote_status: "Canceled",
+      operational_visible: false,
+      production_ready: false,
+      canceled_at: new Date().toISOString(),
+      activity_type: "canceled",
+      activity_note: "Quote canceled while preserving operational and financial history.",
+    });
+
+    navigate(`/admin/quotes/${order.order_number}`, {
+      replace: true,
+      state: {
+        flashMessage: `Quote ${order.order_number} was marked canceled.`,
         flashTone: "success",
       },
     });
@@ -489,12 +520,18 @@ export default function QuoteDetail() {
               textTransform: "uppercase",
             }}
           >
-            {archived ? "Archived Quote Record" : "Quote Detail Workspace"}
+            {archived
+              ? "Archived Quote Record"
+              : canceled
+              ? "Canceled Quote Record"
+              : "Quote Detail Workspace"}
           </p>
           <h1 style={{ margin: "6px 0" }}>Quote {order.order_number}</h1>
           <p style={{ margin: 0, color: "#475569", maxWidth: "760px" }}>
             {archived
               ? "Historical quote record for reference, context, and recovery back into the active quote workflow."
+              : canceled
+              ? "Canceled quote record with preserved operational and financial history for historical review."
               : "Focused operational workspace for approvals, readiness, pricing, artwork, and production release."}
           </p>
         </div>
@@ -514,7 +551,7 @@ export default function QuoteDetail() {
           >
             {archived ? "Back to Archived Quotes" : "Back to Quotes"}
           </Link>
-          {!archived && canAdvanceQuoteStatus(order.quote_status) ? (
+          {!archived && !canceled && canAdvanceQuoteStatus(order.quote_status) ? (
             <button
               type="button"
               onClick={handleAdvanceQuote}
@@ -531,7 +568,7 @@ export default function QuoteDetail() {
               Mark {getNextQuoteStatus(order.quote_status)}
             </button>
           ) : null}
-          {!archived && isQuoteReadyForProduction(order.quote_status) ? (
+          {!archived && !canceled && isQuoteReadyForProduction(order.quote_status) ? (
             <button
               type="button"
               onClick={handleReleaseToProduction}
@@ -548,7 +585,7 @@ export default function QuoteDetail() {
               Release to Production
             </button>
           ) : null}
-          {!archived && canManageArchive ? (
+          {!archived && !canceled && canManageArchive ? (
             <button
               type="button"
               onClick={() => setShowArchiveConfirm((current) => !current)}
@@ -565,7 +602,7 @@ export default function QuoteDetail() {
               Archive Quote
             </button>
           ) : null}
-          {!archived && canManageArchive ? (
+          {!archived && !canceled && canManageArchive ? (
             <Link
               to="/admin/quotes/archived"
               style={{
@@ -580,6 +617,23 @@ export default function QuoteDetail() {
             >
               Archived Quotes
             </Link>
+          ) : null}
+          {!archived && !canceled && canManageArchive ? (
+            <button
+              type="button"
+              onClick={handleCancelQuote}
+              style={{
+                border: "1px solid #fecaca",
+                background: "#fff5f5",
+                color: "#b91c1c",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Cancel Quote
+            </button>
           ) : null}
           {archived && canManageArchive ? (
             <Link
@@ -641,6 +695,32 @@ export default function QuoteDetail() {
               </button>
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {canceled ? (
+        <section
+          aria-live="polite"
+          style={{
+            marginBottom: "20px",
+            borderRadius: "18px",
+            padding: "18px 20px",
+            border: "1px solid #fecaca",
+            background: "#fff5f5",
+            color: "#7f1d1d",
+            display: "grid",
+            gap: "10px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <StatusPill tone="danger">Canceled</StatusPill>
+            <strong style={{ color: "#7f1d1d" }}>
+              This quote was intentionally terminated and remains preserved for review.
+            </strong>
+          </div>
+          <p style={{ margin: 0, lineHeight: 1.6 }}>
+            Operational work stopped on {canceledAt}. Financial history, payments, deposits, and timeline events are still available on this record.
+          </p>
         </section>
       ) : null}
 
@@ -820,15 +900,20 @@ export default function QuoteDetail() {
         <div style={{ display: "grid", gap: "18px" }}>
         <WorkspaceCard
           eyebrow="Workspace Focus"
-          title="Operational quote management"
-          description="This route keeps quote-critical decisions visible at all times. It does not collapse like the list view."
+          title={canceled ? "Canceled quote record" : "Operational quote management"}
+          description={
+            canceled
+              ? "This record is preserved for review, but operational release actions are disabled because the workflow was intentionally terminated."
+              : "This route keeps quote-critical decisions visible at all times. It does not collapse like the list view."
+          }
           background="#f8fafc"
         >
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
-            <StatusPill tone={isQuoteReadyForProduction(order.quote_status) ? "success" : "default"}>
-              {order.quote_status}
+            <StatusPill tone={canceled ? "danger" : isQuoteReadyForProduction(order.quote_status) ? "success" : "default"}>
+              {canceled ? "Canceled" : order.quote_status}
             </StatusPill>
             {archived ? <StatusPill>Archived</StatusPill> : null}
+            {canceled ? <StatusPill tone="danger">Workflow stopped</StatusPill> : null}
             <StatusPill tone={depositStatus === "Deposit received" ? "success" : "warning"}>
               {depositStatus}
             </StatusPill>
@@ -857,9 +942,16 @@ export default function QuoteDetail() {
             <DetailItem label="Due Date" value={order.due_date} />
             <DetailItem
               label="Workflow Visibility"
-              value={archived ? "Removed from active workflow" : "Active operational workflow"}
+              value={
+                archived
+                  ? "Removed from active workflow"
+                  : canceled
+                  ? "Canceled operational workflow"
+                  : "Active operational workflow"
+              }
             />
             {archived ? <DetailItem label="Archived At" value={archivedAt} /> : null}
+            {canceled ? <DetailItem label="Canceled At" value={canceledAt} /> : null}
             <DetailItem
               label="Artwork"
               value={productionReadiness.checks.find((check) => check.label === "Artwork")?.detail || "No artwork required"}
@@ -871,10 +963,12 @@ export default function QuoteDetail() {
         {canManageArchive ? (
           <WorkspaceCard
             eyebrow="Workflow Visibility"
-            title={archived ? "Archived record" : "Quote lifecycle management"}
+            title={archived ? "Archived record" : canceled ? "Canceled record" : "Quote lifecycle management"}
             description={
               archived
                 ? "This record is preserved for reference, but it is no longer treated as active operational work."
+                : canceled
+                ? "This record was intentionally terminated. It remains preserved for review with no restore or archive action required."
                 : "Archive and restore are normal operational lifecycle actions for owner and admin workflow management."
             }
             background={archived ? "#f8fafc" : "#ffffff"}
@@ -889,16 +983,22 @@ export default function QuoteDetail() {
           >
             <div style={{ display: "grid", gap: "12px" }}>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <StatusPill>{archived ? "Archived" : "Active workflow"}</StatusPill>
-                {!archived ? <StatusPill tone="warning">Visible in active quote queue</StatusPill> : null}
+                <StatusPill tone={archived || canceled ? "danger" : "default"}>
+                  {archived ? "Archived" : canceled ? "Canceled" : "Active workflow"}
+                </StatusPill>
+                {!archived && !canceled ? <StatusPill tone="warning">Visible in active quote queue</StatusPill> : null}
               </div>
               <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
                 {archived
                   ? "Archived quotes stay viewable here while remaining out of active workflow and operational queue views."
+                  : canceled
+                  ? "Canceled quotes remain viewable here while their operational and financial history stays preserved."
                   : "Archiving removes this quote from the active quote workflow and operational queue visibility without changing the underlying record."}
               </p>
               {archived ? (
                 <p style={{ margin: 0, color: "#64748b", fontWeight: 600 }}>Archived {archivedAt}</p>
+              ) : canceled ? (
+                <p style={{ margin: 0, color: "#64748b", fontWeight: 600 }}>Canceled {canceledAt}</p>
               ) : null}
             </div>
 
@@ -916,6 +1016,22 @@ export default function QuoteDetail() {
                 <strong style={{ color: "#0f172a" }}>Removed from active work</strong>
                 <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
                   This quote is archived and no longer appears as active operational work.
+                </p>
+              </div>
+            ) : canceled ? (
+              <div
+                style={{
+                  borderRadius: "16px",
+                  border: "1px solid #fecaca",
+                  background: "#fff5f5",
+                  padding: "16px",
+                  display: "grid",
+                  gap: "8px",
+                }}
+              >
+                <strong style={{ color: "#7f1d1d" }}>Workflow terminated</strong>
+                <p style={{ margin: 0, color: "#7f1d1d", lineHeight: 1.6 }}>
+                  This quote is canceled, preserved, and excluded from active release actions.
                 </p>
               </div>
             ) : (
@@ -1274,6 +1390,17 @@ export default function QuoteDetail() {
             </p>
           )}
         </WorkspaceCard>
+
+        {canceled ? (
+          <WorkspaceCard
+            eyebrow="Record History"
+            title="Canceled timeline"
+            description="Cancellation events and preserved workflow history remain available for review on this record."
+            background="#fff5f5"
+          >
+            <ReferenceTimeline events={historyEvents} compact embedded />
+          </WorkspaceCard>
+        ) : null}
         </div>
       )}
     </div>

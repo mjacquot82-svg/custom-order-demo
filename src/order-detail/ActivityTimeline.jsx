@@ -34,13 +34,14 @@ export default function ActivityTimeline({ events = [], compact = false }) {
             <article
               key={event.id || index}
               style={{
-                borderLeft: "4px solid #171717",
-                background: "#f8fafc",
+                borderLeft: event.type === "canceled" ? "4px solid #b91c1c" : "4px solid #171717",
+                background: event.type === "canceled" ? "#fff5f5" : "#f8fafc",
                 borderRadius: "12px",
                 padding: itemPadding,
               }}
             >
               <strong>
+                {event.type === "canceled" ? "Canceled: " : ""}
                 {event.note || "Order activity recorded."}
               </strong>
 

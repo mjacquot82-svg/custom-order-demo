@@ -102,7 +102,7 @@ export default function ArchivedQuotes() {
           </p>
           <h1 style={{ margin: "8px 0 6px" }}>Archived Quotes</h1>
           <p style={{ margin: 0, color: "#475569", maxWidth: "760px", lineHeight: 1.6 }}>
-            Historical quote records live here after removal from the active sales workflow. Restore actions remain visible so lifecycle management stays reversible and operational.
+            Historical quote records live here after removal from the active sales workflow. Restore actions remain visible so lifecycle management stays reversible and operational. Canceled records are tracked separately so termination and archiving stay distinct.
           </p>
         </div>
 

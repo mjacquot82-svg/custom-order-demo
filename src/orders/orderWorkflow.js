@@ -5,11 +5,13 @@ export const OPERATIONAL_ORDER_STATUSES = [
   "Ready for Pickup",
   "Picked Up",
   "Completed",
+  "Canceled",
 ];
 
 const ACTIVE_OPERATIONAL_STATUSES = new Set(
-  OPERATIONAL_ORDER_STATUSES.filter((status) => status !== "Completed")
+  OPERATIONAL_ORDER_STATUSES.filter((status) => !["Completed", "Canceled"].includes(status))
 );
+const TERMINAL_OPERATIONAL_STATUSES = new Set(["Completed", "Canceled"]);
 
 const STATUS_ALIASES = {
   submitted: "New",
@@ -43,8 +45,13 @@ export function isCompletedOperationalStatus(status) {
   return normalizeOperationalStatus(status) === "Completed";
 }
 
+export function isCanceledOperationalStatus(status) {
+  return normalizeOperationalStatus(status) === "Canceled";
+}
+
 export function isActiveOperationalStatus(status) {
-  return ACTIVE_OPERATIONAL_STATUSES.has(normalizeOperationalStatus(status));
+  const normalizedStatus = normalizeOperationalStatus(status);
+  return ACTIVE_OPERATIONAL_STATUSES.has(normalizedStatus);
 }
 
 export function isReadyForProductionStatus(status) {
@@ -54,12 +61,18 @@ export function isReadyForProductionStatus(status) {
 }
 
 export function canAdvanceOperationalStatus(status) {
-  const index = getOperationalStatusIndex(status);
+  const normalizedStatus = normalizeOperationalStatus(status);
+  if (TERMINAL_OPERATIONAL_STATUSES.has(normalizedStatus)) return false;
+
+  const index = getOperationalStatusIndex(normalizedStatus);
   return index >= 0 && index < OPERATIONAL_ORDER_STATUSES.length - 1;
 }
 
 export function getNextOperationalStatus(status) {
-  const index = getOperationalStatusIndex(status);
+  const normalizedStatus = normalizeOperationalStatus(status);
+  if (TERMINAL_OPERATIONAL_STATUSES.has(normalizedStatus)) return normalizedStatus;
+
+  const index = getOperationalStatusIndex(normalizedStatus);
   if (index < 0) return "Awaiting Production";
   return OPERATIONAL_ORDER_STATUSES[Math.min(index + 1, OPERATIONAL_ORDER_STATUSES.length - 1)];
 }

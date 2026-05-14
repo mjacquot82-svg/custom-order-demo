@@ -6,6 +6,7 @@ export default function StatusBadge({ status }) {
     "Ready for Pickup": "bg-sky-100 text-sky-800",
     "Picked Up": "bg-emerald-100 text-emerald-800",
     Completed: "bg-stone-200 text-stone-700",
+    Canceled: "bg-red-100 text-red-800",
   };
 
   return (

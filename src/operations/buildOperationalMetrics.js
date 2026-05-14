@@ -3,6 +3,7 @@ import {
   PRODUCTION_TYPES,
 } from "../constants/productionTypes";
 import {
+  isCanceledOperationalStatus,
   isCompletedOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
@@ -45,6 +46,11 @@ export function buildOperationalMetrics(orders = []) {
     }
 
     const status = normalizeOperationalStatus(order.status);
+    const isCanceled = isCanceledOperationalStatus(status);
+
+    if (isCanceled) {
+      return;
+    }
 
     if (order.due_date) {
       const dueDate = new Date(`${order.due_date}T00:00:00`);

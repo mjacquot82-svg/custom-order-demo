@@ -1,5 +1,6 @@
 import {
   getOperationalStatusIndex,
+  isCanceledOperationalStatus,
   isCompletedOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
@@ -15,13 +16,17 @@ export function buildQueuePriority(order = {}) {
   if (order.due_date) {
     const dueDate = new Date(`${order.due_date}T00:00:00`);
     daysUntilDue = Math.ceil((dueDate - today) / 86400000);
-    overdue = daysUntilDue < 0 && !isCompletedOperationalStatus(order.status);
+    overdue =
+      daysUntilDue < 0 &&
+      !isCompletedOperationalStatus(order.status) &&
+      !isCanceledOperationalStatus(order.status);
     dueSoon = !overdue && daysUntilDue <= 2;
   }
 
   const unassigned = !order.assigned_to_staff_id && !order.assigned_to_staff_name;
   const status = normalizeOperationalStatus(order.status);
   const completed = status === "Completed";
+  const canceled = status === "Canceled";
 
   let priorityScore = 0;
   if (overdue) priorityScore += 100;
@@ -29,6 +34,7 @@ export function buildQueuePriority(order = {}) {
   if (unassigned) priorityScore += 25;
   priorityScore += Math.max(0, 20 - getOperationalStatusIndex(status));
   if (completed) priorityScore -= 200;
+  if (canceled) priorityScore -= 300;
 
   return {
     overdue,
@@ -45,6 +51,8 @@ export function buildQueuePriority(order = {}) {
       ? "Unassigned"
       : completed
       ? "Completed"
+      : canceled
+      ? "Canceled"
       : "Normal",
   };
 }

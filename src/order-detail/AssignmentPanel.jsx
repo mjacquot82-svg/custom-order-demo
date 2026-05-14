@@ -1,6 +1,7 @@
 import {
   canAdvanceOperationalStatus,
   getNextOperationalStatus,
+  isCanceledOperationalStatus,
 } from "../orders/orderWorkflow";
 
 function formatAssignedAt(value) {
@@ -22,6 +23,7 @@ export default function AssignmentPanel({
   const canAdvance = canAdvanceOperationalStatus(order.status);
   const nextStatus = canAdvance ? getNextOperationalStatus(order.status) : null;
   const assignedWorker = order.assigned_to_staff_name || "Unassigned";
+  const canceled = isCanceledOperationalStatus(order.status);
 
   return (
     <section
@@ -64,7 +66,7 @@ export default function AssignmentPanel({
           </div>
         </div>
 
-        {canManageAssignments ? (
+        {canManageAssignments && !canceled ? (
           <label style={{ display: "grid", gap: "6px" }}>
             Assign or Reassign
             <select
@@ -86,6 +88,19 @@ export default function AssignmentPanel({
               ))}
             </select>
           </label>
+        ) : canceled ? (
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: "14px",
+              background: "#fff5f5",
+              border: "1px solid #fecaca",
+              color: "#7f1d1d",
+              fontWeight: 700,
+            }}
+          >
+            Assignment changes are disabled on canceled records.
+          </div>
         ) : (
           <div
             style={{
@@ -119,7 +134,7 @@ export default function AssignmentPanel({
             <div style={{ marginTop: "4px", color: "#475569" }}>{order.status}</div>
           </div>
 
-          {canAdvance ? (
+          {canAdvance && !canceled ? (
             <button
               type="button"
               onClick={onAdvanceStatus}
@@ -141,7 +156,7 @@ export default function AssignmentPanel({
           )}
         </div>
 
-        {canManageAssignments ? (
+        {canManageAssignments && !canceled ? (
           <div
             style={{
               display: "flex",

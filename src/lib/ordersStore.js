@@ -89,6 +89,8 @@ function normalizeOrderTimestamps(order = {}) {
       order.approved_at,
       order.customer_approved_at,
       order.production_started_at,
+      order.canceled_at,
+      order.quote_canceled_at,
       ...activityTimestamps,
       ...paymentTimestamps,
       order.updated_at,
@@ -100,6 +102,8 @@ function normalizeOrderTimestamps(order = {}) {
       order.updated_at,
       order.completed_at,
       order.picked_up_at,
+      order.canceled_at,
+      order.quote_canceled_at,
       order.production_started_at,
       order.approved_at,
       order.customer_approved_at,
@@ -296,21 +300,27 @@ function buildWorkflowDerivedUpdates(currentOrder, updates) {
     updates.quote_status || currentOrder.quote_status
   );
   const shouldDeriveStatus = Object.prototype.hasOwnProperty.call(updates, "status");
+  const isCanceled =
+    nextStatus === "Canceled" || nextQuoteStatus === "Canceled";
   const isArchived = Object.prototype.hasOwnProperty.call(updates, "quote_archived")
     ? updates.quote_archived === true
     : currentOrder.quote_archived === true;
 
   return {
     ...updates,
-    status: nextStatus,
-    quote_status: nextQuoteStatus,
+    status: isCanceled ? "Canceled" : nextStatus,
+    quote_status: isCanceled ? "Canceled" : nextQuoteStatus,
     production_ready: shouldDeriveStatus
-      ? isReadyForProductionStatus(nextStatus)
+      ? isCanceled
+        ? false
+        : isReadyForProductionStatus(nextStatus)
       : Object.prototype.hasOwnProperty.call(updates, "production_ready")
       ? updates.production_ready
       : currentOrder.production_ready,
     operational_visible: shouldDeriveStatus
-      ? isActiveOperationalStatus(nextStatus)
+      ? isCanceled
+        ? false
+        : isActiveOperationalStatus(nextStatus)
       : Object.prototype.hasOwnProperty.call(updates, "operational_visible")
       ? updates.operational_visible
       : currentOrder.operational_visible,
@@ -328,6 +338,9 @@ function describeOrderUpdate(updates) {
   if (updates.activity_note) return updates.activity_note;
   if (updates.quote_archived === true) return "Quote archived from active workflow.";
   if (updates.quote_archived === false) return "Quote restored to active workflow.";
+  if (updates.status === "Canceled" || updates.quote_status === "Canceled") {
+    return "Workflow canceled while preserving operational and financial history.";
+  }
   if (updates.status) return `Status changed to ${updates.status}.`;
   if (updates.pickup_status === "Picked Up") return "Order marked as picked up.";
   if (updates.pickup_status === "Ready for Pickup") return "Order marked ready for pickup.";
@@ -345,6 +358,7 @@ function describeOrderUpdate(updates) {
 function describeActivityType(updates) {
   if (updates.activity_type) return updates.activity_type;
   if (Object.prototype.hasOwnProperty.call(updates, "quote_archived")) return "quote_archive";
+  if (updates.status === "Canceled" || updates.quote_status === "Canceled") return "canceled";
   if (updates.status) return "status_change";
   if (updates.pickup_status) return "pickup";
   if (updates.payment_history) return "payment";

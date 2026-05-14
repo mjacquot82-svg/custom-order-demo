@@ -18,6 +18,7 @@ import { normalizeOrderFinancials } from "../orders/orderFinancials";
 import { formatDateTimeParts } from "../lib/dateFormatting";
 import {
   getNextOperationalStatus,
+  isCanceledOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
 import { isAdminWorkspaceView, isStaffWorkspaceView } from "./adminRoleView";
@@ -112,6 +113,8 @@ export default function OrderDetail() {
   }
 
   function handleAssign(staffId) {
+    if (isCanceledOperationalStatus(order.status)) return;
+
     const worker = staffUsers.find((staff) => staff.id === staffId);
     const previousAssignment = order.assigned_to_staff_name || "";
     const nextAssignment = worker?.name || "";
@@ -137,6 +140,8 @@ export default function OrderDetail() {
   }
 
   function handleAdvanceStatus() {
+    if (isCanceledOperationalStatus(order.status)) return;
+
     const nextStatus = getNextOperationalStatus(order.status);
     const now = new Date().toISOString();
     const nextUpdates = {
@@ -174,6 +179,8 @@ export default function OrderDetail() {
   }
 
   function handleMarkPickedUp() {
+    if (isCanceledOperationalStatus(order.status)) return;
+
     const now = new Date().toISOString();
     const balanceNote =
       normalizedOrder.balance_due > 0
@@ -193,6 +200,8 @@ export default function OrderDetail() {
   }
 
   function handleSendDepositRequest(requestDetails = {}) {
+    if (isCanceledOperationalStatus(order.status)) return;
+
     const now = new Date().toISOString();
 
     saveOrderUpdates({
@@ -208,6 +217,20 @@ export default function OrderDetail() {
       },
       activity_type: "deposit_request",
       activity_note: `Deposit request prepared via ${requestDetails.channel || "manual workflow"}.`,
+    });
+  }
+
+  function handleCancelProductionOrder() {
+    if (isCanceledOperationalStatus(order.status)) return;
+
+    updateStoredOrder(orderNumber, {
+      status: "Canceled",
+      quote_status: "Canceled",
+      operational_visible: false,
+      production_ready: false,
+      canceled_at: new Date().toISOString(),
+      activity_type: "canceled",
+      activity_note: "Production order canceled while preserving operational and financial history.",
     });
   }
 
@@ -264,6 +287,25 @@ export default function OrderDetail() {
               {urgency.label}
             </span>
           </div>
+
+          {isCanceledOperationalStatus(order.status) ? (
+            <div
+              style={{
+                marginTop: "14px",
+                maxWidth: "520px",
+                borderRadius: "16px",
+                padding: "14px 16px",
+                border: "1px solid #fecaca",
+                background: "#fff5f5",
+                color: "#7f1d1d",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: "6px" }}>Canceled workflow</strong>
+              <span style={{ lineHeight: 1.6 }}>
+                This production order was intentionally terminated and remains available with its production, payment, and timeline history intact.
+              </span>
+            </div>
+          ) : null}
 
           <div
             style={{
@@ -326,6 +368,22 @@ export default function OrderDetail() {
           >
             Print Production Sheet
           </button>
+          {canManageAssignments && !isCanceledOperationalStatus(order.status) ? (
+            <button
+              type="button"
+              onClick={handleCancelProductionOrder}
+              style={{
+                border: "1px solid #fecaca",
+                background: "#fff5f5",
+                color: "#b91c1c",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                fontWeight: 700,
+              }}
+            >
+              Cancel Production Order
+            </button>
+          ) : null}
         </div>
       </div>
 

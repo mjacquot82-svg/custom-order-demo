@@ -8,6 +8,7 @@ import {
   canAdvanceQuoteStatus,
   getNextQuoteStatus,
   isActiveQuoteWorkflowOrder,
+  isQuoteCanceled,
   isQuoteReadyForProduction,
   sortQuotesByStatus,
 } from "../quotes/quoteWorkflow";
@@ -149,6 +150,7 @@ function StatusPill({ children, tone = "default" }) {
     default: { background: "#f8fafc", border: "#e2e8f0", color: "#0f172a" },
     warning: { background: "#fff7ed", border: "#fed7aa", color: "#9a3412" },
     success: { background: "#ecfdf5", border: "#bbf7d0", color: "#166534" },
+    danger: { background: "#fef2f2", border: "#fecaca", color: "#b91c1c" },
   };
   const palette = tones[tone] || tones.default;
 
@@ -243,6 +245,10 @@ export default function Quotes() {
     () => sortQuotesByStatus(orders.filter((order) => isActiveQuoteWorkflowOrder(order))),
     [orders]
   );
+  const canceledQuotes = useMemo(
+    () => sortQuotesByStatus(orders.filter((order) => isQuoteCanceled(order))),
+    [orders]
+  );
   const statusCounts = useMemo(() => buildStatusCountMap(quotes), [quotes]);
   const readyQuotes = useMemo(
     () => quotes.filter((quote) => isQuoteReadyForProduction(quote.quote_status)),
@@ -252,12 +258,14 @@ export default function Quotes() {
   useEffect(() => {
     const activeOrderNumbers = new Set(quotes.map((quote) => quote.order_number));
 
-    setExpandedQuotes((current) => {
-      const nextState = Object.fromEntries(
-        Object.entries(current).filter(([orderNumber]) => activeOrderNumbers.has(orderNumber))
-      );
+    queueMicrotask(() => {
+      setExpandedQuotes((current) => {
+        const nextState = Object.fromEntries(
+          Object.entries(current).filter(([orderNumber]) => activeOrderNumbers.has(orderNumber))
+        );
 
-      return Object.keys(nextState).length === Object.keys(current).length ? current : nextState;
+        return Object.keys(nextState).length === Object.keys(current).length ? current : nextState;
+      });
     });
   }, [quotes]);
 
@@ -268,27 +276,32 @@ export default function Quotes() {
   useEffect(() => {
     if (!location.state?.createdOrderNumber && !location.state?.flashMessage) return;
 
-    if (location.state?.flashMessage) {
-      setFlashTitle(location.state.flashTitle || "Quote Created Successfully");
-      setFlashMessage(location.state.flashMessage);
-      setFlashTone(location.state.flashTone || "default");
-    }
+    const stateTimer = window.setTimeout(() => {
+      if (location.state?.flashMessage) {
+        setFlashTitle(location.state.flashTitle || "Quote Created Successfully");
+        setFlashMessage(location.state.flashMessage);
+        setFlashTone(location.state.flashTone || "default");
+      }
 
-    if (location.state?.createdOrderNumber) {
-      setHighlightedQuote(location.state.createdOrderNumber);
-    }
+      if (location.state?.createdOrderNumber) {
+        setHighlightedQuote(location.state.createdOrderNumber);
+      }
+    }, 0);
 
     navigate(location.pathname, { replace: true, state: null });
+    return () => window.clearTimeout(stateTimer);
   }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (!highlightedQuote) return;
     if (!quotes.some((quote) => quote.order_number === highlightedQuote)) return;
 
-    setExpandedQuotes((current) => ({
-      ...current,
-      [highlightedQuote]: true,
-    }));
+    window.requestAnimationFrame(() => {
+      setExpandedQuotes((current) => ({
+        ...current,
+        [highlightedQuote]: true,
+      }));
+    });
 
     const scrollToQuote = () => {
       cardRefs.current[highlightedQuote]?.scrollIntoView({
@@ -963,6 +976,91 @@ export default function Quotes() {
           )}
         </div>
       </section>
+
+      {canViewArchivedQuotes && canceledQuotes.length ? (
+        <section
+          style={{
+            background: "#fff7f7",
+            borderRadius: "20px",
+            padding: "22px",
+            border: "1px solid #fecaca",
+            display: "grid",
+            gap: "14px",
+            marginTop: "18px",
+          }}
+        >
+          <div>
+            <p
+              style={{
+                margin: 0,
+                color: "#b91c1c",
+                fontSize: "12px",
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              Historical Records
+            </p>
+            <h2 style={{ margin: "6px 0 4px", color: "#7f1d1d" }}>Canceled Quotes</h2>
+            <p style={{ margin: 0, color: "#7f1d1d", maxWidth: "780px", lineHeight: 1.6 }}>
+              These quotes were intentionally terminated after entering workflow. Their operational and financial context stays preserved for review.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gap: "10px" }}>
+            {canceledQuotes.map((quote) => {
+              const summary = buildQuoteSummary(quote);
+
+              return (
+                <article
+                  key={quote.order_number}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(120px, 1fr) minmax(180px, 1.4fr) minmax(160px, 1fr) auto",
+                    gap: "12px",
+                    alignItems: "center",
+                    padding: "16px",
+                    borderRadius: "16px",
+                    border: "1px solid #fecaca",
+                    background: "#ffffff",
+                  }}
+                >
+                  <div style={{ display: "grid", gap: "6px" }}>
+                    <strong style={{ color: "#7f1d1d" }}>{quote.order_number || "—"}</strong>
+                    <StatusPill tone="danger">Canceled</StatusPill>
+                  </div>
+
+                  <div style={{ display: "grid", gap: "4px" }}>
+                    <strong style={{ color: "#0f172a" }}>{quote.customer_name || "Walk-in Customer"}</strong>
+                    <span style={{ color: "#475569" }}>{quote.garment || "Custom garment"}</span>
+                  </div>
+
+                  <div style={{ display: "grid", gap: "4px" }}>
+                    <span style={{ color: "#475569", fontSize: "13px", fontWeight: 700 }}>
+                      Canceled {quote.canceled_at ? formatValue(quote.canceled_at) : formatValue(quote.updated_at)}
+                    </span>
+                    <span style={{ color: "#475569", fontSize: "13px", fontWeight: 700 }}>
+                      {summary.depositStatus} • Balance {money(summary.balance)}
+                    </span>
+                  </div>
+
+                  <Link
+                    to={`/admin/quotes/${quote.order_number}`}
+                    style={{
+                      color: "#7f1d1d",
+                      textDecoration: "none",
+                      fontWeight: 800,
+                    }}
+                  >
+                    View Record
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

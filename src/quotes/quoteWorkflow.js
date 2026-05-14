@@ -6,6 +6,7 @@ export const QUOTE_STATUSES = [
   "Awaiting Deposit",
   "Approved",
   "Ready For Production",
+  "Canceled",
 ];
 
 const QUOTE_STATUS_ALIASES = {
@@ -35,12 +36,18 @@ export function getQuoteStatusIndex(status) {
 }
 
 export function canAdvanceQuoteStatus(status) {
-  const index = getQuoteStatusIndex(status);
+  const normalizedStatus = normalizeQuoteStatus(status);
+  if (normalizedStatus === "Canceled") return false;
+
+  const index = getQuoteStatusIndex(normalizedStatus);
   return index >= 0 && index < QUOTE_STATUSES.length - 1;
 }
 
 export function getNextQuoteStatus(status) {
-  const index = getQuoteStatusIndex(status);
+  const normalizedStatus = normalizeQuoteStatus(status);
+  if (normalizedStatus === "Canceled") return "Canceled";
+
+  const index = getQuoteStatusIndex(normalizedStatus);
   if (index < 0) return "Sent";
 
   return QUOTE_STATUSES[Math.min(index + 1, QUOTE_STATUSES.length - 1)];
@@ -54,8 +61,12 @@ export function isQuoteArchived(order) {
   return order?.quote_archived === true;
 }
 
+export function isQuoteCanceled(order) {
+  return normalizeQuoteStatus(order?.quote_status || order?.status) === "Canceled";
+}
+
 export function isActiveQuoteWorkflowOrder(order) {
-  return order?.operational_visible !== true && !isQuoteArchived(order);
+  return order?.operational_visible !== true && !isQuoteArchived(order) && !isQuoteCanceled(order);
 }
 
 export function sortQuotesByStatus(quotes = []) {

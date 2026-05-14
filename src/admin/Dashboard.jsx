@@ -8,6 +8,7 @@ import {
   normalizeQuoteStatus,
 } from "../quotes/quoteWorkflow";
 import {
+  isCanceledOperationalStatus,
   isCompletedOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
@@ -113,7 +114,11 @@ function buildWorkflowSnapshotCards(orders = []) {
     const isBlockedByAssignment = order.needs_assignment || !order.assigned_to_staff_name;
     const isBlockedAtIntake = operationalStatus === "New";
 
-    if (!isCompletedOperationalStatus(operationalStatus) && (isBlockedByAssignment || isBlockedAtIntake)) {
+    if (
+      !isCompletedOperationalStatus(operationalStatus) &&
+      !isCanceledOperationalStatus(operationalStatus) &&
+      (isBlockedByAssignment || isBlockedAtIntake)
+    ) {
       snapshot.blockedJobs += 1;
     }
   });
@@ -152,7 +157,7 @@ function buildStaffWorkspaceSummary(orders = []) {
       const status = normalizeOperationalStatus(order.status);
       const dueDate = order.due_date ? new Date(`${order.due_date}T00:00:00`) : null;
 
-      if (!isCompletedOperationalStatus(status)) {
+      if (!isCompletedOperationalStatus(status) && !isCanceledOperationalStatus(status)) {
         summary.active += 1;
       }
 
@@ -171,9 +176,14 @@ function buildStaffWorkspaceSummary(orders = []) {
       if (dueDate) {
         const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-        if (diffDays < 0 && !isCompletedOperationalStatus(status)) {
+        if (diffDays < 0 && !isCompletedOperationalStatus(status) && !isCanceledOperationalStatus(status)) {
           summary.overdue += 1;
-        } else if (diffDays >= 0 && diffDays <= 2 && !isCompletedOperationalStatus(status)) {
+        } else if (
+          diffDays >= 0 &&
+          diffDays <= 2 &&
+          !isCompletedOperationalStatus(status) &&
+          !isCanceledOperationalStatus(status)
+        ) {
           summary.dueSoon += 1;
         }
       }

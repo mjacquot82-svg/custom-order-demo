@@ -1,6 +1,8 @@
 import { normalizeProductionType } from "../constants/productionTypes";
 import { formatShortDate } from "../lib/dateFormatting";
 import {
+  isActiveOperationalStatus,
+  isCanceledOperationalStatus,
   isCompletedOperationalStatus,
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
@@ -12,6 +14,7 @@ export const PRODUCTION_STATUS_FILTERS = [
   { key: "in-production", label: "In Production" },
   { key: "ready-for-pickup", label: "Ready For Pickup" },
   { key: "completed", label: "Completed" },
+  { key: "canceled", label: "Canceled" },
   { key: "unassigned", label: "Unassigned Work" },
   { key: "urgent", label: "Urgent" },
 ];
@@ -175,7 +178,10 @@ export function matchesProductionStatus(order, activeStatus) {
   const queuePriority = buildQueuePriority(order);
 
   if (activeStatus === "active") {
-    return order.operational_visible !== false && !isCompletedOperationalStatus(normalizedStatus);
+    return (
+      order.operational_visible !== false &&
+      isActiveOperationalStatus(normalizedStatus)
+    );
   }
 
   if (activeStatus === "awaiting-production") {
@@ -192,6 +198,10 @@ export function matchesProductionStatus(order, activeStatus) {
 
   if (activeStatus === "completed") {
     return isCompletedOperationalStatus(normalizedStatus);
+  }
+
+  if (activeStatus === "canceled") {
+    return isCanceledOperationalStatus(normalizedStatus) || order.workflow_state === "Canceled";
   }
 
   if (activeStatus === "unassigned") {
@@ -246,12 +256,16 @@ export function buildProductionWorkspaceSummary(orders = []) {
   const completedOrders = orders.filter((order) =>
     matchesProductionStatus(order, "completed")
   );
+  const canceledOrders = orders.filter((order) =>
+    matchesProductionStatus(order, "canceled")
+  );
 
   return {
     activeOrders: activeOrders.length,
     urgentOrders: urgentOrders.length,
     unassignedOrders: unassignedOrders.length,
     completedOrders: completedOrders.length,
+    canceledOrders: canceledOrders.length,
   };
 }
 

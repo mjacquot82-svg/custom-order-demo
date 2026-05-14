@@ -27,18 +27,23 @@ export default function ProductionProgressTracker({ order }) {
         {OPERATIONAL_ORDER_STATUSES.map((stage, index) => {
           const complete = index < currentStage;
           const active = index === currentStage;
+          const canceled = stage === "Canceled";
 
           return (
             <div
               key={stage}
               style={{
                 border: active
-                  ? "1px solid #171717"
+                  ? canceled
+                    ? "1px solid #b91c1c"
+                    : "1px solid #171717"
                   : complete
                   ? "1px solid #86efac"
                   : "1px solid #e2e8f0",
                 background: active
-                  ? "#171717"
+                  ? canceled
+                    ? "#b91c1c"
+                    : "#171717"
                   : complete
                   ? "#ecfdf5"
                   : "#f8fafc",
