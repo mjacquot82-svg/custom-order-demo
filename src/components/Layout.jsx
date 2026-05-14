@@ -75,7 +75,7 @@ function getAdminSections(staffUser) {
           { to: "/admin", label: "My Dashboard", navKey: "dashboard" },
           {
             to: "/admin/assignments",
-            label: "My Work Queue",
+            label: "My Assigned Work",
             navKey: "assignments",
             badgeKey: "assignments",
           },
@@ -89,11 +89,11 @@ function getAdminSections(staffUser) {
         ],
       },
       {
-        title: "Production",
+        title: "Shop Production",
         links: [
           {
             to: "/admin/orders",
-            label: "Production Queue",
+            label: "Shop Production Queue",
             navKey: "productionOrders",
             badgeKey: "productionOrders",
           },

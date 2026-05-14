@@ -7,12 +7,12 @@ import {
 import { buildQueuePriority } from "../queue/buildQueuePriority";
 
 export const PRODUCTION_STATUS_FILTERS = [
-  { key: "active", label: "Active" },
+  { key: "active", label: "All Active Work" },
   { key: "awaiting-production", label: "Awaiting Production" },
   { key: "in-production", label: "In Production" },
   { key: "ready-for-pickup", label: "Ready For Pickup" },
   { key: "completed", label: "Completed" },
-  { key: "unassigned", label: "Unassigned" },
+  { key: "unassigned", label: "Unassigned Work" },
   { key: "urgent", label: "Urgent" },
 ];
 
@@ -259,7 +259,10 @@ export function buildResultsLabel(count, activeStatus) {
   const activeFilter = PRODUCTION_STATUS_FILTERS.find(
     (filter) => filter.key === activeStatus
   );
-  const label = activeFilter?.label || "Results";
+  const label =
+    activeFilter?.key === "active"
+      ? "Active"
+      : activeFilter?.label || "Results";
   return `${count} ${label.toLowerCase()}${count === 1 ? " job" : " jobs"}`;
 }
 

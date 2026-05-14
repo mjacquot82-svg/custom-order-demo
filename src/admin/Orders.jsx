@@ -27,7 +27,11 @@ import {
   PRODUCTION_STATUS_FILTERS,
 } from "../production/productionWorkspace";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
-import { getOperationalOrdersForStaff, isStaffWorkspaceView } from "./adminRoleView";
+import {
+  getAssignedOrdersForStaff,
+  getOperationalOrdersForStaff,
+  isStaffWorkspaceView,
+} from "./adminRoleView";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -329,6 +333,10 @@ export default function Orders() {
     () => buildProductionWorkspaceSummary(workspaceOrders),
     [workspaceOrders]
   );
+  const assignedToMeCount = useMemo(
+    () => (isStaffWorkspace ? getAssignedOrdersForStaff(workspaceOrders, staffUser).length : 0),
+    [isStaffWorkspace, staffUser, workspaceOrders]
+  );
 
   const filteredOrders = useMemo(
     () =>
@@ -477,7 +485,7 @@ export default function Orders() {
             </h1>
             <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
               {isStaffWorkspace
-                ? "Shared operational queue for production movement, ready jobs, and front-counter follow-through."
+                ? "Shop-wide production visibility for active work across the floor. This queue includes your assignments, other staff assignments, and unassigned jobs awaiting assignment."
                 : "Production-first workspace for active jobs, stage flow, and fast order handling."}
             </p>
           </div>
@@ -523,7 +531,7 @@ export default function Orders() {
                   fontWeight: 700,
                 }}
               >
-                My Work Queue
+                My Assigned Work
               </Link>
             ) : null}
           </div>
@@ -536,18 +544,43 @@ export default function Orders() {
             gap: "10px",
           }}
         >
-            <SummaryCard label="Active Jobs" value={workspaceSummary.activeOrders} />
-          {isStaffWorkspace ? null : (
+          <SummaryCard label={isStaffWorkspace ? "All Active Jobs" : "Active Jobs"} value={workspaceSummary.activeOrders} />
+          {isStaffWorkspace ? (
+            <SummaryCard label="Unassigned Work" value={workspaceSummary.unassignedOrders} tone="warning" />
+          ) : (
             <SummaryCard label="Unassigned" value={workspaceSummary.unassignedOrders} tone="warning" />
           )}
+          {isStaffWorkspace ? (
+            <SummaryCard
+              label="Assigned To Me"
+              value={assignedToMeCount}
+            />
+          ) : null}
           <SummaryCard label="Urgent" value={workspaceSummary.urgentOrders} tone="danger" />
         </section>
+
+        {isStaffWorkspace ? (
+          <section
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: "18px",
+              padding: "16px 18px",
+              display: "grid",
+              gap: "6px",
+            }}
+          >
+            <strong style={{ color: "#0f172a" }}>How to read this workspace</strong>
+            <p style={{ margin: 0, color: "#64748b" }}>
+              Use <strong>My Assigned Work</strong> for your personal queue. Use this Production Queue for the full shop view, including jobs assigned to other staff and unassigned work that is available or still waiting for assignment.
+            </p>
+          </section>
+        ) : null}
 
         <section style={{ display: "grid", gap: "16px" }}>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
             {PRODUCTION_STATUS_FILTERS.filter((filter) => {
               if (filter.key === "urgent") return false;
-              if (isStaffWorkspace && filter.key === "unassigned") return false;
               return true;
             }).map((filter) => (
               <FilterPill
@@ -819,7 +852,9 @@ export default function Orders() {
             orders={filteredOrders}
             emptyMessage={
               isStaffWorkspace
-                ? "No assigned jobs match the current workspace filters."
+                ? activeStatusFilter === "unassigned"
+                  ? "No unassigned production jobs match the current filters."
+                  : "No shop production jobs match the current filters."
                 : "No production orders match the current workspace filters."
             }
             onAdvanceStatus={handleAdvanceStatus}

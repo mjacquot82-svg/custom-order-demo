@@ -184,23 +184,39 @@ function StaffAssignments({ allOrders, staffUser }) {
           <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>My Assignments</p>
           <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>My Work Queue</h1>
           <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            Personal execution board for the jobs currently assigned to you.
+            Only jobs assigned directly to you appear here. Unassigned shop work and jobs assigned to other staff stay in the Shop Production Queue.
           </p>
         </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Production Queue</Link>
+          <Link to="/admin/orders" style={{ border: "none", background: "#171717", color: "#ffffff", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Open Shop Production</Link>
           <Link to="/admin/sales/new" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Quick Sale</Link>
           <Link to="/admin/quotes" style={{ border: "1px solid #cbd5e1", background: "#ffffff", color: "#171717", borderRadius: "12px", padding: "12px 16px", textDecoration: "none", fontWeight: 800 }}>Quote Intake</Link>
         </div>
       </div>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "14px" }}>
-        <SummaryMetric label="Active Assignments" value={activeAssignedOrders.length} />
+        <SummaryMetric label="Assigned To Me" value={activeAssignedOrders.length} />
         <SummaryMetric label="Ready To Start" value={groupedOrders.ready.length} />
         <SummaryMetric label="In Production" value={groupedOrders.inProgress.length} tone="success" />
         <SummaryMetric label="Ready For Pickup" value={groupedOrders.paused.length} />
         <SummaryMetric label="Overdue" value={overdueOrders.length} tone="danger" />
+      </section>
+
+      <section
+        style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: "18px",
+          padding: "16px 18px",
+          display: "grid",
+          gap: "6px",
+        }}
+      >
+        <strong style={{ color: "#0f172a" }}>This queue is personal to you.</strong>
+        <p style={{ margin: 0, color: "#64748b" }}>
+          If this page is empty, there may still be production work in the shop. Check the Shop Production Queue to view unassigned jobs and overall production activity.
+        </p>
       </section>
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
@@ -208,19 +224,19 @@ function StaffAssignments({ allOrders, staffUser }) {
           title="Ready To Start"
           description="Assigned jobs waiting for production work."
           orders={groupedOrders.ready}
-          emptyMessage="No jobs are waiting to be started."
+          emptyMessage="No jobs assigned to you are waiting to be started."
         />
         <StaffAssignmentColumn
           title="In Production"
           description="Work already moving through production."
           orders={groupedOrders.inProgress}
-          emptyMessage="Nothing is currently marked in production."
+          emptyMessage="No jobs assigned to you are currently marked in production."
         />
         <StaffAssignmentColumn
           title="Ready For Pickup"
           description="Completed production work waiting for handoff."
           orders={groupedOrders.paused}
-          emptyMessage="No jobs are waiting for pickup."
+          emptyMessage="No jobs assigned to you are waiting for pickup."
         />
       </section>
     </div>

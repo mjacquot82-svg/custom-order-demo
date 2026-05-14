@@ -82,6 +82,22 @@ export default function ProductionQueueBoard({ orders = [] }) {
 
   return (
     <div style={{ display: "grid", gap: "18px" }}>
+      <section
+        style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: "18px",
+          padding: "16px",
+          display: "grid",
+          gap: "6px",
+        }}
+      >
+        <strong style={{ color: "#0f172a" }}>Shop-wide production visibility</strong>
+        <p style={{ margin: 0, color: "#64748b" }}>
+          Unassigned work appears first. Assigned work is grouped by staff member below so it is clear what is available versus already owned.
+        </p>
+      </section>
+
       {unassignedSection.hasItems ? (
         <section
           style={{
@@ -92,9 +108,12 @@ export default function ProductionQueueBoard({ orders = [] }) {
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
-            <h2 style={{ margin: 0, fontSize: "18px" }}>Unassigned</h2>
+            <h2 style={{ margin: 0, fontSize: "18px" }}>Unassigned Work</h2>
             <span style={{ color: "#92400e", fontWeight: 700 }}>{unassignedSection.count} jobs</span>
           </div>
+          <p style={{ margin: "0 0 12px", color: "#92400e" }}>
+            These jobs are active in the shop but are not currently assigned to a staff member.
+          </p>
           <div style={{ display: "grid", gap: "10px" }}>
             {unassignedSection.orders.map((order) => (
               <OrderCard key={order.order_number} order={order} />
@@ -119,6 +138,9 @@ export default function ProductionQueueBoard({ orders = [] }) {
                 <h2 style={{ margin: 0, fontSize: "18px" }}>{section.workerName}</h2>
                 <span style={{ color: "#475569", fontWeight: 700 }}>{section.orderCount} jobs</span>
               </div>
+              <p style={{ margin: "0 0 12px", color: "#64748b" }}>
+                Jobs currently assigned to {section.workerName}.
+              </p>
               <div style={{ display: "grid", gap: "10px" }}>
                 {section.orders.map((order) => (
                   <OrderCard key={order.order_number} order={order} />

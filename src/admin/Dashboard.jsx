@@ -297,6 +297,9 @@ function StaffDashboard({ orders, staffUser }) {
   const readyForPickupOrders = activeOperationalOrders.filter(
     (order) => normalizeOperationalStatus(order.status) === "Ready for Pickup"
   );
+  const unassignedOrders = activeOperationalOrders.filter(
+    (order) => order.needs_assignment || !order.assigned_to_staff_id
+  );
   const awaitingProductionOrders = activeOperationalOrders.filter((order) => {
     const status = normalizeOperationalStatus(order.status);
     return status === "Awaiting Production" || status === "New";
@@ -358,9 +361,9 @@ function StaffDashboard({ orders, staffUser }) {
         </div>
       </div>
 
-      <Section title="Today’s Focus" description={`Signed in as ${staffUser?.name || "staff"}. This workspace only surfaces the work that supports day-to-day execution.`}>
+      <Section title="Today’s Focus" description={`Signed in as ${staffUser?.name || "staff"}. These counts reflect only the jobs currently assigned to you.`}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          <SummaryCard label="Active Work" value={summary.active} />
+          <SummaryCard label="Assigned To Me" value={summary.active} />
           <SummaryCard label="Ready To Start" value={summary.ready} />
           <SummaryCard label="In Production" value={summary.inProduction} tone="success" />
           <SummaryCard label="Due Soon" value={summary.dueSoon} tone="warning" />
@@ -422,15 +425,16 @@ function StaffDashboard({ orders, staffUser }) {
           </div>
         ) : (
           <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
-            No active jobs are currently assigned to you.
+            No jobs are currently assigned to you. Shop production work may still be active or unassigned.
           </p>
         )}
       </Section>
 
-      <Section title="Production Queue" description="A shared view of operational jobs across the shop floor so staff can follow movement beyond their personal assignments.">
+      <Section title="Shop Production" description="This is the shop-wide production view. It includes work assigned to you, work assigned to other staff, and unassigned jobs still awaiting assignment.">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          <SummaryCard label="Active Jobs" value={activeOperationalOrders.length} />
+          <SummaryCard label="All Active Jobs" value={activeOperationalOrders.length} />
           <SummaryCard label="Assigned To Me" value={activeAssignedOrders.length} />
+          <SummaryCard label="Unassigned Work" value={unassignedOrders.length} tone="warning" />
           <SummaryCard label="Ready For Pickup" value={readyForPickupOrders.length} />
         </div>
         <div style={{ marginTop: "16px" }}>
@@ -449,7 +453,7 @@ function StaffDashboard({ orders, staffUser }) {
               fontWeight: 800,
             }}
           >
-            Open Production Queue
+            Open Shop Production Queue
           </Link>
         </div>
       </Section>
