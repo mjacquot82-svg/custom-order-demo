@@ -600,7 +600,7 @@ function AdminWorkspaceHeader({ staffUser }) {
 
   function handleLogout() {
     clearActiveStaffSession();
-    navigate("/");
+    navigate("/login", { replace: true });
   }
 
   return (

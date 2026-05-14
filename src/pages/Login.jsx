@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getStoredStaffUsers,
   setActiveStaffUser,
+  subscribeToStaffUsers,
   validateStaffPin,
 } from "../lib/staffUsersStore";
 
@@ -28,10 +29,28 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showStaffLogin, setShowStaffLogin] = useState(false);
-  const [staffUsers] = useState(() => getStoredStaffUsers().filter((user) => user.status !== "Inactive"));
+  const [staffUsers, setStaffUsers] = useState(() =>
+    getStoredStaffUsers().filter((user) => user.status !== "Inactive")
+  );
   const [selectedStaffId, setSelectedStaffId] = useState(staffUsers[0]?.id || "");
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
+
+  useEffect(() => {
+    function syncStaffUsers(nextUsers) {
+      const activeUsers = nextUsers.filter((user) => user.status !== "Inactive");
+      setStaffUsers(activeUsers);
+      setSelectedStaffId((currentId) => {
+        if (activeUsers.some((user) => user.id === currentId)) {
+          return currentId;
+        }
+
+        return activeUsers[0]?.id || "";
+      });
+    }
+
+    return subscribeToStaffUsers(syncStaffUsers);
+  }, []);
 
   function handleCustomerLogin(e) {
     e.preventDefault();
@@ -57,7 +76,7 @@ export default function Login() {
 
     setActiveStaffUser(matchedUser);
 
-    navigate("/admin");
+    navigate("/admin", { replace: true });
   }
 
   function addPinDigit(digit) {

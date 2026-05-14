@@ -121,6 +121,14 @@ function emitActiveStaffUpdated() {
   window.dispatchEvent(new CustomEvent(ACTIVE_STAFF_UPDATED_EVENT));
 }
 
+function clearLegacyActiveStaffPersistence() {
+  removeStorageItem(ACTIVE_STAFF_KEY);
+}
+
+function clearSessionActiveStaffPersistence() {
+  removeStorageItem(ACTIVE_STAFF_KEY, { storage: "session" });
+}
+
 export function getStoredStaffUsers() {
   if (!hasBrowserStorage()) return DEFAULT_STAFF_USERS;
 
@@ -241,8 +249,8 @@ export function validateStaffPin(pin) {
 export function setActiveStaffUser(user) {
   if (!hasBrowserStorage()) return;
   if (!user) {
-    removeStorageItem(ACTIVE_STAFF_KEY);
-    removeStorageItem(ACTIVE_STAFF_KEY, { storage: "session" });
+    clearLegacyActiveStaffPersistence();
+    clearSessionActiveStaffPersistence();
     emitActiveStaffUpdated();
     return;
   }
@@ -253,7 +261,7 @@ export function setActiveStaffUser(user) {
     role: user.role,
   });
 
-  setRawStorageItem(ACTIVE_STAFF_KEY, nextActiveUser);
+  clearLegacyActiveStaffPersistence();
   setRawStorageItem(ACTIVE_STAFF_KEY, nextActiveUser, { storage: "session" });
   emitActiveStaffUpdated();
 }
@@ -266,9 +274,9 @@ export function getActiveStaffUser() {
   if (!hasBrowserStorage()) return null;
 
   try {
-    const persistedUser = getJsonStorageItem(ACTIVE_STAFF_KEY, null);
     const sessionUser = getJsonStorageItem(ACTIVE_STAFF_KEY, null, { storage: "session" });
-    const parsedUser = persistedUser || sessionUser;
+    clearLegacyActiveStaffPersistence();
+    const parsedUser = sessionUser;
 
     if (!parsedUser?.id) {
       return null;
