@@ -738,12 +738,16 @@ export default function Layout() {
   const [activeStaffUser, setActiveStaffUser] = useState(() => getActiveStaffUser());
 
   useEffect(() => {
-    if (!isAdmin) return undefined;
+    function syncActiveStaffUser(nextStaffUser = getActiveStaffUser()) {
+      setActiveStaffUser(nextStaffUser);
+    }
+
+    syncActiveStaffUser();
 
     return subscribeToActiveStaffUser((nextStaffUser) => {
-      setActiveStaffUser(nextStaffUser);
+      syncActiveStaffUser(nextStaffUser);
     });
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     if (!isAdmin) return;
