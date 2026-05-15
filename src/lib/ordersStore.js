@@ -16,6 +16,7 @@ import { buildStaffAuditFields, getActiveStaffUser } from "./staffUsersStore";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 import { formatShortDate, toIsoTimestamp } from "./dateFormatting";
 import { getArtworkDisplayName, getOrderArtworkFiles } from "./orderArtwork";
+import { createOperationalEvent } from "./operationalEventsStore";
 
 const STORAGE_KEY = "teeCoStaffOrders";
 const orderListeners = new Set();
@@ -383,6 +384,241 @@ function buildPaymentValidationError(validation) {
   return error;
 }
 
+function resolveOperationalEventPath(order = {}, workflowLabel = "") {
+  const orderNumber = order.order_number || "";
+  if (!orderNumber) return "";
+
+  if (workflowLabel === "Quote Lifecycle") {
+    return `/admin/quotes/${orderNumber}`;
+  }
+
+  return `/admin/orders/${orderNumber}`;
+}
+
+function buildOperationalEventRecord(order, eventType, summary, options = {}) {
+  if (!order?.order_number || !summary) return null;
+
+  const staff = options.staffUser || getActiveStaffUser();
+  const workflowLabel = options.workflowLabel || "Operations";
+
+  return {
+    event_type: eventType,
+    workflow_label: workflowLabel,
+    reference_type: options.referenceType || "order",
+    reference_id: order.order_number,
+    reference_label: `Order ${order.order_number}`,
+    reference_path:
+      Object.prototype.hasOwnProperty.call(options, "referencePath")
+        ? options.referencePath
+        : resolveOperationalEventPath(order, workflowLabel),
+    summary,
+    staff_id: staff?.id || "",
+    staff_name: staff?.name || "Unknown Staff",
+    staff_role: staff?.role || "",
+    created_at: options.createdAt || new Date().toISOString(),
+  };
+}
+
+function emitOperationalEventsForOrderUpdate(previousOrder, nextOrder, updates = {}, timestamp) {
+  if (!previousOrder || !nextOrder) return;
+
+  const previousFinancials = normalizeOrderFinancials(previousOrder);
+  const nextFinancials = normalizeOrderFinancials(nextOrder);
+  const recentPayment = Array.isArray(updates.payment_history) ? updates.payment_history[0] : null;
+  const paymentMethod = recentPayment?.method ? ` via ${recentPayment.method}` : "";
+  const normalizedPreviousStatus = normalizeOperationalStatus(previousOrder.status);
+  const normalizedNextStatus = normalizeOperationalStatus(nextOrder.status);
+  const previousQuoteStatus = normalizeQuoteStatus(previousOrder.quote_status);
+  const nextQuoteStatus = normalizeQuoteStatus(nextOrder.quote_status);
+  const previousPickupStatus = String(previousOrder.pickup_status || "").trim();
+  const nextPickupStatus = String(nextOrder.pickup_status || "").trim();
+  const previousCanceled =
+    normalizedPreviousStatus === "Canceled" || previousQuoteStatus === "Canceled";
+  const nextCanceled = normalizedNextStatus === "Canceled" || nextQuoteStatus === "Canceled";
+  const previousDepositApplied = Number(previousFinancials.deposit_applied || 0);
+  const nextDepositApplied = Number(nextFinancials.deposit_applied || 0);
+  const depositRecordedAmount = Math.max(0, nextDepositApplied - previousDepositApplied);
+  const eventRecords = [];
+
+  if (
+    Array.isArray(updates.payment_history) &&
+    depositRecordedAmount > 0
+  ) {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "deposit_recorded",
+        `Deposit recorded for ${money(depositRecordedAmount)}${paymentMethod}.`,
+        {
+          createdAt: timestamp,
+          workflowLabel: "Payments",
+        }
+      )
+    );
+  }
+
+  if (
+    Array.isArray(updates.payment_history) &&
+    previousFinancials.payment_status !== "Paid" &&
+    nextFinancials.payment_status === "Paid"
+  ) {
+    const finalPaymentAmount = Number(recentPayment?.amount || 0);
+
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "final_payment_recorded",
+        `Final payment recorded for ${money(finalPaymentAmount)}${paymentMethod}. Order balance is now settled.`,
+        {
+          createdAt: timestamp,
+          workflowLabel: "Payments",
+        }
+      )
+    );
+  }
+
+  if (!previousCanceled && nextCanceled) {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "order_canceled",
+        `${nextQuoteStatus === "Canceled" && previousQuoteStatus !== "Canceled" ? "Quote workflow" : "Order"} canceled.`,
+        {
+          createdAt: timestamp,
+          workflowLabel:
+            nextQuoteStatus === "Canceled" && previousQuoteStatus !== "Canceled"
+              ? "Quote Lifecycle"
+              : "Production Workflow",
+          referencePath:
+            nextQuoteStatus === "Canceled" && previousQuoteStatus !== "Canceled"
+              ? `/admin/quotes/${nextOrder.order_number}`
+              : `/admin/orders/${nextOrder.order_number}`,
+        }
+      )
+    );
+  }
+
+  if (
+    normalizedPreviousStatus !== "Completed" &&
+    normalizedNextStatus === "Completed"
+  ) {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "order_completed",
+        `Order marked complete${nextOrder.assigned_to_staff_name ? ` by ${nextOrder.assigned_to_staff_name}` : ""}.`,
+        {
+          createdAt: timestamp,
+          workflowLabel: "Production Workflow",
+        }
+      )
+    );
+
+    if (nextOrder.assigned_to_staff_name) {
+      eventRecords.push(
+        buildOperationalEventRecord(
+          nextOrder,
+          "assignment_completed",
+          `Assigned production work completed by ${nextOrder.assigned_to_staff_name}.`,
+          {
+            createdAt: timestamp,
+            workflowLabel: "Assignments",
+          }
+        )
+      );
+    }
+  }
+
+  if (
+    normalizedPreviousStatus !== "Ready for Pickup" &&
+    normalizedNextStatus === "Ready for Pickup"
+  ) {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "order_ready_for_pickup",
+        "Order moved to ready-for-pickup status.",
+        {
+          createdAt: timestamp,
+          workflowLabel: "Pickup Handling",
+        }
+      )
+    );
+  }
+
+  if (
+    previousPickupStatus !== "Picked Up" &&
+    nextPickupStatus === "Picked Up"
+  ) {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "pickup_completed",
+        "Pickup marked completed.",
+        {
+          createdAt: timestamp,
+          workflowLabel: "Pickup Handling",
+        }
+      )
+    );
+  }
+
+  if (
+    updates.deposit?.status === "pending" &&
+    updates.deposit?.requested_at &&
+    updates.deposit.requested_at !== previousOrder.deposit?.requested_at
+  ) {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "deposit_request_sent",
+        `Deposit request prepared${updates.deposit.request_channel ? ` via ${updates.deposit.request_channel}` : ""}.`,
+        {
+          createdAt: timestamp,
+          workflowLabel: "Payments",
+        }
+      )
+    );
+  }
+
+  if (updates.activity_type === "customer_ready_sent") {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "customer_ready_communication_sent",
+        updates.activity_note || "Customer-ready communication sent.",
+        {
+          createdAt: timestamp,
+          workflowLabel: "Front Counter",
+        }
+      )
+    );
+  }
+
+  if (
+    updates.activity_type === "release_to_production" &&
+    previousQuoteStatus !== "Ready For Production" &&
+    nextQuoteStatus === "Ready For Production"
+  ) {
+    eventRecords.push(
+      buildOperationalEventRecord(
+        nextOrder,
+        "quote_released_to_production",
+        "Quote released into the production workflow.",
+        {
+          createdAt: timestamp,
+          workflowLabel: "Quote Lifecycle",
+          referencePath: `/admin/quotes/${nextOrder.order_number}`,
+        }
+      )
+    );
+  }
+
+  eventRecords.filter(Boolean).forEach((eventRecord) => {
+    createOperationalEvent(eventRecord);
+  });
+}
+
 export function getStoredOrders() {
   return readStoredOrders();
 }
@@ -487,9 +723,12 @@ export function updateStoredOrder(orderNumber, updates) {
   const currentOrders = getStoredOrders();
   const now = new Date().toISOString();
   let updatedOrder = null;
+  let previousOrder = null;
 
   const nextOrders = currentOrders.map((order) => {
     if (order.order_number !== orderNumber) return order;
+
+    previousOrder = order;
 
     const cleanUpdates = stripActivityMeta(
       buildWorkflowDerivedUpdates(order, buildAssignmentUpdates(order, updates))
@@ -517,6 +756,8 @@ export function updateStoredOrder(orderNumber, updates) {
   if (!saveStoredOrders(nextOrders)) {
     throw new Error("Unable to update order. Browser storage write failed.");
   }
+
+  emitOperationalEventsForOrderUpdate(previousOrder, updatedOrder, updates, now);
   return updatedOrder;
 }
 

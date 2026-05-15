@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
-import { formatShortDate } from "../lib/dateFormatting";
+import { formatDateTime, formatShortDate } from "../lib/dateFormatting";
 import { buildOperationalMetrics } from "../operations/buildOperationalMetrics";
 import {
   isActiveQuoteWorkflowOrder,
@@ -21,6 +21,7 @@ import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
 import { buildProductionReadiness } from "../quotes/productionReadiness";
 import StaffHomeWorkspace from "./StaffHomeWorkspace";
 import AdminDiagnosticsPanel from "../components/AdminDiagnosticsPanel";
+import { useOperationalEvents } from "../lib/operationalEventsStore";
 
 function Section({ title, children, description }) {
   return (
@@ -334,6 +335,110 @@ function EmptyAttentionState() {
   );
 }
 
+function eventTone(eventType) {
+  if (["order_canceled"].includes(eventType)) {
+    return {
+      border: "#fecaca",
+      background: "#fef2f2",
+      badgeBackground: "#fee2e2",
+      badgeColor: "#b91c1c",
+    };
+  }
+
+  if (["deposit_recorded", "final_payment_recorded", "pickup_completed", "assignment_completed"].includes(eventType)) {
+    return {
+      border: "#bbf7d0",
+      background: "#f0fdf4",
+      badgeBackground: "#dcfce7",
+      badgeColor: "#166534",
+    };
+  }
+
+  if (["order_ready_for_pickup", "deposit_request_sent"].includes(eventType)) {
+    return {
+      border: "#bfdbfe",
+      background: "#eff6ff",
+      badgeBackground: "#dbeafe",
+      badgeColor: "#1d4ed8",
+    };
+  }
+
+  return {
+    border: "#e2e8f0",
+    background: "#f8fafc",
+    badgeBackground: "#e2e8f0",
+    badgeColor: "#334155",
+  };
+}
+
+function formatEventTypeLabel(eventType = "") {
+  return String(eventType || "operational_update")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function OperationalEventCard({ event }) {
+  const tone = eventTone(event.event_type);
+  const destination = event.reference_path || "/admin";
+
+  return (
+    <Link
+      to={destination}
+      style={{
+        display: "grid",
+        gap: "10px",
+        textDecoration: "none",
+        color: "#0f172a",
+        borderRadius: "18px",
+        border: `1px solid ${tone.border}`,
+        background: tone.background,
+        padding: "16px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "12px",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            borderRadius: "999px",
+            padding: "6px 10px",
+            background: tone.badgeBackground,
+            color: tone.badgeColor,
+            fontSize: "11px",
+            fontWeight: 800,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          {formatEventTypeLabel(event.event_type)}
+        </span>
+        <strong style={{ color: "#475569", fontSize: "13px" }}>
+          {formatDateTime(event.created_at)}
+        </strong>
+      </div>
+
+      <div>
+        <strong style={{ display: "block", lineHeight: 1.5 }}>{event.summary}</strong>
+        <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: "14px", lineHeight: 1.5 }}>
+          {event.reference_label}
+          {event.workflow_label ? ` • ${event.workflow_label}` : ""}
+          {event.staff_name ? ` • ${event.staff_name}` : ""}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 function buildUpcomingOperationalOrders(orders = []) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -376,11 +481,12 @@ function buildUpcomingOperationalOrders(orders = []) {
     });
 }
 
-function OwnerDashboard({ orders }) {
+function OwnerDashboard({ orders, operationalEvents }) {
   const metrics = buildOperationalMetrics(orders);
   const attentionItems = buildOwnerAttentionItems(orders);
   const workspaceOverview = buildOwnerWorkspaceOverview(orders);
   const upcomingOrders = buildUpcomingOperationalOrders(orders);
+  const recentOperationalEvents = operationalEvents.slice(0, 6);
 
   return (
     <div style={{ maxWidth: "1240px", margin: "0 auto", padding: "32px 24px 44px" }}>
@@ -456,12 +562,32 @@ function OwnerDashboard({ orders }) {
           </p>
         )}
       </Section>
+
+      <div style={{ height: "28px" }} />
+
+      <Section
+        title="Recent Operational Activity"
+        description="Important workflow actions performed by staff. This stays lightweight and owner-facing so operational awareness improves without turning into a notification center."
+      >
+        {recentOperationalEvents.length ? (
+          <div style={{ display: "grid", gap: "12px" }}>
+            {recentOperationalEvents.map((event) => (
+              <OperationalEventCard key={event.id} event={event} />
+            ))}
+          </div>
+        ) : (
+          <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
+            Important operational events will appear here as staff complete workflow actions.
+          </p>
+        )}
+      </Section>
     </div>
   );
 }
 
 export default function Dashboard() {
   const orders = useStoredOrders();
+  const operationalEvents = useOperationalEvents();
   const staffUser = getActiveStaffUser();
   const resolvedRole = resolveOperationalRole(staffUser);
 
@@ -486,5 +612,5 @@ export default function Dashboard() {
     );
   }
 
-  return <OwnerDashboard orders={orders} />;
+  return <OwnerDashboard orders={orders} operationalEvents={operationalEvents} />;
 }
