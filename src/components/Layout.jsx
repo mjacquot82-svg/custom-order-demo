@@ -269,9 +269,9 @@ function AdminSidebar({ pathname, staffUser }) {
   return (
     <aside
       style={{
-        width: "238px",
-        minWidth: "238px",
-        maxWidth: "238px",
+        width: "220px",
+        minWidth: "220px",
+        maxWidth: "220px",
         flexShrink: 0,
         display: "flex",
         flexDirection: "column",
@@ -279,7 +279,7 @@ function AdminSidebar({ pathname, staffUser }) {
         minHeight: "100vh",
         background: "#ffffff",
         borderRight: "1px solid #e2e8f0",
-        padding: "20px 14px 16px",
+        padding: "18px 12px 16px",
         boxSizing: "border-box",
         position: "sticky",
         top: 0,

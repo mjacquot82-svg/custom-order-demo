@@ -34,27 +34,30 @@ export default function OperationsSummaryCards({ metrics }) {
 
   return (
     <div
+      className="owner-dashboard-summary-grid"
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-        gap: "16px",
+        gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+        gap: "12px",
       }}
     >
       {cards.map((card) => (
         <article
+          className="owner-dashboard-summary-card"
           key={card.label}
           style={{
             background: card.background,
             border: "1px solid #e2e8f0",
-            borderRadius: "20px",
-            padding: "20px",
+            borderRadius: "16px",
+            padding: "16px",
           }}
         >
           <div
             style={{
               color: card.color,
-              fontSize: "30px",
+              fontSize: "28px",
               fontWeight: 900,
+              lineHeight: 1,
             }}
           >
             {card.value}
@@ -62,10 +65,11 @@ export default function OperationsSummaryCards({ metrics }) {
 
           <div
             style={{
-              marginTop: "8px",
+              marginTop: "6px",
               color: "#334155",
               fontWeight: 700,
-              lineHeight: 1.4,
+              lineHeight: 1.35,
+              fontSize: "14px",
             }}
           >
             {card.label}
