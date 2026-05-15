@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
-import { formatDateTime, formatShortDate } from "../lib/dateFormatting";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 import { buildOperationalMetrics } from "../operations/buildOperationalMetrics";
 import {
@@ -18,6 +17,7 @@ import {
 } from "./adminRoleView";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
 import { buildProductionReadiness } from "../quotes/productionReadiness";
+import StaffHomeWorkspace from "./StaffHomeWorkspace";
 
 function Section({ title, children, description }) {
   return (
@@ -130,108 +130,6 @@ function buildWorkflowSnapshotCards(orders = []) {
     { label: "Ready For Production", value: snapshot.readyForProduction, tone: "success" },
     { label: "Blocked Jobs", value: snapshot.blockedJobs, tone: "default" },
   ];
-}
-
-function buildStaffActivity(orders = []) {
-  return orders
-    .flatMap((order) =>
-      (order.connected_timeline || order.activity_log || []).map((event) => ({
-        ...event,
-        order_number: order.order_number,
-        status: order.status,
-      }))
-    )
-    .sort(
-      (left, right) =>
-        new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime()
-    )
-    .slice(0, 8);
-}
-
-function buildStaffWorkspaceSummary(orders = []) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return orders.reduce(
-    (summary, order) => {
-      const status = normalizeOperationalStatus(order.status);
-      const dueDate = order.due_date ? new Date(`${order.due_date}T00:00:00`) : null;
-
-      if (!isCompletedOperationalStatus(status) && !isCanceledOperationalStatus(status)) {
-        summary.active += 1;
-      }
-
-      if (status === "Awaiting Production" || status === "New") {
-        summary.ready += 1;
-      }
-
-      if (status === "In Production") {
-        summary.inProduction += 1;
-      }
-
-      if (status === "Ready for Pickup") {
-        summary.readyForPickup += 1;
-      }
-
-      if (dueDate) {
-        const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0 && !isCompletedOperationalStatus(status) && !isCanceledOperationalStatus(status)) {
-          summary.overdue += 1;
-        } else if (
-          diffDays >= 0 &&
-          diffDays <= 2 &&
-          !isCompletedOperationalStatus(status) &&
-          !isCanceledOperationalStatus(status)
-        ) {
-          summary.dueSoon += 1;
-        }
-      }
-
-      return summary;
-    },
-    {
-      active: 0,
-      ready: 0,
-      inProduction: 0,
-      readyForPickup: 0,
-      overdue: 0,
-      dueSoon: 0,
-    }
-  );
-}
-
-function StaffJobCard({ order }) {
-  return (
-    <Link
-      to={`/admin/orders/${order.order_number}`}
-      style={{
-        display: "grid",
-        gap: "8px",
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
-        borderRadius: "18px",
-        padding: "16px",
-        textDecoration: "none",
-        color: "#171717",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-        <strong>{order.order_number}</strong>
-        <span style={{ color: "#475569", fontWeight: 700, fontSize: "13px" }}>{order.status}</span>
-      </div>
-      <div>
-        <p style={{ margin: 0, fontWeight: 700 }}>{order.customer_name || "Walk-in Customer"}</p>
-        <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "14px" }}>
-          {order.garment || order.item || "Custom garment"}
-        </p>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
-        <span>{order.decoration_type || "Production"}</span>
-        <span>Due {order.due_date ? formatShortDate(order.due_date) : "TBD"}</span>
-      </div>
-    </Link>
-  );
 }
 
 function WorkspaceCountLink({ label, count, description, to, tone = "default" }) {
@@ -559,88 +457,17 @@ function OwnerDashboard({ orders }) {
   );
 }
 
-function StaffDashboard({ orders, staffUser }) {
-  const assignedOrders = getAssignedOrdersForStaff(orders, staffUser);
-  const summary = buildStaffWorkspaceSummary(assignedOrders);
-  const activeAssignedOrders = assignedOrders.filter(
-    (order) => !isCompletedOperationalStatus(normalizeOperationalStatus(order.status))
-  );
-  const recentActivity = buildStaffActivity(assignedOrders);
-
-  return (
-    <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px" }}>
-      <div style={{ marginBottom: "20px" }}>
-        <div>
-          <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Staff Workspace</p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "36px" }}>Dashboard</h1>
-          <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            Personal overview for today. This page stays focused on your workload, while production, quotes, and front-counter execution each happen in their dedicated workspace.
-          </p>
-        </div>
-      </div>
-
-      <Section title="Today’s Focus" description={`Signed in as ${staffUser?.name || "staff"}. These counts reflect only the jobs currently assigned to you.`}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-          <SummaryCard label="Assigned To Me" value={summary.active} />
-          <SummaryCard label="Ready To Start" value={summary.ready} />
-          <SummaryCard label="In Production" value={summary.inProduction} tone="success" />
-          <SummaryCard label="Due Soon" value={summary.dueSoon} tone="warning" />
-          <SummaryCard label="Overdue" value={summary.overdue} tone="danger" />
-          <SummaryCard label="Ready For Pickup" value={summary.readyForPickup} />
-        </div>
-      </Section>
-
-      <Section title="My Active Jobs" description="Open the order detail workspace to update production status, review instructions, and track activity.">
-        {activeAssignedOrders.length ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px" }}>
-            {activeAssignedOrders.slice(0, 8).map((order) => (
-              <StaffJobCard key={order.order_number} order={order} />
-            ))}
-          </div>
-        ) : (
-          <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
-            No jobs are currently assigned to you. Shop production work may still be active or unassigned.
-          </p>
-        )}
-      </Section>
-
-      <Section title="Recent Activity" description="A compact timeline of the latest work changes tied to your assigned jobs.">
-        {recentActivity.length ? (
-          <div style={{ display: "grid", gap: "10px" }}>
-            {recentActivity.map((event, index) => (
-              <article
-                key={event.id || `${event.order_number}-${index}`}
-                style={{
-                  borderLeft: "4px solid #171717",
-                  background: "#f8fafc",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                }}
-              >
-                <strong>{event.note || "Order activity recorded."}</strong>
-                <div style={{ marginTop: "4px", color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
-                  {event.order_number ? `Order ${event.order_number}` : "Order update"}
-                  {event.created_at ? ` • ${formatDateTime(event.created_at)}` : ""}
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
-            No recent activity is attached to your assignments yet.
-          </p>
-        )}
-      </Section>
-    </div>
-  );
-}
-
 export default function Dashboard() {
   const orders = useStoredOrders();
   const staffUser = getActiveStaffUser();
 
   if (isStaffWorkspaceView(staffUser)) {
-    return <StaffDashboard orders={orders} staffUser={staffUser} />;
+    return (
+      <StaffHomeWorkspace
+        orders={getAssignedOrdersForStaff(orders, staffUser)}
+        staffUser={staffUser}
+      />
+    );
   }
 
   return <OwnerDashboard orders={orders} />;

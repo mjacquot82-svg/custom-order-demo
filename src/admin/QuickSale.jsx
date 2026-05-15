@@ -1278,7 +1278,7 @@ export default function QuickSale() {
               cursor: "pointer",
             }}
           >
-            {isStaffWorkspace ? "Return to Staff Workspace" : "Return to Dashboard"}
+            {isStaffWorkspace ? "Return to My Assigned Work" : "Return to Dashboard"}
           </button>
         </div>
       </div>

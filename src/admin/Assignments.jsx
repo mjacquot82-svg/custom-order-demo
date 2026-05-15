@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import {
   seedStoredOrders,
   updateStoredOrder,
@@ -7,7 +7,6 @@ import {
 } from "../lib/ordersStore";
 import { getActiveStaffUser, getStoredStaffUsers } from "../lib/staffUsersStore";
 import AssignmentDispatchBoard from "../assignments/AssignmentDispatchBoard";
-import { buildWorkerJobsView } from "../worker/buildWorkerJobsView";
 import {
   isActiveOperationalStatus,
   isCompletedOperationalStatus,
@@ -15,7 +14,6 @@ import {
   sortOrdersByOperationalStatus,
 } from "../orders/orderWorkflow";
 import {
-  getAssignedOrdersForStaff,
   isStaffWorkspaceView,
 } from "./adminRoleView";
 
@@ -75,49 +73,6 @@ function SummaryMetric({ label, value, tone = "default" }) {
   );
 }
 
-function StaffAssignmentColumn({ title, description, orders = [], emptyMessage }) {
-  return (
-    <section style={{ ...cardStyle, display: "grid", gap: "14px" }}>
-      <div>
-        <h2 style={{ margin: "0 0 4px" }}>{title}</h2>
-        <p style={{ margin: 0, color: "#64748b" }}>{description}</p>
-      </div>
-
-      {orders.length ? (
-        <div style={{ display: "grid", gap: "10px" }}>
-          {orders.map((order) => (
-            <Link
-              key={order.order_number}
-              to={`/admin/orders/${order.order_number}`}
-              style={{
-                display: "grid",
-                gap: "6px",
-                borderRadius: "16px",
-                border: "1px solid #e2e8f0",
-                background: "#f8fafc",
-                padding: "14px",
-                textDecoration: "none",
-                color: "#171717",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-                <strong>{order.order_number}</strong>
-                <span style={{ color: "#475569", fontWeight: 700, fontSize: "13px" }}>{order.status}</span>
-              </div>
-              <span style={{ fontWeight: 700 }}>{order.customer_name}</span>
-              <span style={{ color: "#64748b", fontSize: "14px" }}>
-                {order.garment} • Due {order.due_date || "TBD"}
-              </span>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
 function OwnerAssignments({ allOrders, staffUsers, activeOrders, assignedOrders, overdueOrders }) {
   const unassignedOrders = activeOrders.filter((order) => !order.assigned_to_staff_id);
 
@@ -170,55 +125,6 @@ function OwnerAssignments({ allOrders, staffUsers, activeOrders, assignedOrders,
   );
 }
 
-function StaffAssignments({ allOrders, staffUser }) {
-  const assignedOrders = getAssignedOrdersForStaff(allOrders, staffUser);
-  const activeAssignedOrders = assignedOrders.filter((order) => isOpenOrder(order));
-  const overdueOrders = activeAssignedOrders.filter(isOverdue);
-  const groupedOrders = buildWorkerJobsView(activeAssignedOrders, staffUser);
-
-  return (
-    <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px", display: "grid", gap: "18px" }}>
-      <div>
-        <div>
-          <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>My Assignments</p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>My Work Queue</h1>
-          <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
-            Personal execution queue for jobs assigned directly to you. Shop-wide production and intake stay in their own workspaces.
-          </p>
-        </div>
-      </div>
-
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "14px" }}>
-        <SummaryMetric label="Ready To Start" value={groupedOrders.ready.length} />
-        <SummaryMetric label="In Production" value={groupedOrders.inProgress.length} tone="success" />
-        <SummaryMetric label="Ready For Pickup" value={groupedOrders.paused.length} />
-        <SummaryMetric label="Overdue" value={overdueOrders.length} tone="danger" />
-      </section>
-
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
-        <StaffAssignmentColumn
-          title="Ready To Start"
-          description="Assigned jobs waiting for production work."
-          orders={groupedOrders.ready}
-          emptyMessage="No jobs assigned to you are waiting to be started."
-        />
-        <StaffAssignmentColumn
-          title="In Production"
-          description="Work already moving through production."
-          orders={groupedOrders.inProgress}
-          emptyMessage="No jobs assigned to you are currently marked in production."
-        />
-        <StaffAssignmentColumn
-          title="Ready For Pickup"
-          description="Completed production work waiting for handoff."
-          orders={groupedOrders.paused}
-          emptyMessage="No jobs assigned to you are waiting for pickup."
-        />
-      </section>
-    </div>
-  );
-}
-
 export default function Assignments() {
   const storedOrders = useStoredOrders();
   const staffUser = getActiveStaffUser();
@@ -242,7 +148,7 @@ export default function Assignments() {
   const overdueOrders = activeOrders.filter(isOverdue);
 
   if (isStaffWorkspaceView(staffUser)) {
-    return <StaffAssignments allOrders={allOrders} staffUser={staffUser} />;
+    return <Navigate to="/admin" replace />;
   }
 
   return (

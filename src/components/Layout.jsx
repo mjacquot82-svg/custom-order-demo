@@ -77,27 +77,16 @@ function getAdminSections(staffUser) {
   if (!isAdminWorkspaceView(staffUser)) {
     return [
       {
-        title: "Overview",
+        title: "Workspaces",
         links: [
-          { to: "/admin", label: "Dashboard", navKey: "dashboard" },
           {
-            to: "/admin/assignments",
+            to: "/admin",
             label: "My Assigned Work",
             navKey: "assignments",
             badgeKey: "assignments",
           },
-        ],
-      },
-      {
-        title: "Sales And Intake",
-        links: [
           { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
           { to: "/admin/quotes", label: "Quotes", navKey: "quotes" },
-        ],
-      },
-      {
-        title: "Shop Production",
-        links: [
           {
             to: "/admin/orders",
             label: "Shop Production",
@@ -183,7 +172,9 @@ function getActiveSidebarLink(pathname, staffUser) {
   }
   if (pathname === "/admin/orders") return "productionOrders";
   if (pathname.startsWith("/admin/orders/")) return "productionOrders";
-  if (pathname === "/admin") return "dashboard";
+  if (pathname === "/admin") {
+    return isStaffWorkspaceView(staffUser) ? "assignments" : "dashboard";
+  }
   return "";
 }
 

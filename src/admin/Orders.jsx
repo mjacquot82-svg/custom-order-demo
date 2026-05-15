@@ -484,9 +484,9 @@ export default function Orders() {
               Shop Production
             </p>
             <h1 style={{ margin: "8px 0 6px" }}>Shop Production</h1>
-            <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
+              <p style={{ margin: 0, color: "#64748b", maxWidth: "760px" }}>
               {isStaffWorkspace
-                ? "Global production visibility across the floor. Use this workspace for the shared shop queue; your personal job execution stays in My Assigned Work."
+                ? "Global production visibility across the floor. Use this workspace for the shared shop queue; your personal execution queue stays in My Assigned Work."
                 : "Global production visibility for active jobs, queue state, and shop-wide order handling."}
             </p>
           </div>
