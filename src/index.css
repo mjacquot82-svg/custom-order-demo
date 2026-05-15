@@ -199,9 +199,12 @@ aside img:not(.tee-co-logo) {
 
 .owner-dashboard-page {
   display: grid;
-  gap: 16px;
-  max-width: 1880px;
+  gap: 14px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
+  box-sizing: border-box;
+  align-content: start;
 }
 
 .owner-dashboard-top-grid,
@@ -211,6 +214,7 @@ aside img:not(.tee-co-logo) {
 
 .owner-dashboard-section {
   min-width: 0;
+  box-sizing: border-box;
 }
 
 .owner-dashboard-attention-grid,
@@ -221,24 +225,48 @@ aside img:not(.tee-co-logo) {
   min-width: 0;
 }
 
-@media (min-width: 1100px) {
+.owner-dashboard-hero,
+.owner-dashboard-count-link,
+.owner-dashboard-workspace-link,
+.owner-dashboard-upcoming-card,
+.owner-dashboard-event-card,
+.owner-dashboard-summary-card {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.owner-dashboard-count-link,
+.owner-dashboard-workspace-link,
+.owner-dashboard-upcoming-card,
+.owner-dashboard-event-card {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 900px) {
   .owner-dashboard-page {
-    gap: 14px;
-    padding-left: 22px !important;
-    padding-right: 26px !important;
+    gap: 12px;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
   }
 
   .owner-dashboard-top-grid {
-    grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr) !important;
+    grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr) !important;
   }
 
-  .owner-dashboard-attention-grid,
+  .owner-dashboard-bottom-grid {
+    grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr) !important;
+  }
+
+  .owner-dashboard-attention-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .owner-dashboard-workspace-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .owner-dashboard-bottom-grid {
-    grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.98fr) !important;
+  .owner-dashboard-section-secondary {
+    align-self: start;
   }
 
   .owner-dashboard-deadlines-grid {
@@ -246,17 +274,18 @@ aside img:not(.tee-co-logo) {
   }
 
   .owner-dashboard-events-list {
-    max-height: 560px;
-    overflow: auto;
-    padding-right: 4px;
+    max-height: 540px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 3px;
   }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1180px) {
   .owner-dashboard-page {
     gap: 12px;
-    padding-left: 26px !important;
-    padding-right: 30px !important;
+    padding-left: 20px !important;
+    padding-right: 22px !important;
   }
 
   .owner-dashboard-summary-grid {
@@ -264,23 +293,34 @@ aside img:not(.tee-co-logo) {
   }
 
   .owner-dashboard-top-grid {
-    grid-template-columns: minmax(0, 1.12fr) minmax(400px, 0.98fr) !important;
+    grid-template-columns: minmax(0, 1.24fr) minmax(320px, 0.86fr) !important;
   }
 
   .owner-dashboard-bottom-grid {
-    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.98fr) !important;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.84fr) !important;
+  }
+
+  .owner-dashboard-workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .owner-dashboard-events-list {
+    max-height: 580px;
   }
 }
 
-@media (min-width: 1500px) {
+@media (min-width: 1400px) {
   .owner-dashboard-page {
-    max-width: none;
-    padding-left: 30px !important;
-    padding-right: 36px !important;
+    padding-left: 24px !important;
+    padding-right: 26px !important;
   }
 
   .owner-dashboard-top-grid {
-    grid-template-columns: minmax(0, 1.2fr) minmax(440px, 1fr) !important;
+    grid-template-columns: minmax(0, 1.28fr) minmax(360px, 0.84fr) !important;
+  }
+
+  .owner-dashboard-bottom-grid {
+    grid-template-columns: minmax(0, 1.24fr) minmax(360px, 0.82fr) !important;
   }
 
   .owner-dashboard-deadlines-grid {
@@ -288,7 +328,6 @@ aside img:not(.tee-co-logo) {
   }
 
   .owner-dashboard-events-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     max-height: none;
     overflow: visible;
     padding-right: 0;

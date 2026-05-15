@@ -37,7 +37,7 @@ export default function OperationsSummaryCards({ metrics }) {
       className="owner-dashboard-summary-grid"
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
         gap: "10px",
       }}
     >
@@ -49,13 +49,13 @@ export default function OperationsSummaryCards({ metrics }) {
             background: card.background,
             border: "1px solid #e2e8f0",
             borderRadius: "16px",
-            padding: "14px",
+            padding: "13px 14px",
           }}
         >
           <div
             style={{
               color: card.color,
-              fontSize: "26px",
+              fontSize: "24px",
               fontWeight: 900,
               lineHeight: 1,
             }}
@@ -65,11 +65,11 @@ export default function OperationsSummaryCards({ metrics }) {
 
           <div
             style={{
-              marginTop: "5px",
+              marginTop: "4px",
               color: "#334155",
               fontWeight: 700,
               lineHeight: 1.35,
-              fontSize: "13px",
+              fontSize: "12px",
             }}
           >
             {card.label}

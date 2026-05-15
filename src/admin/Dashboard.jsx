@@ -23,14 +23,14 @@ import StaffHomeWorkspace from "./StaffHomeWorkspace";
 import AdminDiagnosticsPanel from "../components/AdminDiagnosticsPanel";
 import { useOperationalEvents } from "../lib/operationalEventsStore";
 
-function Section({ title, children, description }) {
+function Section({ title, children, description, className = "" }) {
   return (
     <section
-      className="owner-dashboard-section"
+      className={`owner-dashboard-section ${className}`.trim()}
       style={{
         background: "#ffffff",
         borderRadius: "20px",
-        padding: "18px",
+        padding: "16px",
         border: "1px solid #e2e8f0",
         boxShadow: "0 10px 26px rgba(15, 23, 42, 0.035)",
       }}
@@ -154,7 +154,7 @@ function WorkspaceCountLink({ label, count, description, to, tone = "default" })
         gap: "8px",
         alignItems: "start",
         borderRadius: "14px",
-        padding: "14px",
+        padding: "13px 14px",
         background: palette.background,
         border: `1px solid ${palette.border}`,
         color: "#171717",
@@ -188,7 +188,7 @@ function WorkspaceOverviewLink({ label, count, description, to }) {
       style={{
         display: "grid",
         gap: "6px",
-        padding: "13px 14px",
+        padding: "12px 13px",
         borderRadius: "14px",
         border: "1px solid #e2e8f0",
         background: "#f8fafc",
@@ -296,9 +296,9 @@ function UpcomingOrderCard({ order }) {
       className="owner-dashboard-upcoming-card"
       style={{
         display: "grid",
-        gap: "8px",
+        gap: "7px",
         borderRadius: "14px",
-        padding: "14px 15px",
+        padding: "12px 14px",
         background: "#f8fafc",
         border: "1px solid #e2e8f0",
         textDecoration: "none",
@@ -393,13 +393,13 @@ function OperationalEventCard({ event }) {
       className="owner-dashboard-event-card"
       style={{
         display: "grid",
-        gap: "8px",
+        gap: "7px",
         textDecoration: "none",
         color: "#0f172a",
         borderRadius: "14px",
         border: `1px solid ${tone.border}`,
         background: tone.background,
-        padding: "12px 14px",
+        padding: "11px 13px",
       }}
     >
       <div
@@ -494,14 +494,17 @@ function OwnerDashboard({ orders, operationalEvents }) {
   const recentOperationalEvents = operationalEvents.slice(0, 6);
 
   return (
-    <div className="owner-dashboard-page" style={{ width: "100%", padding: "20px 18px 28px" }}>
-      <div className="owner-dashboard-hero" style={{ marginBottom: "18px" }}>
+    <div
+      className="owner-dashboard-page"
+      style={{ width: "100%", boxSizing: "border-box", padding: "18px 16px 24px" }}
+    >
+      <div className="owner-dashboard-hero" style={{ marginBottom: "14px" }}>
         <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Owner Operations</p>
-        <h1 style={{ margin: "4px 0 6px", fontSize: "34px", lineHeight: 1.05 }}>Dashboard</h1>
-        <p style={{ margin: 0, color: "#64748b", maxWidth: "760px", lineHeight: 1.45, fontSize: "14px" }}>Global operational overview for the owner workspace. Use this page to spot pressure points, then move into the dedicated workspace that handles the work.</p>
+        <h1 style={{ margin: "4px 0 6px", fontSize: "32px", lineHeight: 1.02 }}>Dashboard</h1>
+        <p style={{ margin: 0, color: "#64748b", maxWidth: "680px", lineHeight: 1.45, fontSize: "14px" }}>Global operational overview for the owner workspace. Use this page to spot pressure points, then move into the dedicated workspace that handles the work.</p>
       </div>
 
-      <div style={{ marginBottom: "18px" }}>
+      <div style={{ marginBottom: "14px" }}>
         <OperationsSummaryCards metrics={metrics} />
       </div>
 
@@ -509,13 +512,14 @@ function OwnerDashboard({ orders, operationalEvents }) {
         className="owner-dashboard-top-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: "16px",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: "14px",
           alignItems: "start",
-          marginBottom: "16px",
+          marginBottom: "14px",
         }}
       >
         <Section
+          className="owner-dashboard-section-primary"
           title="Owner Attention"
           description="Only the highest-priority items stay here. Detailed queue management remains in Quotes, Shop Production, Front Counter, Assignments, and Financial."
         >
@@ -538,6 +542,7 @@ function OwnerDashboard({ orders, operationalEvents }) {
         </Section>
 
         <Section
+          className="owner-dashboard-section-secondary"
           title="Workspace Guide"
           description="Each workspace keeps its own workflow detail so the dashboard can stay calm and quick to scan."
         >
@@ -564,11 +569,12 @@ function OwnerDashboard({ orders, operationalEvents }) {
         }}
       >
         <Section
+          className="owner-dashboard-section-primary"
           title="Upcoming Deadlines"
           description="A short operational cut of the next due jobs so the owner overview stays useful without becoming another production board."
         >
           {upcomingOrders.length ? (
-            <div className="owner-dashboard-deadlines-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "10px" }}>
+            <div className="owner-dashboard-deadlines-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px" }}>
               {upcomingOrders.slice(0, 6).map((order) => (
                 <UpcomingOrderCard key={order.orderNumber} order={order} />
               ))}
@@ -581,6 +587,7 @@ function OwnerDashboard({ orders, operationalEvents }) {
         </Section>
 
         <Section
+          className="owner-dashboard-section-secondary"
           title="Recent Operational Activity"
           description="Important workflow actions performed by staff. This stays lightweight and owner-facing so operational awareness improves without turning into a notification center."
         >
