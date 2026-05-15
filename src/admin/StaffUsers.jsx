@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import {
-  getStoredStaffUsers,
+  getOwnerAdminAccount,
+  getOperationalStaffUsers,
   subscribeToStaffUsers,
   createStoredStaffUser,
   updateStoredStaffUser,
   disableStoredStaffUser,
   reactivateStoredStaffUser,
   generateUniqueStaffPin,
-  isProtectedStaffUser,
   STAFF_ROLES,
 } from "../lib/staffUsersStore";
 
@@ -29,6 +29,7 @@ const buttonStyle = {
 };
 
 export default function StaffUsers() {
+  const [ownerAccount, setOwnerAccount] = useState(null);
   const [staff, setStaff] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [form, setForm] = useState({
@@ -38,9 +39,11 @@ export default function StaffUsers() {
   });
 
   useEffect(() => {
-    setStaff(getStoredStaffUsers());
+    setOwnerAccount(getOwnerAdminAccount());
+    setStaff(getOperationalStaffUsers());
     return subscribeToStaffUsers((users) => {
-      setStaff(users);
+      setOwnerAccount(users.find((user) => user.role === "Owner") || null);
+      setStaff(users.filter((user) => user.role !== "Owner"));
     });
   }, []);
 
@@ -59,7 +62,8 @@ export default function StaffUsers() {
   }, [staff]);
 
   function refreshStaff() {
-    setStaff(getStoredStaffUsers());
+    setOwnerAccount(getOwnerAdminAccount());
+    setStaff(getOperationalStaffUsers());
   }
 
   function setDraftValue(userId, field, value) {
@@ -197,7 +201,8 @@ export default function StaffUsers() {
             fontSize: "15px",
           }}
         >
-          Create and manage staff accounts for production operations.
+          Keep the owner/admin account distinct from operational staff accounts used for
+          production and counter work.
         </p>
       </div>
 
@@ -217,15 +222,32 @@ export default function StaffUsers() {
             padding: "20px",
           }}
         >
-          <h2
+            <h2
+              style={{
+                marginTop: 0,
+                marginBottom: "18px",
+                fontSize: "20px",
+              }}
+            >
+              Add Staff User
+            </h2>
+
+          <div
             style={{
-              marginTop: 0,
               marginBottom: "18px",
-              fontSize: "20px",
+              padding: "14px",
+              borderRadius: "14px",
+              background: "#fafaf9",
+              border: "1px solid #e7e5e4",
+              color: "#57534e",
+              fontSize: "14px",
+              lineHeight: 1.5,
             }}
           >
-            Add Staff User
-          </h2>
+            Add managers and staff members here for day-to-day operational sign-in. The
+            owner/admin account is managed separately and does not appear in the staff PIN
+            login list.
+          </div>
 
           <form
             onSubmit={handleCreate}
@@ -329,6 +351,33 @@ export default function StaffUsers() {
             padding: "20px",
           }}
         >
+          <div
+            style={{
+              marginBottom: "20px",
+              padding: "18px",
+              borderRadius: "16px",
+              border: "1px solid #d6d3d1",
+              background: "#fafaf9",
+            }}
+          >
+            <p style={{ margin: "0 0 6px", fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#78716c" }}>
+              Owner / Admin Account
+            </p>
+            <h2 style={{ margin: "0 0 8px", fontSize: "20px", color: "#171717" }}>
+              {ownerAccount?.name || "Owner / Admin"}
+            </h2>
+            <p style={{ margin: "0 0 4px", color: "#57534e", lineHeight: 1.5 }}>
+              Role: <strong style={{ color: "#171717" }}>{ownerAccount?.role || "Owner"}</strong>
+            </p>
+            <p style={{ margin: "0 0 4px", color: "#57534e", lineHeight: 1.5 }}>
+              Status: <strong style={{ color: "#171717" }}>{ownerAccount?.status || "Active"}</strong>
+            </p>
+            <p style={{ margin: "10px 0 0", color: "#57534e", lineHeight: 1.5, fontSize: "14px" }}>
+              This account signs in through the dedicated owner/admin login path and is kept
+              separate from operational staff users.
+            </p>
+          </div>
+
           <h2
             style={{
               marginTop: 0,
@@ -336,38 +385,34 @@ export default function StaffUsers() {
               fontSize: "20px",
             }}
           >
-            Staff Users
+            Operational Staff Users
           </h2>
 
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-              }}
-            >
-              <thead>
-                <tr
-                  style={{
-                    borderBottom: "1px solid #e7e5e4",
-                    textAlign: "left",
-                  }}
-                >
-                  <th style={{ padding: "12px" }}>Name</th>
-                  <th style={{ padding: "12px" }}>PIN</th>
-                  <th style={{ padding: "12px" }}>Role</th>
-                  <th style={{ padding: "12px" }}>Status</th>
-                  <th style={{ padding: "12px" }}>Actions</th>
-                </tr>
-              </thead>
+          {staff.length ? (
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      borderBottom: "1px solid #e7e5e4",
+                      textAlign: "left",
+                    }}
+                  >
+                    <th style={{ padding: "12px" }}>Name</th>
+                    <th style={{ padding: "12px" }}>PIN</th>
+                    <th style={{ padding: "12px" }}>Role</th>
+                    <th style={{ padding: "12px" }}>Status</th>
+                    <th style={{ padding: "12px" }}>Actions</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {staff.map((user) => (
-                  (() => {
-                    const isProtected = isProtectedStaffUser(user);
-                    const roleOptions = isProtected
-                      ? ["Owner"]
-                      : STAFF_ROLES.filter((role) => role !== "Owner");
+                <tbody>
+                  {staff.map((user) => {
                     const isInactive = user.status === "Inactive";
                     const draft = drafts[user.id] || {
                       name: user.name,
@@ -386,10 +431,8 @@ export default function StaffUsers() {
                             style={{
                               ...inputStyle,
                               minWidth: "180px",
-                              opacity: isProtected ? 0.75 : 1,
                             }}
                             value={draft.name}
-                            disabled={isProtected}
                             onChange={(e) =>
                               setDraftValue(user.id, "name", e.target.value)
                             }
@@ -415,10 +458,8 @@ export default function StaffUsers() {
                                 ...inputStyle,
                                 fontFamily: "monospace",
                                 letterSpacing: "0.18em",
-                                opacity: isProtected ? 0.75 : 1,
                               }}
                               value={draft.pin}
-                              disabled={isProtected}
                               onChange={(e) =>
                                 setDraftValue(user.id, "pin", e.target.value)
                               }
@@ -432,13 +473,11 @@ export default function StaffUsers() {
 
                             <button
                               onClick={() => handleResetPin(user)}
-                              disabled={isProtected}
                               style={{
                                 ...buttonStyle,
-                                background: isProtected ? "#e7e5e4" : "#f5f5f4",
-                                color: isProtected ? "#a8a29e" : "#292524",
+                                background: "#f5f5f4",
+                                color: "#292524",
                                 border: "1px solid #d6d3d1",
-                                cursor: isProtected ? "not-allowed" : "pointer",
                               }}
                             >
                               Reset PIN
@@ -449,7 +488,6 @@ export default function StaffUsers() {
                         <td style={{ padding: "12px" }}>
                           <select
                             value={user.role}
-                            disabled={isProtected}
                             onChange={(e) =>
                               handleRoleChange(
                                 user.id,
@@ -459,11 +497,9 @@ export default function StaffUsers() {
                             style={{
                               ...inputStyle,
                               minWidth: "140px",
-                              opacity: isProtected ? 0.7 : 1,
-                              cursor: isProtected ? "not-allowed" : "pointer",
                             }}
                           >
-                            {roleOptions.map((role) => (
+                            {STAFF_ROLES.filter((role) => role !== "Owner").map((role) => (
                               <option key={role} value={role}>
                                 {role}
                               </option>
@@ -476,39 +512,42 @@ export default function StaffUsers() {
                         </td>
 
                         <td style={{ padding: "12px" }}>
-                          {isProtected ? (
-                            <span
-                              style={{
-                                color: "#78716c",
-                                fontWeight: 700,
-                              }}
-                            >
-                              Protected
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() =>
-                                isInactive
-                                  ? handleReactivate(user.id)
-                                  : handleDisable(user.id)
-                              }
-                              style={{
-                                ...buttonStyle,
-                                background: isInactive ? "#16a34a" : "#dc2626",
-                                color: "#ffffff",
-                              }}
-                            >
-                              {isInactive ? "Reactivate" : "Disable"}
-                            </button>
-                          )}
+                          <button
+                            onClick={() =>
+                              isInactive
+                                ? handleReactivate(user.id)
+                                : handleDisable(user.id)
+                            }
+                            style={{
+                              ...buttonStyle,
+                              background: isInactive ? "#16a34a" : "#dc2626",
+                              color: "#ffffff",
+                            }}
+                          >
+                            {isInactive ? "Reactivate" : "Disable"}
+                          </button>
                         </td>
                       </tr>
                     );
-                  })()
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "18px",
+                borderRadius: "14px",
+                border: "1px dashed #d6d3d1",
+                background: "#fafaf9",
+                color: "#57534e",
+                lineHeight: 1.6,
+              }}
+            >
+              No operational staff users have been added yet. Create a manager or staff account
+              to enable staff PIN sign-in.
+            </div>
+          )}
         </section>
       </div>
     </div>

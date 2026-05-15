@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   attemptTemporaryOwnerLogin,
   attemptStaffLogin,
-  getStoredStaffUsers,
+  getActiveOperationalStaffUsers,
   subscribeToStaffUsers,
   TEMP_OWNER_DEMO_CREDENTIALS,
 } from "../lib/staffUsersStore";
@@ -57,9 +57,7 @@ export default function Login() {
   const [ownerLoginId, setOwnerLoginId] = useState(TEMP_OWNER_DEMO_CREDENTIALS.loginId);
   const [ownerPin, setOwnerPin] = useState("");
   const [ownerError, setOwnerError] = useState("");
-  const [staffUsers, setStaffUsers] = useState(() =>
-    getStoredStaffUsers().filter((user) => user.status !== "Inactive")
-  );
+  const [staffUsers, setStaffUsers] = useState(() => getActiveOperationalStaffUsers());
   const [selectedStaffId, setSelectedStaffId] = useState(staffUsers[0]?.id || "");
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
@@ -67,7 +65,9 @@ export default function Login() {
 
   useEffect(() => {
     function syncStaffUsers(nextUsers) {
-      const activeUsers = nextUsers.filter((user) => user.status !== "Inactive");
+      const activeUsers = nextUsers.filter(
+        (user) => user.status !== "Inactive" && user.role !== "Owner"
+      );
       setStaffUsers(activeUsers);
       setSelectedStaffId((currentId) => {
         if (activeUsers.some((user) => user.id === currentId)) {
@@ -347,86 +347,107 @@ export default function Login() {
                   Workspace sign-in
                 </h2>
                 <p style={{ margin: 0, color: "#57534e", lineHeight: 1.6 }}>
-                  Staff and administrators can continue to the Central Operations workspace
-                  using their assigned credentials.
+                  Choose the role-based sign-in path for Central Operations. Owner/admin
+                  access uses the administrative credential, while staff access uses assigned
+                  staff PINs.
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={openStaffLogin}
-                style={{
-                  width: "100%",
-                  background: "#171717",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "14px",
-                  padding: "14px 18px",
-                  fontWeight: "700",
-                  fontSize: "15px",
-                  cursor: "pointer",
-                }}
-              >
-                Continue to Staff Sign-In
-              </button>
+              <div style={{ display: "grid", gap: "16px" }}>
+                <div
+                  style={{
+                    border: "1px solid #e7e5e4",
+                    borderRadius: "18px",
+                    padding: "18px",
+                    background: "#fafaf9",
+                  }}
+                >
+                  <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#292524" }}>
+                    Owner / Admin access
+                  </p>
+                  <p style={{ margin: "0 0 14px", color: "#57534e", lineHeight: 1.5, fontSize: "14px" }}>
+                    Use your login ID and PIN to open the full administrative workspace.
+                    This is the only owner/admin sign-in path.
+                  </p>
 
-              <div
-                style={{
-                  borderTop: "1px solid #e7e5e4",
-                  paddingTop: "22px",
-                }}
-              >
-                <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#292524" }}>
-                  Admin access
-                </p>
-                <p style={{ margin: "0 0 14px", color: "#57534e", lineHeight: 1.5, fontSize: "14px" }}>
-                  Use your login ID and PIN to open the administrative workspace directly.
-                </p>
+                  <form onSubmit={handleOwnerLogin}>
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={labelStyle}>Login ID</label>
+                      <input
+                        type="text"
+                        value={ownerLoginId}
+                        onChange={(event) => {
+                          setOwnerError("");
+                          setOwnerLoginId(event.target.value);
+                        }}
+                        placeholder="Enter login ID"
+                        style={inputStyle}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                      />
+                    </div>
 
-                <form onSubmit={handleOwnerLogin}>
-                  <div style={{ marginBottom: "12px" }}>
-                    <label style={labelStyle}>Login ID</label>
-                    <input
-                      type="text"
-                      value={ownerLoginId}
-                      onChange={(event) => {
-                        setOwnerError("");
-                        setOwnerLoginId(event.target.value);
-                      }}
-                      placeholder="Enter login ID"
-                      style={inputStyle}
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                    />
-                  </div>
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={labelStyle}>PIN</label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength="4"
+                        value={ownerPin}
+                        onChange={(event) => {
+                          setOwnerError("");
+                          setOwnerPin(event.target.value.replace(/\D/g, "").slice(0, 4));
+                        }}
+                        placeholder="••••"
+                        style={inputStyle}
+                      />
+                    </div>
 
-                  <div style={{ marginBottom: "12px" }}>
-                    <label style={labelStyle}>PIN</label>
-                    <input
-                      type="password"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength="4"
-                      value={ownerPin}
-                      onChange={(event) => {
-                        setOwnerError("");
-                        setOwnerPin(event.target.value.replace(/\D/g, "").slice(0, 4));
-                      }}
-                      placeholder="••••"
-                      style={inputStyle}
-                    />
-                  </div>
+                    {ownerError ? (
+                      <p style={{ margin: "0 0 14px", color: "#b91c1c", fontWeight: 700 }}>
+                        {ownerError}
+                      </p>
+                    ) : null}
 
-                  {ownerError ? (
-                    <p style={{ margin: "0 0 14px", color: "#b91c1c", fontWeight: 700 }}>
-                      {ownerError}
-                    </p>
-                  ) : null}
+                    <button type="submit" style={primaryButtonStyle}>
+                      Enter Owner Workspace
+                    </button>
+                  </form>
+                </div>
 
-                  <button type="submit" style={primaryButtonStyle}>
-                    Enter Admin Workspace
+                <div
+                  style={{
+                    borderTop: "1px solid #e7e5e4",
+                    paddingTop: "6px",
+                  }}
+                >
+                  <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#292524" }}>
+                    Staff access
+                  </p>
+                  <p style={{ margin: "0 0 14px", color: "#57534e", lineHeight: 1.5, fontSize: "14px" }}>
+                    Production and counter staff sign in with their assigned staff profile and
+                    4-digit PIN.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={openStaffLogin}
+                    style={{
+                      width: "100%",
+                      background: "#171717",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "14px",
+                      padding: "14px 18px",
+                      fontWeight: "700",
+                      fontSize: "15px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Continue to Staff Sign-In
                   </button>
-                </form>
+                </div>
               </div>
             </div>
           </>
@@ -466,7 +487,8 @@ export default function Login() {
             </h1>
 
             <p style={{ marginTop: 0, color: "#57534e", lineHeight: 1.6, marginBottom: "22px" }}>
-              Select your staff profile and enter your PIN to access Central Operations.
+              Select an operational staff profile and enter the assigned PIN. Owner/admin
+              access stays on the dedicated owner sign-in form.
             </p>
 
             <form onSubmit={handleShopLogin}>
@@ -557,14 +579,14 @@ export default function Login() {
                   cursor: pin.length === 4 ? "pointer" : "not-allowed",
                 }}
               >
-                Enter Shop Dashboard
+                Enter Staff Workspace
               </button>
             </form>
 
             <p style={{ margin: "16px 0 0", color: "#78716c", fontSize: "13px", lineHeight: 1.5 }}>
               {staffUsers.length
-                ? "Use the staff profile assigned to you to continue into Central Operations."
-                : "No active staff users are currently available."}
+                ? "Use the staff profile assigned to you for day-to-day operations."
+                : "No active staff users are currently available. Owner/admin access remains available on the main sign-in screen."}
             </p>
           </div>
         )}

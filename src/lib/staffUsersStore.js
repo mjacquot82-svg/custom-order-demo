@@ -208,6 +208,18 @@ export function getStoredStaffUsers() {
   }
 }
 
+export function getOwnerAdminAccount() {
+  return getStoredStaffUsers().find((user) => isProtectedStaffUser(user)) || null;
+}
+
+export function getOperationalStaffUsers() {
+  return getStoredStaffUsers().filter((user) => !isProtectedStaffUser(user));
+}
+
+export function getActiveOperationalStaffUsers() {
+  return getOperationalStaffUsers().filter((user) => user.status !== "Inactive");
+}
+
 export function saveStoredStaffUsers(users) {
   if (!hasBrowserStorage()) return;
   const normalizedUsers = buildPersistedStaffUsers(users);
