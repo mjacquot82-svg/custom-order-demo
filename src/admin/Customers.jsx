@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { createStoredCustomer, getStoredCustomers } from "../lib/customersStore";
+import { getStoredOrders } from "../lib/ordersStore";
+import { getStoredQuickSales } from "../lib/salesStore";
 
 const fieldStyle = {
   border: "1px solid #cbd5e1",
@@ -19,6 +21,19 @@ const labelStyle = {
   color: "#292524",
 };
 
+const summaryCardStyle = {
+  background: "#ffffff",
+  border: "1px solid #e2e8f0",
+  borderRadius: "18px",
+  padding: "18px",
+  display: "grid",
+  gap: "6px",
+};
+
+function currency(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
 function formatDate(value) {
   if (!value) return "Recently added";
 
@@ -33,8 +48,69 @@ function formatDate(value) {
   }
 }
 
+function normalize(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizePhone(value) {
+  return normalize(value).replace(/\D/g, "");
+}
+
+function buildSearchText(customer) {
+  return [
+    customer.name,
+    customer.company,
+    customer.phone,
+    customer.email,
+    ...(customer.order_numbers || []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function matchesSavedCustomer(customer, record) {
+  if (!customer) return false;
+
+  if (customer.id && record.customer_id && customer.id === record.customer_id) {
+    return true;
+  }
+
+  const customerName = normalize(customer.name);
+  const customerEmail = normalize(customer.email);
+  const customerPhone = normalizePhone(customer.phone);
+  const recordName = normalize(record.customer_name || record.name);
+  const recordEmail = normalize(record.email);
+  const recordPhone = normalizePhone(record.phone);
+  const linkedOrders = new Set(customer.order_numbers || []);
+
+  if (record.order_number && linkedOrders.has(record.order_number)) {
+    return true;
+  }
+
+  if (customerName && recordName && customerName === recordName) {
+    return true;
+  }
+
+  if (customerEmail && recordEmail && customerEmail === recordEmail) {
+    return true;
+  }
+
+  if (customerPhone && recordPhone && customerPhone === recordPhone) {
+    return true;
+  }
+
+  return false;
+}
+
+function compareTimestamps(left, right) {
+  return new Date(right || 0).getTime() - new Date(left || 0).getTime();
+}
+
 export default function Customers() {
   const [customers, setCustomers] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [sales, setSales] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -46,20 +122,99 @@ export default function Customers() {
 
   useEffect(() => {
     setCustomers(getStoredCustomers());
+    setOrders(getStoredOrders());
+    setSales(getStoredQuickSales());
   }, []);
+
+  const customerRecords = useMemo(() => {
+    return customers
+      .map((customer) => {
+        const relatedOrders = orders.filter((order) => matchesSavedCustomer(customer, order));
+        const relatedSales = sales.filter((sale) => matchesSavedCustomer(customer, sale));
+        const openOrders = relatedOrders.filter(
+          (order) =>
+            order.operational_visible !== false &&
+            !["Completed", "Picked Up", "Canceled"].includes(order.status)
+        );
+        const balanceDue = relatedOrders.reduce(
+          (sum, order) => sum + Number(order.balance_due || 0),
+          0
+        );
+        const counterBalanceDue = relatedSales.reduce(
+          (sum, sale) => sum + Number(sale.balance_due || 0),
+          0
+        );
+        const totalSales = relatedSales.reduce(
+          (sum, sale) => sum + Number(sale.total || 0),
+          0
+        );
+        const lastActivityAt = [customer.updated_at, customer.created_at]
+          .concat(relatedOrders.map((order) => order.updated_at || order.created_at || order.date))
+          .concat(relatedSales.map((sale) => sale.updated_at || sale.created_at))
+          .sort(compareTimestamps)[0];
+
+        return {
+          ...customer,
+          relatedOrders,
+          relatedSales,
+          openOrders,
+          balanceDue,
+          counterBalanceDue,
+          totalSales,
+          lastActivityAt,
+        };
+      })
+      .sort((left, right) => compareTimestamps(left.lastActivityAt, right.lastActivityAt));
+  }, [customers, orders, sales]);
 
   const filteredCustomers = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    if (!query) return customers;
+    const phoneQuery = normalizePhone(searchTerm);
 
-    return customers.filter((customer) =>
-      [customer.name, customer.company, customer.phone, customer.email]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
+    if (!query && !phoneQuery) return customerRecords;
+
+    return customerRecords.filter((customer) => {
+      const searchText = buildSearchText(customer);
+      const customerPhone = normalizePhone(customer.phone);
+
+      return (
+        searchText.includes(query) ||
+        (phoneQuery.length >= 3 && customerPhone.includes(phoneQuery))
+      );
+    });
+  }, [customerRecords, searchTerm]);
+
+  const summary = useMemo(() => {
+    const customersWithBalances = customerRecords.filter(
+      (customer) => customer.balanceDue > 0 || customer.counterBalanceDue > 0
+    ).length;
+    const openOrders = customerRecords.reduce(
+      (sum, customer) => sum + customer.openOrders.length,
+      0
     );
-  }, [customers, searchTerm]);
+    const todaysCounterSales = sales.filter((sale) => {
+      if (!sale.created_at) return false;
+      const createdAt = new Date(sale.created_at);
+      const now = new Date();
+
+      return (
+        createdAt.getFullYear() === now.getFullYear() &&
+        createdAt.getMonth() === now.getMonth() &&
+        createdAt.getDate() === now.getDate()
+      );
+    }).length;
+
+    return {
+      customersWithBalances,
+      openOrders,
+      todaysCounterSales,
+      outstandingBalance:
+        customerRecords.reduce(
+          (sum, customer) => sum + customer.balanceDue + customer.counterBalanceDue,
+          0
+        ),
+    };
+  }, [customerRecords, sales]);
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -81,21 +236,40 @@ export default function Customers() {
   return (
     <div
       style={{
-        maxWidth: "1100px",
+        maxWidth: "1200px",
         margin: "0 auto",
         padding: "24px",
         fontFamily:
           'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-end", flexWrap: "wrap", marginBottom: "22px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "16px",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          marginBottom: "22px",
+        }}
+      >
         <div>
-          <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          <p
+            style={{
+              margin: 0,
+              color: "#78716c",
+              fontSize: "12px",
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
             Records
           </p>
-          <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>Customers</h1>
-          <p style={{ margin: 0, color: "#475569" }}>
-            Add walk-in, phone, and repeat customers so sales and production orders can stay connected.
+          <h1 style={{ margin: "6px 0 8px", fontSize: "32px" }}>Customer Lookup</h1>
+          <p style={{ margin: 0, color: "#475569", maxWidth: "760px" }}>
+            Search saved customer records, check linked orders, and confirm open balances
+            before starting a quote, collecting payment, or releasing work.
           </p>
         </div>
 
@@ -105,145 +279,279 @@ export default function Customers() {
         </div>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: "#ffffff",
-          padding: "24px",
-          borderRadius: "20px",
-          marginBottom: "18px",
-          display: "grid",
-          gap: "18px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-        }}
-      >
-        <div>
-          <h2 style={{ margin: "0 0 6px", fontSize: "22px" }}>Add Customer</h2>
-          <p style={{ margin: 0, color: "#64748b" }}>
-            Customer name is required. Everything else can be filled in later from the customer profile.
-          </p>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
-          <label style={labelStyle}>
-            Customer Name
-            <input placeholder="ABC Construction" value={form.name} onChange={(event) => updateForm("name", event.target.value)} style={fieldStyle} />
-          </label>
-
-          <label style={labelStyle}>
-            Company
-            <input placeholder="Company name" value={form.company} onChange={(event) => updateForm("company", event.target.value)} style={fieldStyle} />
-          </label>
-
-          <label style={labelStyle}>
-            Phone
-            <input placeholder="(555) 123-4567" value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} style={fieldStyle} />
-          </label>
-
-          <label style={labelStyle}>
-            Email
-            <input type="email" placeholder="customer@example.com" value={form.email} onChange={(event) => updateForm("email", event.target.value)} style={fieldStyle} />
-          </label>
-        </div>
-
-        <label style={labelStyle}>
-          Notes
-          <textarea placeholder="Customer preferences, billing notes, logo details, or reorder reminders." value={form.notes} onChange={(event) => updateForm("notes", event.target.value)} style={{ ...fieldStyle, minHeight: "92px", resize: "vertical" }} />
-        </label>
-
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="submit"
-            style={{
-              background: "#171717",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "12px",
-              padding: "13px 18px",
-              cursor: "pointer",
-              fontWeight: 800,
-            }}
-          >
-            Save Customer
-          </button>
-        </div>
-      </form>
-
       <section
         style={{
-          background: "#ffffff",
-          padding: "24px",
-          borderRadius: "20px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "14px",
+          marginBottom: "18px",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "center", flexWrap: "wrap", marginBottom: "18px" }}>
-          <div>
-            <h2 style={{ margin: "0 0 6px", fontSize: "22px" }}>Customer List</h2>
-            <p style={{ margin: 0, color: "#64748b" }}>
-              Open a customer profile to view linked orders and customer details.
-            </p>
-          </div>
+        <article style={summaryCardStyle}>
+          <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+            Open Production Orders
+          </span>
+          <strong style={{ fontSize: "28px", color: "#171717" }}>{summary.openOrders}</strong>
+          <span style={{ color: "#475569" }}>
+            Active jobs connected to saved customer records.
+          </span>
+        </article>
 
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search customers..."
-            style={{ ...fieldStyle, maxWidth: "280px" }}
-          />
-        </div>
+        <article style={summaryCardStyle}>
+          <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+            Customers With Balances
+          </span>
+          <strong style={{ fontSize: "28px", color: "#171717" }}>
+            {summary.customersWithBalances}
+          </strong>
+          <span style={{ color: "#475569" }}>
+            Customers with production or counter amounts still due.
+          </span>
+        </article>
 
-        {filteredCustomers.length ? (
-          <div style={{ display: "grid", gap: "12px" }}>
-            {filteredCustomers.map((customer) => (
-              <Link
-                key={customer.id}
-                to={`/admin/customers/${customer.id}`}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(220px, 1.1fr) minmax(180px, 0.9fr) minmax(180px, 0.9fr) auto",
-                  gap: "14px",
-                  alignItems: "center",
-                  padding: "16px",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "16px",
-                  color: "inherit",
-                  textDecoration: "none",
-                  background: "#f8fafc",
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: "17px", color: "#171717" }}>{customer.name}</strong>
-                  <p style={{ margin: "4px 0 0", color: "#64748b" }}>{customer.company || "No company saved"}</p>
-                </div>
+        <article style={summaryCardStyle}>
+          <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+            Outstanding Balance
+          </span>
+          <strong style={{ fontSize: "28px", color: "#171717" }}>
+            {currency(summary.outstandingBalance)}
+          </strong>
+          <span style={{ color: "#475569" }}>
+            Combined open balance across linked orders and counter sales.
+          </span>
+        </article>
 
-                <div style={{ color: "#475569" }}>
-                  <strong style={{ display: "block", color: "#292524", fontSize: "13px" }}>Contact</strong>
-                  {[customer.phone, customer.email].filter(Boolean).join(" • ") || "No contact info"}
-                </div>
-
-                <div style={{ color: "#475569" }}>
-                  <strong style={{ display: "block", color: "#292524", fontSize: "13px" }}>Orders</strong>
-                  {(customer.order_numbers || []).length} linked
-                </div>
-
-                <div style={{ textAlign: "right", color: "#64748b", fontWeight: 700 }}>
-                  {formatDate(customer.created_at)}
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div style={{ border: "1px dashed #cbd5e1", borderRadius: "16px", padding: "28px", textAlign: "center", background: "#f8fafc" }}>
-            <strong style={{ display: "block", marginBottom: "6px", color: "#292524" }}>
-              {customers.length ? "No matching customers" : "No customers yet"}
-            </strong>
-            <p style={{ margin: 0, color: "#64748b" }}>
-              {customers.length ? "Try a different search term." : "Add the first customer above to start building the records area."}
-            </p>
-          </div>
-        )}
+        <article style={summaryCardStyle}>
+          <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+            Counter Sales Today
+          </span>
+          <strong style={{ fontSize: "28px", color: "#171717" }}>
+            {summary.todaysCounterSales}
+          </strong>
+          <span style={{ color: "#475569" }}>
+            Quick sales recorded today for saved customer records.
+          </span>
+        </article>
       </section>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(320px, 0.95fr) minmax(0, 1.35fr)",
+          gap: "18px",
+          alignItems: "start",
+        }}
+      >
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            background: "#ffffff",
+            padding: "24px",
+            borderRadius: "20px",
+            display: "grid",
+            gap: "18px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: "0 0 6px", fontSize: "22px" }}>Add Customer</h2>
+            <p style={{ margin: 0, color: "#64748b" }}>
+              Keep intake lightweight. Save the core contact now and fill in the rest
+              when more history builds up.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gap: "16px" }}>
+            <label style={labelStyle}>
+              Customer Name
+              <input
+                placeholder="ABC Construction"
+                value={form.name}
+                onChange={(event) => updateForm("name", event.target.value)}
+                style={fieldStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Company
+              <input
+                placeholder="Company name"
+                value={form.company}
+                onChange={(event) => updateForm("company", event.target.value)}
+                style={fieldStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Phone
+              <input
+                placeholder="(555) 123-4567"
+                value={form.phone}
+                onChange={(event) => updateForm("phone", event.target.value)}
+                style={fieldStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Email
+              <input
+                type="email"
+                placeholder="customer@example.com"
+                value={form.email}
+                onChange={(event) => updateForm("email", event.target.value)}
+                style={fieldStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Notes
+              <textarea
+                placeholder="Pickup instructions, billing preference, artwork reminders, or reorder details."
+                value={form.notes}
+                onChange={(event) => updateForm("notes", event.target.value)}
+                style={{ ...fieldStyle, minHeight: "92px", resize: "vertical" }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="submit"
+              style={{
+                background: "#171717",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "12px",
+                padding: "13px 18px",
+                cursor: "pointer",
+                fontWeight: 800,
+              }}
+            >
+              Save Customer
+            </button>
+          </div>
+        </form>
+
+        <section
+          style={{
+            background: "#ffffff",
+            padding: "24px",
+            borderRadius: "20px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "16px",
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginBottom: "18px",
+            }}
+          >
+            <div>
+              <h2 style={{ margin: "0 0 6px", fontSize: "22px" }}>Customer Records</h2>
+              <p style={{ margin: 0, color: "#64748b" }}>
+                Open a profile to review contact details, order history, artwork, and payment visibility.
+              </p>
+            </div>
+
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search name, phone, email, or order..."
+              style={{ ...fieldStyle, maxWidth: "320px" }}
+            />
+          </div>
+
+          {filteredCustomers.length ? (
+            <div style={{ display: "grid", gap: "12px" }}>
+              {filteredCustomers.map((customer) => (
+                <Link
+                  key={customer.id}
+                  to={`/admin/customers/${customer.id}`}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(220px, 1.15fr) minmax(180px, 0.9fr) minmax(180px, 0.9fr) minmax(180px, 0.9fr) auto",
+                    gap: "14px",
+                    alignItems: "center",
+                    padding: "16px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "16px",
+                    color: "inherit",
+                    textDecoration: "none",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: "17px", color: "#171717" }}>{customer.name}</strong>
+                    <p style={{ margin: "4px 0 0", color: "#64748b" }}>
+                      {customer.company || "No company saved"}
+                    </p>
+                    <p style={{ margin: "6px 0 0", color: "#475569", fontSize: "13px" }}>
+                      {[customer.phone, customer.email].filter(Boolean).join(" • ") || "No contact info"}
+                    </p>
+                  </div>
+
+                  <div style={{ color: "#475569" }}>
+                    <strong style={{ display: "block", color: "#292524", fontSize: "13px" }}>
+                      Orders
+                    </strong>
+                    {customer.relatedOrders.length} linked
+                    <div style={{ color: "#64748b", fontSize: "12px", marginTop: "4px" }}>
+                      {customer.openOrders.length} active
+                    </div>
+                  </div>
+
+                  <div style={{ color: "#475569" }}>
+                    <strong style={{ display: "block", color: "#292524", fontSize: "13px" }}>
+                      Payment Visibility
+                    </strong>
+                    {currency(customer.balanceDue + customer.counterBalanceDue)} due
+                    <div style={{ color: "#64748b", fontSize: "12px", marginTop: "4px" }}>
+                      {customer.relatedSales.length} counter sales
+                    </div>
+                  </div>
+
+                  <div style={{ color: "#475569" }}>
+                    <strong style={{ display: "block", color: "#292524", fontSize: "13px" }}>
+                      Recent Activity
+                    </strong>
+                    {formatDate(customer.lastActivityAt)}
+                    <div style={{ color: "#64748b", fontSize: "12px", marginTop: "4px" }}>
+                      Sales total {currency(customer.totalSales)}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: "right", color: "#0f172a", fontWeight: 800 }}>
+                    View record
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                border: "1px dashed #cbd5e1",
+                borderRadius: "16px",
+                padding: "28px",
+                textAlign: "center",
+                background: "#f8fafc",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: "6px", color: "#292524" }}>
+                {customers.length ? "No matching customers" : "No customers yet"}
+              </strong>
+              <p style={{ margin: 0, color: "#64748b" }}>
+                {customers.length
+                  ? "Try a different search term."
+                  : "Add the first customer to make the lookup workspace operational."}
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

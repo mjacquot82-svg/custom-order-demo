@@ -59,10 +59,8 @@ export function canAccessOwnerWorkspace(pathname, staffUser = getActiveStaffUser
   const blockedExactPaths = [
     "/admin/financial",
     "/admin/staff-users",
-    "/admin/sales",
   ];
   const blockedPathPrefixes = [
-    "/admin/customers",
     "/admin/products",
     "/admin/quotes/archived",
     "/admin/records/canceled",
