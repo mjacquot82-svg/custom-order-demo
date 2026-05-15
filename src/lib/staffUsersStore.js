@@ -6,15 +6,23 @@ import {
   setJsonStorageItem,
   setRawStorageItem,
 } from "./browserStorage";
+import { pushAuthDiagnostic } from "./authDiagnostics";
 
 const STORAGE_KEY = "teeCoStaffUsers";
 const ACTIVE_STAFF_KEY = "teeCoActiveStaffUser";
 const STAFF_USERS_UPDATED_EVENT = "tee-co-staff-users-updated";
 const ACTIVE_STAFF_UPDATED_EVENT = "tee-co-active-staff-updated";
 const PROTECTED_OWNER_ID = "staff-owner-default";
+const OWNER_AUTH_DIAGNOSTICS_KEY = "__TEE_CO_OWNER_AUTH_DIAGNOSTICS__";
+const TEMP_OWNER_LOGIN_ID = "owner";
+const TEMP_OWNER_PIN = "2468";
 
 export const STAFF_ROLES = ["Owner", "Manager", "Staff"];
 export const STAFF_STATUSES = ["Active", "Inactive"];
+export const TEMP_OWNER_DEMO_CREDENTIALS = {
+  loginId: TEMP_OWNER_LOGIN_ID,
+  pin: TEMP_OWNER_PIN,
+};
 
 const DEFAULT_STAFF_USERS = [
   {
@@ -27,6 +35,55 @@ const DEFAULT_STAFF_USERS = [
     updated_at: new Date().toISOString(),
   },
 ];
+
+function isProtectedOwnerId(userId) {
+  return userId === PROTECTED_OWNER_ID;
+}
+
+function shouldLogOwnerDiagnostics(user) {
+  return Boolean(user) && (user.id === PROTECTED_OWNER_ID || user.role === "Owner");
+}
+
+function normalizeOwnerLoginId(loginId) {
+  return String(loginId ?? "").trim().toLowerCase();
+}
+
+function buildTemporaryOwnerSession() {
+  return {
+    id: PROTECTED_OWNER_ID,
+    name: "Owner / Admin",
+    role: "Owner",
+    authMode: "temporary-owner",
+    isTemporaryOwnerSession: true,
+  };
+}
+
+function isTemporaryOwnerSession(user) {
+  return (
+    Boolean(user) &&
+    user.id === PROTECTED_OWNER_ID &&
+    user.role === "Owner" &&
+    user.authMode === "temporary-owner"
+  );
+}
+
+function pushOwnerAuthDiagnostic(event, details = {}) {
+  if (typeof window === "undefined") return;
+
+  const nextEntry = {
+    event,
+    timestamp: new Date().toISOString(),
+    ...details,
+  };
+
+  const currentLog = Array.isArray(window[OWNER_AUTH_DIAGNOSTICS_KEY])
+    ? window[OWNER_AUTH_DIAGNOSTICS_KEY]
+    : [];
+  const nextLog = [...currentLog.slice(-24), nextEntry];
+
+  window[OWNER_AUTH_DIAGNOSTICS_KEY] = nextLog;
+  console.info("[owner-auth]", nextEntry);
+}
 
 function cleanStaffPin(pin) {
   return String(pin ?? "").replace(/\D/g, "").slice(0, 4);
@@ -78,7 +135,7 @@ function prepareStaffUserInput(userInput, users, excludedUserId) {
 }
 
 function normalizeStaffUser(user) {
-  const isProtectedOwner = user.id === PROTECTED_OWNER_ID;
+  const isProtectedOwner = isProtectedOwnerId(user.id);
   const fallbackRole = isProtectedOwner ? "Owner" : "Staff";
 
   return {
@@ -126,7 +183,7 @@ function clearLegacyActiveStaffPersistence() {
 }
 
 function clearSessionActiveStaffPersistence() {
-  removeStorageItem(ACTIVE_STAFF_KEY, { storage: "session" });
+  return removeStorageItem(ACTIVE_STAFF_KEY, { storage: "session" });
 }
 
 export function getStoredStaffUsers() {
@@ -246,28 +303,80 @@ export function validateStaffPin(pin) {
   );
 }
 
-export function setActiveStaffUser(user) {
+function resolveStoredStaffUser(user) {
+  if (!user?.id) return null;
+
+  return (
+    getStoredStaffUsers().find((storedUser) => storedUser.id === user.id) || null
+  );
+}
+
+export function setActiveStaffUser(user, options = {}) {
   if (!hasBrowserStorage()) return;
+
   if (!user) {
+    const hadOwnerSession = shouldLogOwnerDiagnostics(getActiveStaffUser());
+    const previousSession = getJsonStorageItem(ACTIVE_STAFF_KEY, null, { storage: "session" });
     clearLegacyActiveStaffPersistence();
-    clearSessionActiveStaffPersistence();
+    const clearedSession = clearSessionActiveStaffPersistence();
     emitActiveStaffUpdated();
+    pushAuthDiagnostic("staff-session-cleared", {
+      reason: options.reason || "manual-clear",
+      clearedSession,
+      hadSession: Boolean(previousSession),
+      previousStaffUserId: previousSession?.id || "",
+      previousStaffRole: previousSession?.role || "",
+    });
+    if (hadOwnerSession) {
+      pushOwnerAuthDiagnostic("logout-cleanup", {
+        clearedSession,
+        sessionAfterClear: getJsonStorageItem(ACTIVE_STAFF_KEY, null, { storage: "session" }),
+      });
+    }
     return;
   }
 
-  const nextActiveUser = JSON.stringify({
-    id: user.id,
-    name: user.name,
-    role: user.role,
-  });
+  const resolvedUser = isTemporaryOwnerSession(user)
+    ? buildTemporaryOwnerSession()
+    : resolveStoredStaffUser(user) || normalizeStaffUser(user);
+  const nextActiveUser = {
+    id: resolvedUser.id,
+    name: resolvedUser.name,
+    role: resolvedUser.role,
+    ...(isTemporaryOwnerSession(resolvedUser)
+      ? {
+          authMode: resolvedUser.authMode,
+          isTemporaryOwnerSession: true,
+        }
+      : {}),
+  };
 
   clearLegacyActiveStaffPersistence();
-  setRawStorageItem(ACTIVE_STAFF_KEY, nextActiveUser, { storage: "session" });
+  const sessionCreated = setRawStorageItem(
+    ACTIVE_STAFF_KEY,
+    JSON.stringify(nextActiveUser),
+    { storage: "session" }
+  );
   emitActiveStaffUpdated();
+  pushAuthDiagnostic("staff-session-created", {
+    userId: resolvedUser.id,
+    resolvedRole: resolvedUser.role,
+    displayName: resolvedUser.name,
+  });
+  if (shouldLogOwnerDiagnostics(resolvedUser)) {
+    pushOwnerAuthDiagnostic("session-created", {
+      userId: resolvedUser.id,
+      resolvedRole: resolvedUser.role,
+      sessionCreated,
+      persistedSession: getJsonStorageItem(ACTIVE_STAFF_KEY, null, { storage: "session" }),
+    });
+  }
+
+  return nextActiveUser;
 }
 
-export function clearActiveStaffSession() {
-  setActiveStaffUser(null);
+export function clearActiveStaffSession(options = {}) {
+  setActiveStaffUser(null, options);
 }
 
 export function getActiveStaffUser() {
@@ -279,14 +388,44 @@ export function getActiveStaffUser() {
     const parsedUser = sessionUser;
 
     if (!parsedUser?.id) {
+      pushAuthDiagnostic("staff-session-hydrated", {
+        hydrationResult: "empty",
+      });
       return null;
     }
 
-    const matchedUser = getStoredStaffUsers().find(
-      (user) => user.id === parsedUser.id
-    );
+    if (isTemporaryOwnerSession(parsedUser)) {
+      const hydratedUser = buildTemporaryOwnerSession();
+
+      pushAuthDiagnostic("staff-session-hydrated", {
+        userId: hydratedUser.id,
+        resolvedRole: hydratedUser.role,
+        hydrationResult: "restored-temporary-owner",
+      });
+      pushOwnerAuthDiagnostic("session-hydrated", {
+        userId: hydratedUser.id,
+        resolvedRole: hydratedUser.role,
+        hydrationResult: "restored-temporary-owner",
+      });
+
+      return hydratedUser;
+    }
+
+    const matchedUser = resolveStoredStaffUser(parsedUser);
 
     if (!matchedUser || matchedUser.status === "Inactive") {
+      pushAuthDiagnostic("staff-session-hydrated", {
+        userId: parsedUser.id,
+        resolvedRole: parsedUser.role || "",
+        hydrationResult: "cleared-missing-or-inactive",
+      });
+      if (shouldLogOwnerDiagnostics(parsedUser)) {
+        pushOwnerAuthDiagnostic("session-hydrated", {
+          userId: parsedUser.id,
+          resolvedRole: parsedUser.role || "",
+          hydrationResult: "cleared-missing-or-inactive",
+        });
+      }
       clearActiveStaffSession();
       return null;
     }
@@ -298,15 +437,145 @@ export function getActiveStaffUser() {
       setActiveStaffUser(matchedUser);
     }
 
-    return {
+    const hydratedUser = {
       id: matchedUser.id,
       name: matchedUser.name,
       role: matchedUser.role,
     };
+
+    pushAuthDiagnostic("staff-session-hydrated", {
+      userId: hydratedUser.id,
+      resolvedRole: hydratedUser.role,
+      hydrationResult: "restored",
+    });
+
+    if (shouldLogOwnerDiagnostics(hydratedUser)) {
+      pushOwnerAuthDiagnostic("session-hydrated", {
+        userId: hydratedUser.id,
+        resolvedRole: hydratedUser.role,
+        hydrationResult: "restored",
+      });
+    }
+
+    return hydratedUser;
   } catch (error) {
     console.error("Unable to read active Tee & Co staff user", error);
+    pushAuthDiagnostic("staff-session-hydrated", {
+      hydrationResult: "error",
+      message: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
+}
+
+export function attemptStaffLogin({ staffUserId, pin, persistSession = true }) {
+  const activeUsers = getStoredStaffUsers().filter((user) => user.status !== "Inactive");
+  const selectedUser = activeUsers.find((user) => user.id === staffUserId) || null;
+  const matchedUser = validateStaffPin(pin);
+  const isOwnerAttempt = isProtectedOwnerId(staffUserId) || shouldLogOwnerDiagnostics(matchedUser);
+
+  if (isOwnerAttempt) {
+    pushOwnerAuthDiagnostic("login-attempt", {
+      selectedUserId: staffUserId || "",
+      pinLength: cleanStaffPin(pin).length,
+      matchedUserId: matchedUser?.id || "",
+      matchedRole: matchedUser?.role || "",
+    });
+  }
+
+  if (!selectedUser || !matchedUser || matchedUser.id !== selectedUser.id) {
+    if (isOwnerAttempt) {
+      pushOwnerAuthDiagnostic("login-result", {
+        selectedUserId: staffUserId || "",
+        resolvedRole: selectedUser?.role || matchedUser?.role || "",
+        loginResult: "credential-mismatch",
+      });
+    }
+
+    return {
+      ok: false,
+      code: "PIN_MISMATCH",
+      message: "That PIN does not match the selected staff member.",
+    };
+  }
+
+  const sessionUser = persistSession ? setActiveStaffUser(selectedUser) : selectedUser;
+  const sessionCreated = persistSession ? Boolean(sessionUser?.id) : true;
+
+  if (isOwnerAttempt) {
+    pushOwnerAuthDiagnostic("login-result", {
+      selectedUserId: selectedUser.id,
+      resolvedRole: sessionUser?.role || selectedUser.role,
+      loginResult: sessionCreated ? "success" : "session-write-failed",
+    });
+  }
+
+  if (!sessionCreated) {
+    return {
+      ok: false,
+      code: "SESSION_WRITE_FAILED",
+      message: "Unable to start the selected staff session.",
+    };
+  }
+
+  return {
+    ok: true,
+    user: sessionUser,
+  };
+}
+
+export function attemptTemporaryOwnerLogin({
+  loginId,
+  pin,
+  persistSession = true,
+} = {}) {
+  const normalizedLoginId = normalizeOwnerLoginId(loginId);
+  const normalizedPin = cleanStaffPin(pin);
+  const ownerUser = buildTemporaryOwnerSession();
+  const credentialsMatch =
+    normalizedLoginId === TEMP_OWNER_LOGIN_ID && normalizedPin === TEMP_OWNER_PIN;
+
+  pushOwnerAuthDiagnostic("temporary-login-attempt", {
+    selectedUserId: ownerUser.id,
+    loginId: normalizedLoginId,
+    pinLength: normalizedPin.length,
+  });
+
+  if (!credentialsMatch) {
+    pushOwnerAuthDiagnostic("temporary-login-result", {
+      selectedUserId: ownerUser.id,
+      resolvedRole: ownerUser.role,
+      loginResult: "credential-mismatch",
+    });
+
+    return {
+      ok: false,
+      code: "PIN_MISMATCH",
+      message: "That owner login or PIN is incorrect.",
+    };
+  }
+
+  const sessionUser = persistSession ? setActiveStaffUser(ownerUser) : ownerUser;
+  const sessionCreated = persistSession ? Boolean(sessionUser?.id) : true;
+
+  pushOwnerAuthDiagnostic("temporary-login-result", {
+    selectedUserId: ownerUser.id,
+    resolvedRole: ownerUser.role,
+    loginResult: sessionCreated ? "success" : "session-write-failed",
+  });
+
+  if (!sessionCreated) {
+    return {
+      ok: false,
+      code: "SESSION_WRITE_FAILED",
+      message: "Unable to start the owner session.",
+    };
+  }
+
+  return {
+    ok: true,
+    user: sessionUser,
+  };
 }
 
 export function isActiveStaffOwner() {

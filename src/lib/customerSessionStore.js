@@ -4,6 +4,7 @@ import {
   removeStorageItem,
   setJsonStorageItem,
 } from "./browserStorage";
+import { pushAuthDiagnostic } from "./authDiagnostics";
 
 const STORAGE_KEY = "teeCoActiveCustomerSession";
 const CUSTOMER_SESSION_UPDATED_EVENT = "tee-co-customer-session-updated";
@@ -33,24 +34,45 @@ export function getActiveCustomerSession() {
 
   const storedSession = getJsonStorageItem(STORAGE_KEY, null, { storage: "session" });
   if (!storedSession || typeof storedSession !== "object") {
+    pushAuthDiagnostic("customer-session-hydrated", {
+      hydrationResult: "empty",
+    });
     return null;
   }
 
-  return normalizeCustomerSession(storedSession);
+  const hydratedSession = normalizeCustomerSession(storedSession);
+  pushAuthDiagnostic("customer-session-hydrated", {
+    hydrationResult: "restored",
+    email: hydratedSession.email,
+    displayName: hydratedSession.displayName,
+  });
+
+  return hydratedSession;
 }
 
-export function setActiveCustomerSession(session) {
+export function setActiveCustomerSession(session, options = {}) {
   if (!hasBrowserStorage()) return null;
   const nextSession = normalizeCustomerSession(session);
   setJsonStorageItem(STORAGE_KEY, nextSession, { storage: "session" });
   emitCustomerSessionUpdated();
+  pushAuthDiagnostic("customer-session-created", {
+    email: nextSession.email,
+    displayName: nextSession.displayName,
+    source: options.source || "unknown",
+  });
   return nextSession;
 }
 
-export function clearActiveCustomerSession() {
+export function clearActiveCustomerSession(options = {}) {
   if (!hasBrowserStorage()) return;
+  const previousSession = getJsonStorageItem(STORAGE_KEY, null, { storage: "session" });
   removeStorageItem(STORAGE_KEY, { storage: "session" });
   emitCustomerSessionUpdated();
+  pushAuthDiagnostic("customer-session-cleared", {
+    reason: options.reason || "manual-clear",
+    hadSession: Boolean(previousSession),
+    previousEmail: previousSession?.email || "",
+  });
 }
 
 export function subscribeToActiveCustomerSession(listener) {

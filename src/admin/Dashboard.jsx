@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
 import { getActiveStaffUser } from "../lib/staffUsersStore";
+import { formatShortDate } from "../lib/dateFormatting";
 import { buildOperationalMetrics } from "../operations/buildOperationalMetrics";
 import {
   isActiveQuoteWorkflowOrder,
@@ -14,10 +15,12 @@ import {
 import {
   getAssignedOrdersForStaff,
   isStaffWorkspaceView,
+  resolveOperationalRole,
 } from "./adminRoleView";
 import OperationsSummaryCards from "../dashboard/OperationsSummaryCards";
 import { buildProductionReadiness } from "../quotes/productionReadiness";
 import StaffHomeWorkspace from "./StaffHomeWorkspace";
+import AdminDiagnosticsPanel from "../components/AdminDiagnosticsPanel";
 
 function Section({ title, children, description }) {
   return (
@@ -460,6 +463,19 @@ function OwnerDashboard({ orders }) {
 export default function Dashboard() {
   const orders = useStoredOrders();
   const staffUser = getActiveStaffUser();
+  const resolvedRole = resolveOperationalRole(staffUser);
+
+  if (!resolvedRole) {
+    return (
+      <AdminDiagnosticsPanel
+        title="Dashboard role unresolved"
+        message="The dashboard loaded before the operational role could be determined, so rendering has been paused with diagnostics."
+        staffUser={staffUser}
+        pathname="/admin"
+        workspaceAccess="blocked"
+      />
+    );
+  }
 
   if (isStaffWorkspaceView(staffUser)) {
     return (

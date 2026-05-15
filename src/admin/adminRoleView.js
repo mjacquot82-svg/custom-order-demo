@@ -1,24 +1,35 @@
 import { getActiveStaffUser } from "../lib/staffUsersStore";
 
+export function resolveOperationalRole(staffUser = getActiveStaffUser()) {
+  if (!staffUser?.id) return "";
+
+  const role = String(staffUser.role || "").trim();
+  if (role === "Owner" || role === "Manager" || role === "Staff") {
+    return role;
+  }
+
+  return "";
+}
+
 export function getAdminViewer(staffUser = getActiveStaffUser()) {
   return staffUser || null;
 }
 
 export function isAdminWorkspaceView(staffUser = getActiveStaffUser()) {
-  const role = staffUser?.role;
+  const role = resolveOperationalRole(staffUser);
   return role === "Owner" || role === "Manager";
 }
 
 export function isOwnerView(staffUser = getActiveStaffUser()) {
-  return staffUser?.role === "Owner";
+  return resolveOperationalRole(staffUser) === "Owner";
 }
 
 export function isStaffWorkspaceView(staffUser = getActiveStaffUser()) {
-  return staffUser?.role === "Staff";
+  return resolveOperationalRole(staffUser) === "Staff";
 }
 
 export function hasOperationalSession(staffUser = getActiveStaffUser()) {
-  return Boolean(staffUser?.id);
+  return Boolean(staffUser?.id) && Boolean(resolveOperationalRole(staffUser));
 }
 
 export function canManageArchivedQuotes(staffUser = getActiveStaffUser()) {

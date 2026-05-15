@@ -1,11 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
+  attemptTemporaryOwnerLogin,
+  attemptStaffLogin,
   getStoredStaffUsers,
-  setActiveStaffUser,
   subscribeToStaffUsers,
-  validateStaffPin,
+  TEMP_OWNER_DEMO_CREDENTIALS,
 } from "../lib/staffUsersStore";
+import { pushAuthDiagnostic } from "../lib/authDiagnostics";
+import { clearAllAuthSessions } from "../lib/authSessionStore";
 import { setActiveCustomerSession } from "../lib/customerSessionStore";
 
 const inputStyle = {
@@ -25,17 +28,42 @@ const labelStyle = {
   color: "#292524",
 };
 
+const sectionEyebrowStyle = {
+  margin: 0,
+  fontSize: "12px",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "#78716c",
+};
+
+const primaryButtonStyle = {
+  width: "100%",
+  background: "#171717",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "14px",
+  padding: "14px 18px",
+  fontWeight: "700",
+  fontSize: "15px",
+  cursor: "pointer",
+  boxShadow: "0 10px 20px rgba(0,0,0,0.10)",
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showStaffLogin, setShowStaffLogin] = useState(false);
+  const [ownerLoginId, setOwnerLoginId] = useState(TEMP_OWNER_DEMO_CREDENTIALS.loginId);
+  const [ownerPin, setOwnerPin] = useState("");
+  const [ownerError, setOwnerError] = useState("");
   const [staffUsers, setStaffUsers] = useState(() =>
     getStoredStaffUsers().filter((user) => user.status !== "Inactive")
   );
   const [selectedStaffId, setSelectedStaffId] = useState(staffUsers[0]?.id || "");
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
+  const [customerError, setCustomerError] = useState("");
 
   useEffect(() => {
     function syncStaffUsers(nextUsers) {
@@ -55,7 +83,25 @@ export default function Login() {
 
   function handleCustomerLogin(e) {
     e.preventDefault();
-    setActiveCustomerSession({ email });
+    const normalizedEmail = email.trim();
+    const normalizedPassword = password.trim();
+
+    if (!normalizedEmail || !normalizedPassword) {
+      setCustomerError("Enter your email and password to start a new customer session.");
+      pushAuthDiagnostic("customer-login-blocked", {
+        reason: "missing-credentials",
+        emailPresent: Boolean(normalizedEmail),
+        passwordPresent: Boolean(normalizedPassword),
+      });
+      return;
+    }
+
+    clearAllAuthSessions("customer-login-start");
+    setActiveCustomerSession({ email: normalizedEmail }, { source: "customer-login" });
+    pushAuthDiagnostic("login-redirect", {
+      actorType: "customer",
+      target: "/my-orders",
+    });
     navigate("/my-orders");
   }
 
@@ -67,17 +113,63 @@ export default function Login() {
       return;
     }
 
-    const selectedUser = staffUsers.find((user) => user.id === selectedStaffId);
-    const matchedUser = validateStaffPin(pin);
+    const loginResult = attemptStaffLogin({
+      staffUserId: selectedStaffId,
+      pin,
+      persistSession: false,
+    });
 
-    if (!selectedUser || !matchedUser || matchedUser.id !== selectedUser.id) {
-      setPinError("That PIN does not match the selected staff member.");
+    if (!loginResult.ok) {
+      setPinError(loginResult.message);
       setPin("");
       return;
     }
 
-    setActiveStaffUser(matchedUser);
+    clearAllAuthSessions("staff-login-session-reset");
+    const finalLoginResult = attemptStaffLogin({
+      staffUserId: selectedStaffId,
+      pin,
+    });
 
+    if (!finalLoginResult.ok) {
+      setPinError(finalLoginResult.message);
+      setPin("");
+      return;
+    }
+
+    pushAuthDiagnostic("login-redirect", {
+      actorType: "staff",
+      userId: finalLoginResult.user?.id || "",
+      role: finalLoginResult.user?.role || "",
+      target: "/admin",
+    });
+    navigate("/admin", { replace: true });
+  }
+
+  function handleOwnerLogin(event) {
+    event.preventDefault();
+
+    setOwnerError("");
+    clearAllAuthSessions("temporary-owner-login-reset");
+
+    const loginResult = attemptTemporaryOwnerLogin({
+      loginId: ownerLoginId,
+      pin: ownerPin,
+    });
+
+    if (!loginResult.ok) {
+      setOwnerError(loginResult.message);
+      setOwnerPin("");
+      return;
+    }
+
+    pushAuthDiagnostic("login-redirect", {
+      actorType: "staff",
+      userId: loginResult.user?.id || "",
+      role: loginResult.user?.role || "",
+      target: "/admin",
+      authMode: "temporary-owner",
+    });
     navigate("/admin", { replace: true });
   }
 
@@ -95,6 +187,7 @@ export default function Login() {
     setShowStaffLogin(true);
     setPinError("");
     setPin("");
+    setCustomerError("");
   }
 
   function closeStaffLogin() {
@@ -105,121 +198,163 @@ export default function Login() {
   return (
     <div
       style={{
-        maxWidth: "560px",
+        maxWidth: "1040px",
         margin: "0 auto",
-        padding: "24px",
+        padding: "40px 24px 56px",
         fontFamily:
           'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
     >
       <div
         style={{
-          background: "#ffffff",
-          borderRadius: "24px",
-          padding: "32px",
-          border: "1px solid #e7e5e4",
-          boxShadow: "0 14px 30px rgba(0,0,0,0.06)",
+          display: "grid",
+          gridTemplateColumns: showStaffLogin ? "minmax(0, 1fr)" : "minmax(0, 1.15fr) minmax(320px, 0.85fr)",
+          gap: "24px",
+          alignItems: "stretch",
         }}
       >
         {!showStaffLogin ? (
           <>
-            <p
+            <div
               style={{
-                margin: 0,
-                fontSize: "12px",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "#78716c",
+                background: "linear-gradient(145deg, #ffffff 0%, #f5f5f4 100%)",
+                borderRadius: "28px",
+                padding: "36px",
+                border: "1px solid #e7e5e4",
+                boxShadow: "0 18px 40px rgba(0,0,0,0.06)",
               }}
             >
-              Customer Access
-            </p>
+              <p style={sectionEyebrowStyle}>Customer Access</p>
 
-            <h1
-              style={{
-                marginTop: "10px",
-                marginBottom: "10px",
-                fontSize: "32px",
-                lineHeight: 1.1,
-              }}
-            >
-              Sign in to your portal
-            </h1>
-
-            <p
-              style={{
-                marginTop: 0,
-                color: "#57534e",
-                lineHeight: 1.6,
-                marginBottom: "24px",
-              }}
-            >
-              View your order history, track status updates, and respond to payment
-              requests from Tee &amp; Co.
-            </p>
-
-            <form onSubmit={handleCustomerLogin}>
-              <div style={{ marginBottom: "16px" }}>
-                <label style={labelStyle}>Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div style={{ marginBottom: "12px" }}>
-                <label style={labelStyle}>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div
+              <h1
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "22px",
-                  gap: "12px",
-                  flexWrap: "wrap",
+                  marginTop: "10px",
+                  marginBottom: "10px",
+                  fontSize: "36px",
+                  lineHeight: 1.05,
+                  color: "#1c1917",
                 }}
               >
-                <Link
-                  to="/signup"
-                  style={{
-                    color: "#171717",
-                    textDecoration: "none",
-                    fontWeight: "600",
-                    fontSize: "14px",
-                  }}
-                >
-                  Create account
-                </Link>
+                Sign in to your portal
+              </h1>
 
-                <button
-                  type="button"
+              <p
+                style={{
+                  marginTop: 0,
+                  color: "#57534e",
+                  lineHeight: 1.6,
+                  marginBottom: "28px",
+                  maxWidth: "520px",
+                }}
+              >
+                View your order history, track status updates, and respond to payment
+                requests from Tee &amp; Co.
+              </p>
+
+              <form onSubmit={handleCustomerLogin}>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={labelStyle}>Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setCustomerError("");
+                      setEmail(e.target.value);
+                    }}
+                    placeholder="you@example.com"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={labelStyle}>Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                      setCustomerError("");
+                      setPassword(e.target.value);
+                    }}
+                    placeholder="Enter password"
+                    style={inputStyle}
+                  />
+                </div>
+
+                {customerError ? (
+                  <p style={{ margin: "0 0 14px", color: "#b91c1c", fontWeight: 700 }}>
+                    {customerError}
+                  </p>
+                ) : null}
+
+                <div
                   style={{
-                    background: "none",
-                    border: "none",
-                    color: "#57534e",
-                    cursor: "pointer",
-                    padding: 0,
-                    fontSize: "14px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "22px",
+                    gap: "12px",
+                    flexWrap: "wrap",
                   }}
                 >
-                  Forgot password?
+                  <Link
+                    to="/signup"
+                    style={{
+                      color: "#171717",
+                      textDecoration: "none",
+                      fontWeight: "600",
+                      fontSize: "14px",
+                    }}
+                  >
+                    Create account
+                  </Link>
+
+                  <button
+                    type="button"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#57534e",
+                      cursor: "pointer",
+                      padding: 0,
+                      fontSize: "14px",
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                <button type="submit" style={primaryButtonStyle}>
+                  Sign In
                 </button>
+              </form>
+            </div>
+
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: "28px",
+                padding: "30px",
+                border: "1px solid #e7e5e4",
+                boxShadow: "0 18px 40px rgba(0,0,0,0.05)",
+                display: "grid",
+                gap: "22px",
+                alignContent: "start",
+              }}
+            >
+              <div>
+                <p style={sectionEyebrowStyle}>Team Access</p>
+                <h2 style={{ margin: "10px 0 8px", fontSize: "26px", color: "#1c1917" }}>
+                  Workspace sign-in
+                </h2>
+                <p style={{ margin: 0, color: "#57534e", lineHeight: 1.6 }}>
+                  Staff and administrators can continue to the Central Operations workspace
+                  using their assigned credentials.
+                </p>
               </div>
 
               <button
-                type="submit"
+                type="button"
+                onClick={openStaffLogin}
                 style={{
                   width: "100%",
                   background: "#171717",
@@ -230,45 +365,84 @@ export default function Login() {
                   fontWeight: "700",
                   fontSize: "15px",
                   cursor: "pointer",
-                  boxShadow: "0 10px 20px rgba(0,0,0,0.10)",
                 }}
               >
-                Sign In
+                Continue to Staff Sign-In
               </button>
-            </form>
 
-            <div
-              style={{
-                marginTop: "28px",
-                paddingTop: "24px",
-                borderTop: "1px solid #e7e5e4",
-              }}
-            >
-              <p style={{ margin: "0 0 12px", fontWeight: 700, color: "#292524" }}>
-                Shop team access
-              </p>
-
-              <button
-                type="button"
-                onClick={openStaffLogin}
+              <div
                 style={{
-                  width: "100%",
-                  background: "#fafaf9",
-                  color: "#171717",
-                  border: "1px solid #d6d3d1",
-                  borderRadius: "14px",
-                  padding: "14px 18px",
-                  fontWeight: "700",
-                  fontSize: "15px",
-                  cursor: "pointer",
+                  borderTop: "1px solid #e7e5e4",
+                  paddingTop: "22px",
                 }}
               >
-                Staff Login
-              </button>
+                <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#292524" }}>
+                  Admin access
+                </p>
+                <p style={{ margin: "0 0 14px", color: "#57534e", lineHeight: 1.5, fontSize: "14px" }}>
+                  Use your login ID and PIN to open the administrative workspace directly.
+                </p>
+
+                <form onSubmit={handleOwnerLogin}>
+                  <div style={{ marginBottom: "12px" }}>
+                    <label style={labelStyle}>Login ID</label>
+                    <input
+                      type="text"
+                      value={ownerLoginId}
+                      onChange={(event) => {
+                        setOwnerError("");
+                        setOwnerLoginId(event.target.value);
+                      }}
+                      placeholder="Enter login ID"
+                      style={inputStyle}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: "12px" }}>
+                    <label style={labelStyle}>PIN</label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength="4"
+                      value={ownerPin}
+                      onChange={(event) => {
+                        setOwnerError("");
+                        setOwnerPin(event.target.value.replace(/\D/g, "").slice(0, 4));
+                      }}
+                      placeholder="••••"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {ownerError ? (
+                    <p style={{ margin: "0 0 14px", color: "#b91c1c", fontWeight: 700 }}>
+                      {ownerError}
+                    </p>
+                  ) : null}
+
+                  <button type="submit" style={primaryButtonStyle}>
+                    Enter Admin Workspace
+                  </button>
+                </form>
+              </div>
             </div>
           </>
         ) : (
-          <>
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "28px",
+              padding: "32px",
+              border: "1px solid #e7e5e4",
+              boxShadow: "0 18px 40px rgba(0,0,0,0.06)",
+              maxWidth: "560px",
+              width: "100%",
+              justifySelf: "center",
+            }}
+          >
             <button
               type="button"
               onClick={closeStaffLogin}
@@ -285,20 +459,10 @@ export default function Login() {
               ← Back to customer login
             </button>
 
-            <p
-              style={{
-                margin: 0,
-                fontSize: "12px",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "#78716c",
-              }}
-            >
-              Staff Access
-            </p>
+            <p style={sectionEyebrowStyle}>Team Access</p>
 
             <h1 style={{ margin: "10px 0 10px", fontSize: "32px", lineHeight: 1.1 }}>
-              Enter shop workspace
+              Enter staff workspace
             </h1>
 
             <p style={{ marginTop: 0, color: "#57534e", lineHeight: 1.6, marginBottom: "22px" }}>
@@ -399,10 +563,10 @@ export default function Login() {
 
             <p style={{ margin: "16px 0 0", color: "#78716c", fontSize: "13px", lineHeight: 1.5 }}>
               {staffUsers.length
-                ? "Demo default: Owner / Admin uses PIN 1234."
+                ? "Use the staff profile assigned to you to continue into Central Operations."
                 : "No active staff users are currently available."}
             </p>
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
 import { isActiveOperationalStatus } from "../orders/orderWorkflow";
@@ -10,18 +10,20 @@ import {
   hasOperationalSession,
   isAdminWorkspaceView,
   isStaffWorkspaceView,
+  resolveOperationalRole,
 } from "../admin/adminRoleView";
 import {
-  clearActiveStaffSession,
   getActiveStaffUser,
   subscribeToActiveStaffUser,
 } from "../lib/staffUsersStore";
 import {
-  clearActiveCustomerSession,
   getActiveCustomerSession,
   subscribeToActiveCustomerSession,
 } from "../lib/customerSessionStore";
+import { pushAuthDiagnostic } from "../lib/authDiagnostics";
+import { clearAllAuthSessions } from "../lib/authSessionStore";
 import { getUserInitials } from "../utils/getUserInitials";
+import AdminDiagnosticsPanel from "./AdminDiagnosticsPanel";
 
 const ADMIN_LOGO_SRC = "/tee&co512x512.png";
 const FACEBOOK_URL =
@@ -377,7 +379,6 @@ function AdminSidebar({ pathname, staffUser }) {
                 background: active
                   ? "#eff6ff"
                   : "#ffffff",
-                color: active ? "#ffffff" : "#171717",
                 textDecoration: "none",
                 border: active
                   ? "1px solid #bfdbfe"
@@ -473,7 +474,11 @@ function PublicHeader() {
   }, []);
 
   function handleCustomerLogout() {
-    clearActiveCustomerSession();
+    clearAllAuthSessions("customer-logout");
+    pushAuthDiagnostic("login-redirect", {
+      actorType: "customer",
+      target: "/login",
+    });
     navigate("/login", { replace: true });
   }
 
@@ -684,7 +689,13 @@ function AdminWorkspaceHeader({ staffUser }) {
     : "Owner Management Workspace";
 
   function handleLogout() {
-    clearActiveStaffSession();
+    clearAllAuthSessions("staff-logout");
+    pushAuthDiagnostic("login-redirect", {
+      actorType: "staff",
+      userId: staffUser?.id || "",
+      role: staffUser?.role || "",
+      target: "/login",
+    });
     navigate("/login", { replace: true });
   }
 
@@ -816,11 +827,54 @@ function AdminWorkspaceHeader({ staffUser }) {
   );
 }
 
+class AdminRenderBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return {
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+
+  componentDidCatch(error) {
+    pushAuthDiagnostic("admin-render-failed", {
+      pathname: this.props.pathname || "",
+      userId: this.props.staffUser?.id || "",
+      role: this.props.staffUser?.role || "",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <AdminDiagnosticsPanel
+          title="Owner workspace failed to render"
+          message="The admin route hit a render error after login. Diagnostics are shown here so the screen never collapses to blank."
+          staffUser={this.props.staffUser}
+          pathname={this.props.pathname}
+          workspaceAccess={this.props.workspaceAccess}
+          error={this.state.error.message}
+        />
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith("/admin");
+  const requiresCustomerSession = location.pathname === "/my-orders";
   const [activeStaffUser, setActiveStaffUser] = useState(() => getActiveStaffUser());
+  const [activeCustomerSession, setActiveCustomerSession] = useState(() =>
+    getActiveCustomerSession()
+  );
 
   useEffect(() => {
     function syncActiveStaffUser(nextStaffUser = getActiveStaffUser()) {
@@ -835,39 +889,119 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
+    function syncActiveCustomerSession(nextCustomerSession = getActiveCustomerSession()) {
+      setActiveCustomerSession(nextCustomerSession);
+    }
+
+    syncActiveCustomerSession();
+
+    return subscribeToActiveCustomerSession((nextCustomerSession) => {
+      syncActiveCustomerSession(nextCustomerSession);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!isAdmin) return;
+
+    pushAuthDiagnostic("role-resolution", {
+      pathname: location.pathname,
+      currentUserId: activeStaffUser?.id || "",
+      currentUserRole: activeStaffUser?.role || "",
+      workspaceAccess: canAccessOwnerWorkspace(location.pathname, activeStaffUser)
+        ? "allowed"
+        : "blocked",
+    });
+
     if (!hasOperationalSession(activeStaffUser)) {
+      pushAuthDiagnostic("login-redirect", {
+        actorType: "staff",
+        target: "/login",
+        reason: "missing-operational-session",
+        pathname: location.pathname,
+      });
       navigate("/login", { replace: true });
       return;
     }
     if (canAccessOwnerWorkspace(location.pathname, activeStaffUser)) return;
+    pushAuthDiagnostic("login-redirect", {
+      actorType: "staff",
+      userId: activeStaffUser?.id || "",
+      role: activeStaffUser?.role || "",
+      target: "/admin",
+      reason: "workspace-blocked",
+      pathname: location.pathname,
+    });
     navigate("/admin", { replace: true });
   }, [activeStaffUser, isAdmin, location.pathname, navigate]);
 
+  useEffect(() => {
+    if (!requiresCustomerSession) return;
+    if (activeCustomerSession) return;
+
+    pushAuthDiagnostic("login-redirect", {
+      actorType: "customer",
+      target: "/login",
+      reason: "missing-customer-session",
+      pathname: location.pathname,
+    });
+    navigate("/login", { replace: true });
+  }, [activeCustomerSession, location.pathname, navigate, requiresCustomerSession]);
+
   const visibleStaffUser = isAdmin ? activeStaffUser : null;
+  const resolvedStaffRole = resolveOperationalRole(visibleStaffUser);
+  const workspaceAccess = isAdmin
+    ? canAccessOwnerWorkspace(location.pathname, visibleStaffUser)
+      ? "allowed"
+      : "blocked"
+    : "public";
 
   if (isAdmin && !visibleStaffUser) {
-    return null;
+    return (
+      <AdminDiagnosticsPanel
+        title="Operational session missing"
+        message="The admin route loaded without an active staff session, so the workspace cannot mount."
+        pathname={location.pathname}
+        workspaceAccess={workspaceAccess}
+      />
+    );
+  }
+
+  if (isAdmin && !resolvedStaffRole) {
+    return (
+      <AdminDiagnosticsPanel
+        title="Operational role could not be resolved"
+        message="A staff session exists, but its role is not one of Owner, Manager, or Staff, so the workspace has been paused before rendering."
+        staffUser={visibleStaffUser}
+        pathname={location.pathname}
+        workspaceAccess={workspaceAccess}
+      />
+    );
   }
 
   return (
     <div>
       {isAdmin ? (
-        <div style={{ display: "flex", alignItems: "flex-start" }}>
-          <AdminSidebar
-            pathname={location.pathname}
-            search={location.search}
-            staffUser={visibleStaffUser}
-          />
+        <AdminRenderBoundary
+          pathname={location.pathname}
+          staffUser={visibleStaffUser}
+          workspaceAccess={workspaceAccess}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            <AdminSidebar
+              pathname={location.pathname}
+              search={location.search}
+              staffUser={visibleStaffUser}
+            />
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <AdminWorkspaceHeader staffUser={visibleStaffUser} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <AdminWorkspaceHeader staffUser={visibleStaffUser} />
 
-            <main style={{ minWidth: 0 }}>
-              <Outlet />
-            </main>
+              <main style={{ minWidth: 0 }}>
+                <Outlet />
+              </main>
+            </div>
           </div>
-        </div>
+        </AdminRenderBoundary>
       ) : (
         <>
           <PublicHeader />
