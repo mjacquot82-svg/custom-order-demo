@@ -93,7 +93,6 @@ function getAdminSections(staffUser) {
         links: [
           { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
           { to: "/admin/quotes", label: "Quotes", navKey: "quotes" },
-          { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
         ],
       },
       {

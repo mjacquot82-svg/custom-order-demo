@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStoredProducts } from "../lib/productsStore";
 import { createStoredQuickSale } from "../lib/salesStore";
-import { getStoredCustomers } from "../lib/customersStore";
+import { createStoredCustomer, getStoredCustomers } from "../lib/customersStore";
 import {
   recordStoredOrderPayment,
   updateStoredOrder,
@@ -520,7 +520,7 @@ export default function QuickSale() {
 
   const products = useStoredProducts().filter((product) => product.status !== "Inactive");
   const storedOrders = useStoredOrders();
-  const [customers] = useState(() => getStoredCustomers());
+  const [customers, setCustomers] = useState(() => getStoredCustomers());
   const customerDirectory = useMemo(
     () => buildCustomerDirectory(customers, storedOrders),
     [customers, storedOrders]
@@ -530,6 +530,15 @@ export default function QuickSale() {
   const [lookupQuery, setLookupQuery] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerLookupMessage, setCustomerLookupMessage] = useState("");
+  const [showCreateCustomerForm, setShowCreateCustomerForm] = useState(false);
+  const [createCustomerError, setCreateCustomerError] = useState("");
+  const [createCustomerForm, setCreateCustomerForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    company: "",
+  });
   const [selectedTransactionIds, setSelectedTransactionIds] = useState([]);
   const [transactionMessage, setTransactionMessage] = useState("");
   const [paymentAmountOverride, setPaymentAmountOverride] = useState("");
@@ -587,6 +596,11 @@ export default function QuickSale() {
   }, [activeMode, selectableItems]);
   const activeWorkspaceMode =
     transactionWorkspaceModes[activeMode] || transactionWorkspaceModes.payment;
+  const canOfferCustomerCreate =
+    activeMode !== "quick-sale" &&
+    lookupQuery.trim().length >= 2 &&
+    !customerMatches.length &&
+    (!selectedCustomer || normalize(selectedCustomer.name) !== normalize(lookupQuery));
   const selectedTransactionItems = useMemo(
     () => selectableItems.filter((item) => selectedTransactionIds.includes(item.id)),
     [selectableItems, selectedTransactionIds]
@@ -729,6 +743,15 @@ export default function QuickSale() {
   function handleLookupChange(value) {
     setLookupQuery(value);
     setCustomerMatches(findCustomerMatches(customerDirectory, value));
+    setCustomerLookupMessage("");
+    setCreateCustomerError("");
+
+    if (!showCreateCustomerForm) return;
+
+    setCreateCustomerForm((current) => ({
+      ...current,
+      name: current.name || value.trim(),
+    }));
   }
 
   function activateWorkspaceMode(mode) {
@@ -748,10 +771,16 @@ export default function QuickSale() {
     resetPaymentForm("");
   }
 
-  function selectCustomer(customer) {
+  function selectCustomer(customer, options = {}) {
+    const { preserveLookupMessage = false } = options;
     setSelectedCustomer(customer);
     setLookupQuery(customer.name || "");
     setCustomerMatches([]);
+    if (!preserveLookupMessage) {
+      setCustomerLookupMessage("");
+    }
+    setShowCreateCustomerForm(false);
+    setCreateCustomerError("");
     setSelectedTransactionIds([]);
     setTransactionMessage("");
     setCustomerName(customer.name || "");
@@ -759,6 +788,69 @@ export default function QuickSale() {
     setLinkedCustomerName(customer.name || "");
     setActiveMode("payment");
     resetPaymentForm("");
+  }
+
+  function openCreateCustomerForm() {
+    setShowCreateCustomerForm(true);
+    setCreateCustomerError("");
+    setCustomerLookupMessage("");
+    setCreateCustomerForm({
+      name: lookupQuery.trim(),
+      phone: "",
+      email: "",
+      company: "",
+    });
+  }
+
+  function closeCreateCustomerForm() {
+    setShowCreateCustomerForm(false);
+    setCreateCustomerError("");
+    setCreateCustomerForm({
+      name: "",
+      phone: "",
+      email: "",
+      company: "",
+    });
+  }
+
+  function updateCreateCustomerForm(field, value) {
+    setCreateCustomerForm((current) => ({ ...current, [field]: value }));
+    setCreateCustomerError("");
+  }
+
+  function handleCreateCustomer(event) {
+    event.preventDefault();
+
+    if (!createCustomerForm.name.trim()) {
+      setCreateCustomerError("Customer name is required.");
+      return;
+    }
+
+    let createdCustomer;
+
+    try {
+      createdCustomer = createStoredCustomer({
+        name: createCustomerForm.name.trim(),
+        phone: createCustomerForm.phone.trim(),
+        email: createCustomerForm.email.trim(),
+        company: createCustomerForm.company.trim(),
+      });
+    } catch (error) {
+      setCreateCustomerError(error?.message || "Unable to create customer.");
+      return;
+    }
+
+    setCustomers((current) => [createdCustomer, ...current]);
+    setCustomerLookupMessage(`${createdCustomer.name} was added and linked to this counter workflow.`);
+    closeCreateCustomerForm();
+    selectCustomer(
+      {
+        ...createdCustomer,
+        source: "saved",
+        order_numbers: createdCustomer.order_numbers || [],
+      },
+      { preserveLookupMessage: true }
+    );
   }
 
   function toggleTransactionItem(item) {
@@ -1323,11 +1415,11 @@ export default function QuickSale() {
                       Step 1
                     </p>
                     <h2 style={{ margin: "6px 0 8px", fontSize: "26px", color: "#0f172a" }}>
-                      Customer Lookup
+                      Customer & Transaction Lookup
                     </h2>
                     <p style={{ margin: 0, color: "#64748b", lineHeight: 1.5 }}>
-                      Search by customer, phone, email, company, or order number to begin the
-                      counter action.
+                      Search by customer, phone, email, company, or order number to start payment,
+                      pickup, or release work without leaving Front Counter.
                     </p>
                   </div>
 
@@ -1382,6 +1474,145 @@ export default function QuickSale() {
                     ) : null}
                   </div>
 
+                  {customerLookupMessage ? (
+                    <div
+                      style={{
+                        border: "1px solid #bbf7d0",
+                        background: "#f0fdf4",
+                        color: "#166534",
+                        borderRadius: "14px",
+                        padding: "12px 14px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {customerLookupMessage}
+                    </div>
+                  ) : null}
+
+                  {canOfferCustomerCreate ? (
+                    <div
+                      style={{
+                        border: "1px dashed #cbd5e1",
+                        borderRadius: "18px",
+                        padding: "16px",
+                        background: "#f8fafc",
+                        display: "grid",
+                        gap: "12px",
+                      }}
+                    >
+                      <div style={{ display: "grid", gap: "4px" }}>
+                        <strong style={{ color: "#0f172a" }}>No saved customer matched this lookup.</strong>
+                        <span style={{ color: "#64748b", lineHeight: 1.5 }}>
+                          Create a lightweight customer profile here, then continue the counter transaction.
+                        </span>
+                      </div>
+
+                      {!showCreateCustomerForm ? (
+                        <button
+                          type="button"
+                          onClick={openCreateCustomerForm}
+                          style={{
+                            background: "#0f172a",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "12px",
+                            padding: "12px 14px",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            justifySelf: "start",
+                          }}
+                        >
+                          Create New Customer
+                        </button>
+                      ) : (
+                        <form onSubmit={handleCreateCustomer} style={{ display: "grid", gap: "12px" }}>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                              gap: "12px",
+                            }}
+                          >
+                            <label style={labelStyle}>
+                              Name
+                              <input
+                                value={createCustomerForm.name}
+                                onChange={(event) => updateCreateCustomerForm("name", event.target.value)}
+                                placeholder="Customer name"
+                                style={fieldStyle}
+                              />
+                            </label>
+                            <label style={labelStyle}>
+                              Phone
+                              <input
+                                value={createCustomerForm.phone}
+                                onChange={(event) => updateCreateCustomerForm("phone", event.target.value)}
+                                placeholder="Phone number"
+                                style={fieldStyle}
+                              />
+                            </label>
+                            <label style={labelStyle}>
+                              Email
+                              <input
+                                value={createCustomerForm.email}
+                                onChange={(event) => updateCreateCustomerForm("email", event.target.value)}
+                                placeholder="Email address"
+                                style={fieldStyle}
+                              />
+                            </label>
+                            <label style={labelStyle}>
+                              Company
+                              <input
+                                value={createCustomerForm.company}
+                                onChange={(event) => updateCreateCustomerForm("company", event.target.value)}
+                                placeholder="Company (optional)"
+                                style={fieldStyle}
+                              />
+                            </label>
+                          </div>
+
+                          {createCustomerError ? (
+                            <p style={{ margin: 0, color: "#b91c1c", fontWeight: 700 }}>
+                              {createCustomerError}
+                            </p>
+                          ) : null}
+
+                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                            <button
+                              type="submit"
+                              style={{
+                                background: "#0f172a",
+                                color: "#ffffff",
+                                border: "none",
+                                borderRadius: "12px",
+                                padding: "12px 14px",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Save Customer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={closeCreateCustomerForm}
+                              style={{
+                                background: "#ffffff",
+                                color: "#0f172a",
+                                border: "1px solid #cbd5e1",
+                                borderRadius: "12px",
+                                padding: "12px 14px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  ) : null}
+
                   {selectedCustomer ? (
                     <div
                       style={{
@@ -1408,6 +1639,7 @@ export default function QuickSale() {
                             setSelectedCustomer(null);
                             setLookupQuery("");
                             setCustomerMatches([]);
+                            setCustomerLookupMessage("");
                             clearTransactionSelection();
                           }}
                           style={{
