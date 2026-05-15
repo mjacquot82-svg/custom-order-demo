@@ -6,6 +6,7 @@ import {
   subscribeToStaffUsers,
   validateStaffPin,
 } from "../lib/staffUsersStore";
+import { setActiveCustomerSession } from "../lib/customerSessionStore";
 
 const inputStyle = {
   width: "100%",
@@ -54,6 +55,7 @@ export default function Login() {
 
   function handleCustomerLogin(e) {
     e.preventDefault();
+    setActiveCustomerSession({ email });
     navigate("/my-orders");
   }
 

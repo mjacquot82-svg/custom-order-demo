@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { setActiveCustomerSession } from "../lib/customerSessionStore";
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -22,6 +23,11 @@ export default function Signup() {
 
   function handleSubmit(e) {
     e.preventDefault();
+    setActiveCustomerSession({
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+    });
     navigate("/my-orders");
   }
 
