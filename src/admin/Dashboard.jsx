@@ -30,15 +30,15 @@ function Section({ title, children, description }) {
       style={{
         background: "#ffffff",
         borderRadius: "20px",
-        padding: "22px",
+        padding: "18px",
         border: "1px solid #e2e8f0",
-        boxShadow: "0 12px 32px rgba(15, 23, 42, 0.04)",
+        boxShadow: "0 10px 26px rgba(15, 23, 42, 0.035)",
       }}
     >
-      <div style={{ marginBottom: "14px" }}>
-        <h2 style={{ margin: 0, fontSize: "22px", lineHeight: 1.15 }}>{title}</h2>
+      <div style={{ marginBottom: "12px" }}>
+        <h2 style={{ margin: 0, fontSize: "20px", lineHeight: 1.15 }}>{title}</h2>
         {description ? (
-          <p style={{ margin: "6px 0 0", color: "#64748b", maxWidth: "760px", lineHeight: 1.5, fontSize: "14px" }}>
+          <p style={{ margin: "5px 0 0", color: "#64748b", maxWidth: "700px", lineHeight: 1.45, fontSize: "13px" }}>
             {description}
           </p>
         ) : null}
@@ -151,10 +151,10 @@ function WorkspaceCountLink({ label, count, description, to, tone = "default" })
       className="owner-dashboard-count-link"
       style={{
         display: "grid",
-        gap: "10px",
+        gap: "8px",
         alignItems: "start",
-        borderRadius: "16px",
-        padding: "16px",
+        borderRadius: "14px",
+        padding: "14px",
         background: palette.background,
         border: `1px solid ${palette.border}`,
         color: "#171717",
@@ -166,15 +166,15 @@ function WorkspaceCountLink({ label, count, description, to, tone = "default" })
           <p style={{ margin: 0, fontWeight: 900, fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase", color: palette.label }}>
             {label}
           </p>
-          <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: "13px", lineHeight: 1.4 }}>
+          <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "12px", lineHeight: 1.35 }}>
             {description}
           </p>
         </div>
-        <strong style={{ fontSize: "30px", lineHeight: 1, color: palette.count }}>{count}</strong>
+        <strong style={{ fontSize: "28px", lineHeight: 1, color: palette.count }}>{count}</strong>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-        <span style={{ color: "#475569", fontWeight: 700, fontSize: "13px" }}>Open dedicated workspace</span>
-        <span style={{ color: "#64748b", fontWeight: 800, whiteSpace: "nowrap" }}>View</span>
+        <span style={{ color: "#475569", fontWeight: 700, fontSize: "12px" }}>Open dedicated workspace</span>
+        <span style={{ color: "#64748b", fontWeight: 800, fontSize: "12px", whiteSpace: "nowrap" }}>View</span>
       </div>
     </Link>
   );
@@ -187,9 +187,9 @@ function WorkspaceOverviewLink({ label, count, description, to }) {
       className="owner-dashboard-workspace-link"
       style={{
         display: "grid",
-        gap: "8px",
-        padding: "15px 16px",
-        borderRadius: "16px",
+        gap: "6px",
+        padding: "13px 14px",
+        borderRadius: "14px",
         border: "1px solid #e2e8f0",
         background: "#f8fafc",
         textDecoration: "none",
@@ -197,10 +197,10 @@ function WorkspaceOverviewLink({ label, count, description, to }) {
       }}
       >
       <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "baseline" }}>
-        <strong style={{ fontSize: "15px" }}>{label}</strong>
-        <span style={{ color: "#0f172a", fontSize: "20px", fontWeight: 900 }}>{count}</span>
+        <strong style={{ fontSize: "14px" }}>{label}</strong>
+        <span style={{ color: "#0f172a", fontSize: "18px", fontWeight: 900 }}>{count}</span>
       </div>
-      <p style={{ margin: 0, color: "#64748b", fontSize: "13px", lineHeight: 1.4 }}>{description}</p>
+      <p style={{ margin: 0, color: "#64748b", fontSize: "12px", lineHeight: 1.35 }}>{description}</p>
     </Link>
   );
 }
@@ -296,9 +296,9 @@ function UpcomingOrderCard({ order }) {
       className="owner-dashboard-upcoming-card"
       style={{
         display: "grid",
-        gap: "10px",
-        borderRadius: "16px",
-        padding: "15px 16px",
+        gap: "8px",
+        borderRadius: "14px",
+        padding: "14px 15px",
         background: "#f8fafc",
         border: "1px solid #e2e8f0",
         textDecoration: "none",
@@ -325,14 +325,14 @@ function EmptyAttentionState() {
     <div
       className="owner-dashboard-empty-state"
       style={{
-        padding: "18px",
+        padding: "16px",
         borderRadius: "16px",
         border: "1px dashed #cbd5e1",
         background: "#f8fafc",
       }}
     >
       <p style={{ margin: 0, fontWeight: 800, color: "#0f172a" }}>No immediate owner escalations.</p>
-      <p style={{ margin: "8px 0 0", color: "#64748b", lineHeight: 1.6 }}>
+      <p style={{ margin: "6px 0 0", color: "#64748b", lineHeight: 1.5, fontSize: "13px" }}>
         The highest-priority queues are clear right now. Use the workspace links to move into quotes, production, counter, or financial detail only when needed.
       </p>
     </div>
@@ -396,10 +396,10 @@ function OperationalEventCard({ event }) {
         gap: "8px",
         textDecoration: "none",
         color: "#0f172a",
-        borderRadius: "16px",
+        borderRadius: "14px",
         border: `1px solid ${tone.border}`,
         background: tone.background,
-        padding: "14px 15px",
+        padding: "12px 14px",
       }}
     >
       <div
@@ -416,7 +416,7 @@ function OperationalEventCard({ event }) {
             display: "inline-flex",
             alignItems: "center",
             borderRadius: "999px",
-            padding: "6px 10px",
+            padding: "5px 9px",
             background: tone.badgeBackground,
             color: tone.badgeColor,
             fontSize: "11px",
@@ -494,14 +494,14 @@ function OwnerDashboard({ orders, operationalEvents }) {
   const recentOperationalEvents = operationalEvents.slice(0, 6);
 
   return (
-    <div className="owner-dashboard-page" style={{ width: "100%", padding: "24px 20px 32px" }}>
-      <div className="owner-dashboard-hero" style={{ marginBottom: "20px" }}>
+    <div className="owner-dashboard-page" style={{ width: "100%", padding: "20px 18px 28px" }}>
+      <div className="owner-dashboard-hero" style={{ marginBottom: "18px" }}>
         <p style={{ margin: 0, color: "#78716c", fontSize: "12px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Owner Operations</p>
         <h1 style={{ margin: "4px 0 6px", fontSize: "34px", lineHeight: 1.05 }}>Dashboard</h1>
-        <p style={{ margin: 0, color: "#64748b", maxWidth: "760px", lineHeight: 1.5 }}>Global operational overview for the owner workspace. Use this page to spot pressure points, then move into the dedicated workspace that handles the work.</p>
+        <p style={{ margin: 0, color: "#64748b", maxWidth: "760px", lineHeight: 1.45, fontSize: "14px" }}>Global operational overview for the owner workspace. Use this page to spot pressure points, then move into the dedicated workspace that handles the work.</p>
       </div>
 
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: "18px" }}>
         <OperationsSummaryCards metrics={metrics} />
       </div>
 
@@ -510,9 +510,9 @@ function OwnerDashboard({ orders, operationalEvents }) {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: "18px",
+          gap: "16px",
           alignItems: "start",
-          marginBottom: "18px",
+          marginBottom: "16px",
         }}
       >
         <Section
@@ -520,7 +520,7 @@ function OwnerDashboard({ orders, operationalEvents }) {
           description="Only the highest-priority items stay here. Detailed queue management remains in Quotes, Shop Production, Front Counter, Assignments, and Financial."
         >
           {attentionItems.length ? (
-            <div className="owner-dashboard-attention-grid" style={{ display: "grid", gap: "14px" }}>
+            <div className="owner-dashboard-attention-grid" style={{ display: "grid", gap: "12px" }}>
               {attentionItems.map((queue) => (
                 <WorkspaceCountLink
                   key={queue.label}
@@ -541,7 +541,7 @@ function OwnerDashboard({ orders, operationalEvents }) {
           title="Workspace Guide"
           description="Each workspace keeps its own workflow detail so the dashboard can stay calm and quick to scan."
         >
-          <div className="owner-dashboard-workspace-grid" style={{ display: "grid", gap: "12px" }}>
+          <div className="owner-dashboard-workspace-grid" style={{ display: "grid", gap: "10px" }}>
             {workspaceOverview.map((workspace) => (
               <WorkspaceOverviewLink
                 key={workspace.label}
@@ -559,7 +559,7 @@ function OwnerDashboard({ orders, operationalEvents }) {
         className="owner-dashboard-bottom-grid"
         style={{
           display: "grid",
-          gap: "18px",
+          gap: "16px",
           alignItems: "start",
         }}
       >
@@ -568,7 +568,7 @@ function OwnerDashboard({ orders, operationalEvents }) {
           description="A short operational cut of the next due jobs so the owner overview stays useful without becoming another production board."
         >
           {upcomingOrders.length ? (
-            <div className="owner-dashboard-deadlines-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px" }}>
+            <div className="owner-dashboard-deadlines-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "10px" }}>
               {upcomingOrders.slice(0, 6).map((order) => (
                 <UpcomingOrderCard key={order.orderNumber} order={order} />
               ))}
@@ -585,7 +585,7 @@ function OwnerDashboard({ orders, operationalEvents }) {
           description="Important workflow actions performed by staff. This stays lightweight and owner-facing so operational awareness improves without turning into a notification center."
         >
           {recentOperationalEvents.length ? (
-            <div className="owner-dashboard-events-list" style={{ display: "grid", gap: "10px" }}>
+            <div className="owner-dashboard-events-list" style={{ display: "grid", gap: "9px" }}>
               {recentOperationalEvents.map((event) => (
                 <OperationalEventCard key={event.id} event={event} />
               ))}

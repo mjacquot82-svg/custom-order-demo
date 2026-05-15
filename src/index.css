@@ -199,7 +199,7 @@ aside img:not(.tee-co-logo) {
 
 .owner-dashboard-page {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   max-width: 1880px;
   margin: 0 auto;
 }
@@ -223,43 +223,13 @@ aside img:not(.tee-co-logo) {
 
 @media (min-width: 1100px) {
   .owner-dashboard-page {
-    gap: 16px;
-    padding-left: 24px !important;
-    padding-right: 28px !important;
-  }
-
-  .owner-dashboard-top-grid {
-    grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.95fr) !important;
-  }
-
-  .owner-dashboard-bottom-grid {
-    grid-template-columns: minmax(0, 1.3fr) minmax(360px, 1fr) !important;
-  }
-
-  .owner-dashboard-deadlines-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  .owner-dashboard-events-list {
-    max-height: 620px;
-    overflow: auto;
-    padding-right: 4px;
-  }
-}
-
-@media (min-width: 1280px) {
-  .owner-dashboard-page {
     gap: 14px;
-    padding-left: 28px !important;
-    padding-right: 34px !important;
-  }
-
-  .owner-dashboard-summary-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    padding-left: 22px !important;
+    padding-right: 26px !important;
   }
 
   .owner-dashboard-top-grid {
-    grid-template-columns: minmax(0, 1.3fr) minmax(420px, 1fr) !important;
+    grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr) !important;
   }
 
   .owner-dashboard-attention-grid,
@@ -268,19 +238,49 @@ aside img:not(.tee-co-logo) {
   }
 
   .owner-dashboard-bottom-grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.98fr) !important;
+  }
+
+  .owner-dashboard-deadlines-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .owner-dashboard-events-list {
+    max-height: 560px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .owner-dashboard-page {
+    gap: 12px;
+    padding-left: 26px !important;
+    padding-right: 30px !important;
+  }
+
+  .owner-dashboard-summary-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  .owner-dashboard-top-grid {
+    grid-template-columns: minmax(0, 1.12fr) minmax(400px, 0.98fr) !important;
+  }
+
+  .owner-dashboard-bottom-grid {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.98fr) !important;
   }
 }
 
 @media (min-width: 1500px) {
   .owner-dashboard-page {
     max-width: none;
-    padding-left: 32px !important;
-    padding-right: 40px !important;
+    padding-left: 30px !important;
+    padding-right: 36px !important;
   }
 
   .owner-dashboard-top-grid {
-    grid-template-columns: minmax(0, 1.45fr) minmax(480px, 1fr) !important;
+    grid-template-columns: minmax(0, 1.2fr) minmax(440px, 1fr) !important;
   }
 
   .owner-dashboard-deadlines-grid {

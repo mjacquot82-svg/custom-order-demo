@@ -38,7 +38,7 @@ export default function OperationsSummaryCards({ metrics }) {
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-        gap: "12px",
+        gap: "10px",
       }}
     >
       {cards.map((card) => (
@@ -49,13 +49,13 @@ export default function OperationsSummaryCards({ metrics }) {
             background: card.background,
             border: "1px solid #e2e8f0",
             borderRadius: "16px",
-            padding: "16px",
+            padding: "14px",
           }}
         >
           <div
             style={{
               color: card.color,
-              fontSize: "28px",
+              fontSize: "26px",
               fontWeight: 900,
               lineHeight: 1,
             }}
@@ -65,11 +65,11 @@ export default function OperationsSummaryCards({ metrics }) {
 
           <div
             style={{
-              marginTop: "6px",
+              marginTop: "5px",
               color: "#334155",
               fontWeight: 700,
               lineHeight: 1.35,
-              fontSize: "14px",
+              fontSize: "13px",
             }}
           >
             {card.label}
