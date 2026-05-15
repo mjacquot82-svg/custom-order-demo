@@ -94,7 +94,6 @@ function getAdminSections(staffUser) {
           { to: "/admin/sales/new", label: "Front Counter", navKey: "frontCounter" },
           { to: "/admin/quotes", label: "Quotes", navKey: "quotes" },
           { to: "/admin/customers", label: "Customer Lookup", navKey: "customers" },
-          { to: "/admin/sales", label: "Sales History", navKey: "counterSales" },
         ],
       },
       {
@@ -168,7 +167,7 @@ function getAdminSections(staffUser) {
   ];
 }
 
-function getActiveSidebarLink(pathname) {
+function getActiveSidebarLink(pathname, staffUser) {
   if (pathname.startsWith("/admin/assignments")) return "assignments";
   if (pathname.startsWith("/admin/products")) return "products";
   if (pathname.startsWith("/admin/customers")) return "customers";
@@ -180,7 +179,9 @@ function getActiveSidebarLink(pathname) {
   if (pathname === "/admin/financial") return "financial";
   if (pathname === "/admin/sales") return "counterSales";
   if (pathname === "/admin/sales/new") return "frontCounter";
-  if (pathname.startsWith("/admin/sales/receipt/")) return "counterSales";
+  if (pathname.startsWith("/admin/sales/receipt/")) {
+    return isStaffWorkspaceView(staffUser) ? "frontCounter" : "counterSales";
+  }
   if (pathname === "/admin/orders") return "productionOrders";
   if (pathname.startsWith("/admin/orders/")) return "productionOrders";
   if (pathname === "/admin") return "dashboard";
@@ -267,7 +268,7 @@ function AdminSidebar({ pathname, staffUser }) {
     assignedOrders,
     staffWorkspace,
   });
-  const activeLink = getActiveSidebarLink(pathname);
+  const activeLink = getActiveSidebarLink(pathname, staffUser);
   const adminSections = getAdminSections(staffUser);
   const workspaceLabel = staffWorkspace
     ? "Staff Operations"

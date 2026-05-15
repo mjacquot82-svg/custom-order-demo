@@ -1,5 +1,7 @@
 import { Link, useParams } from "react-router-dom";
+import { isStaffWorkspaceView } from "./adminRoleView";
 import { findStoredQuickSale } from "../lib/salesStore";
+import { getActiveStaffUser } from "../lib/staffUsersStore";
 
 function currency(value) {
   return `$${Number(value || 0).toFixed(2)}`;
@@ -13,13 +15,19 @@ function formatDate(value) {
 export default function SaleReceipt() {
   const { saleNumber } = useParams();
   const sale = findStoredQuickSale(saleNumber);
+  const backToCounterLink = isStaffWorkspaceView(getActiveStaffUser())
+    ? "/admin/sales/new"
+    : "/admin/sales";
+  const backToCounterLabel = isStaffWorkspaceView(getActiveStaffUser())
+    ? "Back to Front Counter"
+    : "Back to Counter Sales";
 
   if (!sale) {
     return (
       <div style={{ maxWidth: "720px", margin: "40px auto", padding: "24px" }}>
         <h1>Receipt not found</h1>
         <p>This sale could not be found in the current browser storage.</p>
-        <Link to="/admin/sales">Back to Counter Sales</Link>
+        <Link to={backToCounterLink}>{backToCounterLabel}</Link>
       </div>
     );
   }
@@ -54,10 +62,10 @@ export default function SaleReceipt() {
         }}
       >
         <Link
-          to="/admin/sales"
+          to={backToCounterLink}
           style={{ color: "#475569", fontWeight: 700, textDecoration: "none" }}
         >
-          ← Back to Counter Sales
+          ← {backToCounterLabel}
         </Link>
 
         <button
