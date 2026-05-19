@@ -656,68 +656,13 @@ function PublicHeader() {
           boxSizing: "border-box",
         }}
       >
-        <Link
-          to="/"
+        <div
+          aria-hidden="true"
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "14px",
-            textDecoration: "none",
-            color: "#171717",
-            minWidth: 0,
+            flex: "1 1 auto",
+            minWidth: "24px",
           }}
-        >
-          <div
-            style={{
-              width: "56px",
-              height: "56px",
-              minWidth: "56px",
-              minHeight: "56px",
-              maxWidth: "56px",
-              maxHeight: "56px",
-              overflow: "hidden",
-              borderRadius: "999px",
-              flexShrink: 0,
-            }}
-          >
-            <img
-              className="tee-co-logo"
-              src={ADMIN_LOGO_SRC}
-              alt="Tee & Co"
-              width="56"
-              height="56"
-              loading="eager"
-              decoding="sync"
-              fetchPriority="high"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                display: "block",
-              }}
-            />
-          </div>
-
-          <div>
-            <strong
-              style={{
-                fontSize: "24px",
-                display: "block",
-              }}
-            >
-              Tee & Co Ltd.
-            </strong>
-
-            <span
-              style={{
-                color: "#64748b",
-                fontSize: "14px",
-              }}
-            >
-              Made local, worn proud
-            </span>
-          </div>
-        </Link>
+        />
 
         <div
           style={{

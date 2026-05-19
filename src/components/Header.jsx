@@ -21,56 +21,13 @@ export default function Header() {
             'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
       >
-        <Link
-          to="/"
+        <div
+          aria-hidden="true"
           style={{
-            textDecoration: "none",
-            color: "#171717",
-            lineHeight: "1.1",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
+            flex: "1 1 auto",
+            minWidth: "24px",
           }}
-        >
-          <img
-            src="/assets/icon-512.png"
-            alt="Tee & Co Ltd."
-            width="48"
-            height="48"
-            loading="eager"
-            decoding="async"
-            style={{
-              width: "48px",
-              height: "48px",
-              objectFit: "contain",
-              flexShrink: 0,
-              display: "block",
-            }}
-          />
-
-          <div>
-            <div
-              style={{
-                fontWeight: "700",
-                fontSize: "18px",
-              }}
-            >
-              Tee & Co Ltd.
-            </div>
-
-            <div
-              style={{
-                fontSize: "11px",
-                color: "#78716c",
-                marginTop: "1px",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-              }}
-            >
-              Customer Portal Demo
-            </div>
-          </div>
-        </Link>
+        />
 
         <nav
           style={{
