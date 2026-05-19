@@ -28,6 +28,54 @@ const buttonStyle = {
   fontWeight: 700,
 };
 
+const notificationPreferencePreviewItems = [
+  {
+    key: "orderCompleted",
+    label: "Order Completed",
+    description: "Operational completion milestones for finished production work.",
+  },
+  {
+    key: "pickupCompleted",
+    label: "Pickup Completed",
+    description: "Customer handoff events once completed work leaves the counter.",
+  },
+  {
+    key: "depositRecorded",
+    label: "Deposit Recorded",
+    description: "Payment progress updates when quote work becomes financially cleared.",
+  },
+  {
+    key: "finalPaymentRecorded",
+    label: "Final Payment Recorded",
+    description: "Balance-clearing events for orders that have been fully paid.",
+  },
+  {
+    key: "orderCanceled",
+    label: "Order Canceled",
+    description: "Important cancellation activity that may require owner awareness.",
+  },
+  {
+    key: "assignmentCompleted",
+    label: "Assignment Completed",
+    description: "Operational execution updates as assigned work is finished.",
+  },
+  {
+    key: "customerReadyCommunicationSent",
+    label: "Customer-Ready Communication Sent",
+    description: "Visibility into outbound ready-for-pickup communication milestones.",
+  },
+];
+
+const notificationPreferencePreviewDefaults = {
+  orderCompleted: true,
+  pickupCompleted: true,
+  depositRecorded: true,
+  finalPaymentRecorded: true,
+  orderCanceled: true,
+  assignmentCompleted: false,
+  customerReadyCommunicationSent: false,
+};
+
 export default function StaffUsers() {
   const [ownerAccount, setOwnerAccount] = useState(null);
   const [staff, setStaff] = useState([]);
@@ -37,6 +85,9 @@ export default function StaffUsers() {
     pin: "",
     role: "Staff",
   });
+  const [notificationPreview, setNotificationPreview] = useState(
+    notificationPreferencePreviewDefaults
+  );
 
   useEffect(() => {
     setOwnerAccount(getOwnerAdminAccount());
@@ -178,6 +229,13 @@ export default function StaffUsers() {
     } catch (error) {
       alert(error.message || "Unable to reset PIN.");
     }
+  }
+
+  function handleNotificationPreviewToggle(key) {
+    setNotificationPreview((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
   }
 
   return (
@@ -376,6 +434,137 @@ export default function StaffUsers() {
               This account signs in through the dedicated owner/admin login path and is kept
               separate from operational staff users.
             </p>
+          </div>
+
+          <div
+            style={{
+              marginBottom: "20px",
+              padding: "18px",
+              borderRadius: "16px",
+              border: "1px solid #cbd5e1",
+              background:
+                "linear-gradient(180deg, rgba(248,250,252,1) 0%, rgba(255,255,255,1) 100%)",
+              boxShadow: "0 10px 24px rgba(15, 23, 42, 0.04)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "12px",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                marginBottom: "10px",
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 6px",
+                    fontSize: "12px",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "#78716c",
+                  }}
+                >
+                  Notification Preferences
+                </p>
+                <h2 style={{ margin: 0, fontSize: "20px", color: "#171717" }}>
+                  Operational notification customization
+                </h2>
+              </div>
+
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  background: "#fff7ed",
+                  border: "1px solid #fed7aa",
+                  color: "#9a3412",
+                  fontSize: "11px",
+                  fontWeight: 900,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Coming Soon
+              </span>
+            </div>
+
+            <p style={{ margin: "0 0 10px", color: "#475569", lineHeight: 1.5, fontSize: "14px" }}>
+              Pilot-stage preview of future owner/admin operational notification settings.
+              This establishes which workflow events will likely become configurable later
+              without introducing delivery systems or saved preferences yet.
+            </p>
+
+            <p style={{ margin: "0 0 16px", color: "#64748b", lineHeight: 1.5, fontSize: "13px" }}>
+              Preview only. These toggles are not saved and do not send email, SMS, push, or
+              in-app notifications yet.
+            </p>
+
+            <div style={{ display: "grid", gap: "10px" }}>
+              {notificationPreferencePreviewItems.map((item) => (
+                <label
+                  key={item.key}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "auto 1fr",
+                    gap: "12px",
+                    alignItems: "start",
+                    padding: "12px 13px",
+                    borderRadius: "14px",
+                    border: "1px solid #e2e8f0",
+                    background: notificationPreview[item.key] ? "#f8fafc" : "#ffffff",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(notificationPreview[item.key])}
+                    onChange={() => handleNotificationPreviewToggle(item.key)}
+                    aria-label={item.label}
+                    style={{
+                      marginTop: "2px",
+                      width: "16px",
+                      height: "16px",
+                      accentColor: "#0f766e",
+                    }}
+                  />
+
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "10px",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <strong style={{ color: "#171717" }}>{item.label}</strong>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 800,
+                          color: "#475569",
+                          background: "#e2e8f0",
+                          borderRadius: "999px",
+                          padding: "4px 8px",
+                        }}
+                      >
+                        Preview
+                      </span>
+                    </div>
+
+                    <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: "13px", lineHeight: 1.45 }}>
+                      {item.description}
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
 
           <h2
