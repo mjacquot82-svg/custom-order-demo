@@ -1,6 +1,8 @@
 import { Component, useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
+import { useOperationalEvents } from "../lib/operationalEventsStore";
+import { formatShortDate } from "../lib/dateFormatting";
 import { isActiveOperationalStatus } from "../orders/orderWorkflow";
 import {
   canAccessOwnerWorkspace,
@@ -29,6 +31,7 @@ const ADMIN_LOGO_SRC = "/tee&co512x512.png";
 const FACEBOOK_URL =
   "https://www.facebook.com/p/Tee-Co-Ltd-100078145951464/";
 const INSTAGRAM_URL = "https://www.instagram.com/teeandcodesigns/";
+const STAFF_ATTENTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function FacebookIcon() {
   return (
@@ -205,6 +208,270 @@ function AttentionBadge({ count, active = false }) {
   );
 }
 
+function isRecentAttentionTimestamp(value) {
+  const timestamp = new Date(value || "").getTime();
+  if (!timestamp) return false;
+  return Date.now() - timestamp <= STAFF_ATTENTION_WINDOW_MS;
+}
+
+function buildAttentionTimestampLabel(value) {
+  const timestamp = new Date(value || "").getTime();
+  if (!timestamp) return "";
+
+  const diffMs = Date.now() - timestamp;
+  const diffMinutes = Math.max(1, Math.round(diffMs / (1000 * 60)));
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+
+  return formatShortDate(value);
+}
+
+function buildStaffAttentionItems({
+  assignedOrders = [],
+  operationalEvents = [],
+  staffUser,
+}) {
+  if (!staffUser?.id && !staffUser?.name) return [];
+
+  const orderLookup = new Map(
+    assignedOrders.map((order) => [order.order_number, order])
+  );
+  const items = [];
+
+  assignedOrders.forEach((order) => {
+    if (isRecentAttentionTimestamp(order.assigned_at)) {
+      const urgentAssignment = Boolean(
+        order.due_date &&
+          new Date(`${order.due_date}T00:00:00`).getTime() <=
+            Date.now() + 2 * 24 * 60 * 60 * 1000
+      );
+      const dueDateLabel = order.due_date
+        ? `Due ${formatShortDate(order.due_date)}`
+        : "Due date pending";
+
+      items.push({
+        key: `assignment-${order.order_number}`,
+        label: urgentAssignment ? "Rush Order Assigned" : "New Assignment",
+        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${dueDateLabel}`,
+        to: `/admin/orders/${order.order_number}`,
+        timestamp: order.assigned_at,
+        tone: urgentAssignment ? "warning" : "default",
+      });
+    }
+
+    if (order.status === "Ready for Pickup") {
+      items.push({
+        key: `pickup-${order.order_number}`,
+        label: "Pickup Waiting",
+        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • Ready for handoff`,
+        to: `/admin/orders/${order.order_number}`,
+        timestamp: order.updated_at || order.assigned_at,
+        tone: "success",
+      });
+    }
+  });
+
+  operationalEvents.forEach((event) => {
+    const order = orderLookup.get(event.reference_id);
+    if (!order || !isRecentAttentionTimestamp(event.created_at)) return;
+
+    if (event.event_type === "order_ready_for_pickup") {
+      items.push({
+        key: `event-pickup-${event.id}`,
+        label: "Pickup Waiting",
+        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${event.summary}`,
+        to: event.reference_path || `/admin/orders/${order.order_number}`,
+        timestamp: event.created_at,
+        tone: "success",
+      });
+    }
+
+    if (event.event_type === "quote_released_to_production") {
+      items.push({
+        key: `event-artwork-${event.id}`,
+        label: "Artwork Ready",
+        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${event.summary}`,
+        to: event.reference_path || `/admin/orders/${order.order_number}`,
+        timestamp: event.created_at,
+        tone: "default",
+      });
+    }
+  });
+
+  assignedOrders.forEach((order) => {
+    const recentActivity = (order.activity_log || []).find((event) =>
+      isRecentAttentionTimestamp(event?.created_at)
+    );
+
+    if (!recentActivity) return;
+
+    if (recentActivity.type === "artwork") {
+      items.push({
+        key: `activity-artwork-${order.order_number}`,
+        label: "Artwork Ready",
+        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${recentActivity.note || "Artwork updated."}`,
+        to: `/admin/orders/${order.order_number}`,
+        timestamp: recentActivity.created_at,
+        tone: "default",
+      });
+    }
+
+    if (
+      recentActivity.type === "status_change" &&
+      order.due_date &&
+      new Date(`${order.due_date}T00:00:00`).getTime() <= Date.now() + 2 * 24 * 60 * 60 * 1000
+    ) {
+      items.push({
+        key: `activity-priority-${order.order_number}`,
+        label: "Priority Change",
+        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${recentActivity.note || "Job priority changed."}`,
+        to: `/admin/orders/${order.order_number}`,
+        timestamp: recentActivity.created_at,
+        tone: "warning",
+      });
+    }
+  });
+
+  const dedupedItems = [];
+  const seenOrderLabels = new Set();
+
+  items
+    .sort(
+      (left, right) =>
+        new Date(right.timestamp || 0).getTime() -
+        new Date(left.timestamp || 0).getTime()
+    )
+    .forEach((item) => {
+      const dedupeKey = `${item.label}-${item.to}`;
+      if (seenOrderLabels.has(dedupeKey)) return;
+      seenOrderLabels.add(dedupeKey);
+      dedupedItems.push(item);
+    });
+
+  return dedupedItems.slice(0, 4);
+}
+
+function StaffAttentionStrip({ items = [] }) {
+  if (!items.length) return null;
+
+  const toneStyles = {
+    default: {
+      background: "#f8fafc",
+      border: "#e2e8f0",
+      badgeBackground: "#e2e8f0",
+      badgeColor: "#334155",
+    },
+    warning: {
+      background: "#fff7ed",
+      border: "#fed7aa",
+      badgeBackground: "#ffedd5",
+      badgeColor: "#c2410c",
+    },
+    success: {
+      background: "#ecfdf5",
+      border: "#bbf7d0",
+      badgeBackground: "#dcfce7",
+      badgeColor: "#166534",
+    },
+    danger: {
+      background: "#fef2f2",
+      border: "#fecaca",
+      badgeBackground: "#fee2e2",
+      badgeColor: "#b91c1c",
+    },
+  };
+
+  return (
+    <section
+      style={{
+        marginTop: "4px",
+        marginBottom: "16px",
+        display: "grid",
+        gap: "8px",
+      }}
+    >
+      <div>
+        <p
+          style={{
+            margin: "0 0 4px",
+            fontSize: "11px",
+            fontWeight: 900,
+            color: "#78716c",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+          }}
+        >
+          Attention Now
+        </p>
+        <p style={{ margin: 0, color: "#64748b", fontSize: "12px", lineHeight: 1.4 }}>
+          Recent assignment and workflow changes, separate from queue totals.
+        </p>
+      </div>
+
+      {items.map((item) => {
+        const tone = toneStyles[item.tone] || toneStyles.default;
+
+        return (
+          <Link
+            key={item.key}
+            to={item.to}
+            style={{
+              display: "grid",
+              gap: "6px",
+              textDecoration: "none",
+              color: "#171717",
+              borderRadius: "14px",
+              border: `1px solid ${tone.border}`,
+              background: tone.background,
+              padding: "10px 11px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "8px",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  borderRadius: "999px",
+                  padding: "4px 8px",
+                  background: tone.badgeBackground,
+                  color: tone.badgeColor,
+                  fontSize: "10px",
+                  fontWeight: 900,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {item.label}
+              </span>
+              <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700 }}>
+                {buildAttentionTimestampLabel(item.timestamp)}
+              </span>
+            </div>
+
+            <span style={{ fontSize: "12px", lineHeight: 1.4, color: "#334155" }}>
+              {item.detail}
+            </span>
+          </Link>
+        );
+      })}
+    </section>
+  );
+}
+
 function SocialLinks({ compact = false }) {
   const linkStyle = compact
     ? {
@@ -248,6 +515,7 @@ function SocialLinks({ compact = false }) {
 
 function AdminSidebar({ pathname, staffUser }) {
   const orders = useStoredOrders();
+  const operationalEvents = useOperationalEvents();
   const staffWorkspace = isStaffWorkspaceView(staffUser);
   const operationalOrders = isAdminWorkspaceView(staffUser)
     ? orders
@@ -265,6 +533,13 @@ function AdminSidebar({ pathname, staffUser }) {
   const workspaceLabel = staffWorkspace
     ? "Staff Operations"
     : "Central Operations";
+  const staffAttentionItems = staffWorkspace
+    ? buildStaffAttentionItems({
+        assignedOrders,
+        operationalEvents,
+        staffUser,
+      })
+    : [];
 
   return (
     <aside
@@ -423,6 +698,8 @@ function AdminSidebar({ pathname, staffUser }) {
           </div>
         </div>
       ))}
+
+      {staffWorkspace ? <StaffAttentionStrip items={staffAttentionItems} /> : null}
 
       <div
         style={{
