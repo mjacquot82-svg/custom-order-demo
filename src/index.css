@@ -81,7 +81,7 @@ img {
   font-size: 14px;
 }
 
-.tee-co-logo {
+.app-demo-logo {
   display: block;
   width: 100% !important;
   height: 100% !important;
@@ -91,8 +91,8 @@ img {
   flex-shrink: 0;
 }
 
-header img:not(.tee-co-logo),
-aside img:not(.tee-co-logo) {
+header img:not(.app-demo-logo),
+aside img:not(.app-demo-logo) {
   width: auto !important;
   height: auto !important;
   contain: layout paint size;

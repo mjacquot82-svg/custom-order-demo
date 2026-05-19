@@ -95,7 +95,7 @@ export default function SaleReceipt() {
         }}
       >
         <div style={{ textAlign: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "18px", marginBottom: "18px" }}>
-          <h1 style={{ margin: 0, fontSize: "28px" }}>Tee & Co Ltd.</h1>
+          <h1 style={{ margin: 0, fontSize: "28px" }}>Demo Apparel Co.</h1>
           <p style={{ margin: "6px 0 0", color: "#64748b" }}>Customer Receipt</p>
         </div>
 
@@ -177,7 +177,7 @@ export default function SaleReceipt() {
         )}
 
         <p style={{ textAlign: "center", margin: "26px 0 0", color: "#64748b", fontSize: "14px" }}>
-          Thank you for shopping with Tee & Co Ltd.
+          Thank you for shopping with Demo Apparel Co.
         </p>
       </section>
     </div>

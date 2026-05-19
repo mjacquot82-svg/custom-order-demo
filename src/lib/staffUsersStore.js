@@ -8,12 +8,12 @@ import {
 } from "./browserStorage";
 import { pushAuthDiagnostic } from "./authDiagnostics";
 
-const STORAGE_KEY = "teeCoStaffUsers";
-const ACTIVE_STAFF_KEY = "teeCoActiveStaffUser";
-const STAFF_USERS_UPDATED_EVENT = "tee-co-staff-users-updated";
-const ACTIVE_STAFF_UPDATED_EVENT = "tee-co-active-staff-updated";
+const STORAGE_KEY = "demoStaffUsers";
+const ACTIVE_STAFF_KEY = "demoActiveStaffUser";
+const STAFF_USERS_UPDATED_EVENT = "demo-staff-users-updated";
+const ACTIVE_STAFF_UPDATED_EVENT = "demo-active-staff-updated";
 const PROTECTED_OWNER_ID = "staff-owner-default";
-const OWNER_AUTH_DIAGNOSTICS_KEY = "__TEE_CO_OWNER_AUTH_DIAGNOSTICS__";
+const OWNER_AUTH_DIAGNOSTICS_KEY = "__DEMO_OWNER_AUTH_DIAGNOSTICS__";
 const TEMP_OWNER_LOGIN_ID = "owner";
 const TEMP_OWNER_PIN = "2468";
 
@@ -203,7 +203,7 @@ export function getStoredStaffUsers() {
     setJsonStorageItem(STORAGE_KEY, DEFAULT_STAFF_USERS);
     return DEFAULT_STAFF_USERS;
   } catch (error) {
-    console.error("Unable to read Tee & Co staff users", error);
+    console.error("Unable to read demo staff users", error);
     return DEFAULT_STAFF_USERS;
   }
 }
@@ -471,7 +471,7 @@ export function getActiveStaffUser() {
 
     return hydratedUser;
   } catch (error) {
-    console.error("Unable to read active Tee & Co staff user", error);
+    console.error("Unable to read active demo staff user", error);
     pushAuthDiagnostic("staff-session-hydrated", {
       hydrationResult: "error",
       message: error instanceof Error ? error.message : String(error),

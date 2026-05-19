@@ -23,7 +23,7 @@ import {
   isStaffWorkspaceView,
 } from "./adminRoleView";
 
-const EXPANDED_QUOTES_STORAGE_KEY = "teeCoQuotesExpandedState";
+const EXPANDED_QUOTES_STORAGE_KEY = "demoQuotesExpandedState";
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;

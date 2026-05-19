@@ -1,4 +1,4 @@
-const AUTH_DIAGNOSTICS_KEY = "__TEE_CO_AUTH_DIAGNOSTICS__";
+const AUTH_DIAGNOSTICS_KEY = "__DEMO_AUTH_DIAGNOSTICS__";
 
 export function pushAuthDiagnostic(event, details = {}) {
   if (typeof window === "undefined") return null;

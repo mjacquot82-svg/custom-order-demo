@@ -81,7 +81,7 @@ export default function Signup() {
             marginBottom: "24px",
           }}
         >
-          Set up your Tee &amp; Co account to place orders, upload artwork,
+          Set up your demo account to place orders, upload artwork,
           track status updates, and respond to deposit requests.
         </p>
 

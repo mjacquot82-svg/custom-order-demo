@@ -5,7 +5,7 @@ import {
 import { useSyncExternalStore } from "react";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 
-const STORAGE_KEY = "teeCoProducts";
+const STORAGE_KEY = "demoProducts";
 const EMPTY_PRODUCTS = [];
 const productListeners = new Set();
 let cachedProductsStorageRaw = null;
@@ -415,7 +415,7 @@ export function getStoredProducts() {
 
     return normalizedProducts;
   } catch (error) {
-    console.error("Unable to read Tee & Co products", error);
+    console.error("Unable to read demo products", error);
     cachedProductsStorageRaw = null;
     cachedProductsSnapshotRaw = null;
     cachedProductsSnapshot = getDefaultProductsSnapshot();

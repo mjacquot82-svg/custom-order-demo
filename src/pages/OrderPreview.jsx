@@ -47,7 +47,7 @@ export default function OrderPreview() {
   );
 
   const garmentName = passedState.garmentName || selectedProduct?.name || "Selected Garment";
-  const brand = passedState.brand || selectedProduct?.brand_model || "Tee & Co";
+  const brand = passedState.brand || selectedProduct?.brand_model || "Demo Brand";
   const category = passedState.category || selectedProduct?.category || "Apparel";
   const description =
     passedState.description ||
@@ -565,7 +565,7 @@ export default function OrderPreview() {
 
           <div style={{ marginTop: "18px" }}>
             <p style={{ fontWeight: "700", margin: "0 0 8px 0", fontSize: "15px" }}>
-              Notes for Tee &amp; Co
+              Notes for the shop
             </p>
 
             <textarea

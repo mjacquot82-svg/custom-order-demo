@@ -1,6 +1,6 @@
 import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
 
-const STORAGE_KEY = "teeCoWorkers";
+const STORAGE_KEY = "demoWorkers";
 
 export const defaultWorkers = [
   {

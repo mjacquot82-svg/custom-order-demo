@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 
-const STORAGE_KEY = "teeCoOperationalEvents";
+const STORAGE_KEY = "demoOperationalEvents";
 const MAX_EVENTS = 250;
 const eventListeners = new Set();
 const EMPTY_EVENTS = [];
@@ -50,7 +50,7 @@ function readStoredOperationalEvents() {
 
     return cachedEventsSnapshot;
   } catch (error) {
-    console.error("Unable to read Tee & Co operational events", error);
+    console.error("Unable to read demo operational events", error);
     cachedEventsRaw = null;
     cachedEventsSnapshot = EMPTY_EVENTS;
     return EMPTY_EVENTS;

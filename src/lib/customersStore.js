@@ -1,6 +1,6 @@
 import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
 
-const STORAGE_KEY = "teeCoCustomers";
+const STORAGE_KEY = "demoCustomers";
 
 export function getStoredCustomers() {
   if (!hasBrowserStorage()) return [];

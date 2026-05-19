@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { getRawStorageItem, hasBrowserStorage, setRawStorageItem } from "./browserStorage";
 
-const STORAGE_KEY = "teeCoStaffAssignmentAttention";
+const STORAGE_KEY = "demoStaffAssignmentAttention";
 const attentionListeners = new Set();
 const EMPTY_ATTENTION_STATE = Object.freeze({});
 
@@ -53,7 +53,7 @@ function readStoredAssignmentAttention() {
 
     return cachedAttentionSnapshot;
   } catch (error) {
-    console.error("Unable to read Tee & Co staff assignment attention", error);
+    console.error("Unable to read demo staff assignment attention", error);
     cachedAttentionRaw = null;
     cachedAttentionSnapshot = EMPTY_ATTENTION_STATE;
     return EMPTY_ATTENTION_STATE;

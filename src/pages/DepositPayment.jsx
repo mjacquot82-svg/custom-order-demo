@@ -29,7 +29,7 @@ export default function DepositPayment() {
         <h1 style={{ marginTop: 0 }}>Deposit Payment</h1>
 
         <p style={{ color: "#475569" }}>
-          This demo simulates a deposit payment request sent by Tee &amp; Co.
+          This demo simulates a deposit payment request sent by the shop.
         </p>
 
         <div

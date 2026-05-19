@@ -1,7 +1,7 @@
 {
-  "name": "Tee & Co Central Operations",
-  "short_name": "Tee & Co",
-  "description": "Central operations workspace for Tee & Co staff, production orders, customers, and artwork.",
+  "name": "Apparel Operations Demo",
+  "short_name": "Apparel Demo",
+  "description": "Central operations workspace for demo staff, production orders, customers, and artwork.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,15 +10,15 @@
   "theme_color": "#171717",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/app-demo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/app-demo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

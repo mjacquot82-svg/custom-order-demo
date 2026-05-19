@@ -7,7 +7,7 @@ export default function OrderSubmitted() {
   const quote = state.quote || null;
 
   const garmentName = state.garmentName || "Selected Garment";
-  const brand = state.brand || "Tee & Co";
+  const brand = state.brand || "Demo Brand";
   const category = state.category || "Apparel";
   const selectedColor = state.selectedColor || "Black";
   const selectedSize = state.selectedSize || "M";
@@ -111,7 +111,7 @@ export default function OrderSubmitted() {
           }}
         >
           Your garment selection, artwork details, and placement request have
-          been sent to Tee &amp; Co. The shop can now review the order before
+          been sent to the shop. The team can now review the order before
           approval and production.
         </p>
 

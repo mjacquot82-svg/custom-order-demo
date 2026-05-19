@@ -28,10 +28,9 @@ import AdminDiagnosticsPanel from "./AdminDiagnosticsPanel";
 import { useStaffAssignmentAttention } from "../lib/staffAssignmentAttentionStore";
 import { buildStaffAssignmentAttentionItems } from "../staff/buildStaffAssignmentAttentionItems";
 
-const ADMIN_LOGO_SRC = "/tee&co512x512.png";
-const FACEBOOK_URL =
-  "https://www.facebook.com/p/Tee-Co-Ltd-100078145951464/";
-const INSTAGRAM_URL = "https://www.instagram.com/teeandcodesigns/";
+const ADMIN_LOGO_SRC = "/app-demo-icon.svg";
+const FACEBOOK_URL = "https://example.com";
+const INSTAGRAM_URL = "https://example.com";
 
 function FacebookIcon() {
   return (
@@ -460,9 +459,9 @@ function AdminSidebar({ pathname, staffUser }) {
           }}
         >
           <img
-            className="tee-co-logo"
+            className="app-demo-logo"
             src={ADMIN_LOGO_SRC}
-            alt="Tee & Co"
+            alt="Apparel Operations Demo"
             width="54"
             height="54"
             loading="eager"
@@ -485,7 +484,7 @@ function AdminSidebar({ pathname, staffUser }) {
               lineHeight: 1.1,
             }}
           >
-            Tee & Co
+            Apparel Demo
           </strong>
 
           <span
@@ -593,7 +592,7 @@ function AdminSidebar({ pathname, staffUser }) {
             letterSpacing: "0.08em",
           }}
         >
-          Tee & Co Social
+          Demo Social
         </p>
 
         <SocialLinks compact />

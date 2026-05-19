@@ -23,7 +23,7 @@ export default function PaymentConfirmed() {
         <h1 style={{ marginTop: 0 }}>Payment Confirmed</h1>
 
         <p style={{ color: "#475569", lineHeight: 1.6 }}>
-          Your deposit has been received for order TC-1002. Tee &amp; Co can now
+          Your deposit has been received for order TC-1002. The shop can now
           move your order into production.
         </p>
 

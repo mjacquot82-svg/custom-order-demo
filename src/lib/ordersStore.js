@@ -18,7 +18,7 @@ import { formatShortDate, toIsoTimestamp } from "./dateFormatting";
 import { getArtworkDisplayName, getOrderArtworkFiles } from "./orderArtwork";
 import { createOperationalEvent } from "./operationalEventsStore";
 
-const STORAGE_KEY = "teeCoStaffOrders";
+const STORAGE_KEY = "demoStaffOrders";
 const orderListeners = new Set();
 const EMPTY_ORDERS = [];
 
@@ -221,7 +221,7 @@ function readStoredOrders() {
 
     return cachedOrdersSnapshot;
   } catch (error) {
-    console.error("Unable to read stored Tee & Co orders", error);
+    console.error("Unable to read stored demo orders", error);
     cachedOrdersRaw = null;
     cachedOrdersSnapshot = EMPTY_ORDERS;
     return EMPTY_ORDERS;

@@ -2,7 +2,7 @@ import { buildStaffAuditFields } from "./staffUsersStore";
 import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
 import { validatePaymentAmount } from "./financialValidation";
 
-const STORAGE_KEY = "teeCoQuickSales";
+const STORAGE_KEY = "demoQuickSales";
 
 function buildPaymentValidationError(validation) {
   const error = new Error(validation.message || "Invalid payment amount.");

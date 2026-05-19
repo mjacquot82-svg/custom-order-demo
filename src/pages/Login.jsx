@@ -202,7 +202,7 @@ export default function Login() {
       }}
     >
       <div style={{ marginBottom: "24px" }}>
-        <p style={{ ...sectionEyebrowStyle, marginBottom: "12px" }}>Tee &amp; Co Access</p>
+        <p style={{ ...sectionEyebrowStyle, marginBottom: "12px" }}>Demo Access</p>
         <h1
           style={{
             margin: "0 0 10px",
@@ -269,7 +269,7 @@ export default function Login() {
             }}
           >
             View your order history, track status updates, and respond to payment requests
-            from Tee &amp; Co.
+            from the shop.
           </p>
 
           <form onSubmit={handleCustomerLogin}>

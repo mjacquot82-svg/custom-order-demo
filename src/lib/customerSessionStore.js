@@ -6,8 +6,8 @@ import {
 } from "./browserStorage";
 import { pushAuthDiagnostic } from "./authDiagnostics";
 
-const STORAGE_KEY = "teeCoActiveCustomerSession";
-const CUSTOMER_SESSION_UPDATED_EVENT = "tee-co-customer-session-updated";
+const STORAGE_KEY = "demoActiveCustomerSession";
+const CUSTOMER_SESSION_UPDATED_EVENT = "demo-customer-session-updated";
 
 function emitCustomerSessionUpdated() {
   if (typeof window === "undefined") return;

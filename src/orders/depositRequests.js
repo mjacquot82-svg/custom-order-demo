@@ -16,7 +16,7 @@ export function buildDepositRequestContent(order = {}) {
   const body = [
     `Hello ${customerName},`,
     "",
-    `A deposit is requested for your Tee & Co order #${orderNumber}.`,
+    `A deposit is requested for your demo order #${orderNumber}.`,
     "",
     `Deposit Requested: ${depositAmount}`,
     `Remaining Balance: ${remainingBalance}`,
@@ -25,7 +25,7 @@ export function buildDepositRequestContent(order = {}) {
     "Please contact us if you have any questions regarding your order.",
     "",
     "Thank you,",
-    "Tee & Co",
+    "Demo Support",
   ]
     .filter(Boolean)
     .join("\n");

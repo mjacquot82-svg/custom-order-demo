@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-const SPLASH_LOGO_SRC = "/tee&co512x512.png";
+const SPLASH_LOGO_SRC = "/app-demo-icon.svg";
 
 export default function AppSplash({ children }) {
   const location = useLocation();
@@ -22,11 +22,11 @@ export default function AppSplash({ children }) {
   return (
     <>
       {showSplash && (
-        <div className="app-splash" role="status" aria-label="Loading Tee & Co Central Operations">
+        <div className="app-splash" role="status" aria-label="Loading Apparel Operations Demo">
           <div className="app-splash-card">
             <img
               src={SPLASH_LOGO_SRC}
-              alt="Tee & Co"
+              alt="Apparel Operations Demo"
               className="app-splash-logo"
               width="88"
               height="88"
@@ -35,7 +35,7 @@ export default function AppSplash({ children }) {
               fetchPriority="high"
             />
             <div>
-              <p className="app-splash-kicker">Tee & Co</p>
+              <p className="app-splash-kicker">Apparel Demo</p>
               <h1 className="app-splash-title">Central Operations</h1>
               <p className="app-splash-copy">Preparing your workspace…</p>
             </div>

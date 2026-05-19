@@ -1,7 +1,7 @@
 import { getJsonStorageItem, hasBrowserStorage, setJsonStorageItem } from "./browserStorage";
 import { getArtworkDisplayName } from "./orderArtwork";
 
-const STORAGE_KEY = "teeCoCustomerArtwork";
+const STORAGE_KEY = "demoCustomerArtwork";
 
 export function getAllCustomerArtwork() {
   if (!hasBrowserStorage()) return [];

@@ -44,7 +44,7 @@ function buildSubmittedOrderPreview(orderState = {}) {
     order_number: orderState.orderNumber || "TEE-1042",
     status: "New",
     garment: orderState.garmentName || "Selected Garment",
-    brand: orderState.brand || "Tee & Co",
+    brand: orderState.brand || "Demo Brand",
     category: orderState.category || "Custom Order",
     color: orderState.selectedColor || "Black",
     size: orderState.selectedSize || "M",
@@ -68,7 +68,7 @@ function buildSubmittedOrderPreview(orderState = {}) {
       {
         id: "customer-order-submitted",
         type: "created",
-        note: "Order request submitted and queued for Tee & Co review.",
+        note: "Order request submitted and queued for shop review.",
         created_at: createdAt,
         staff_name: "Customer Portal",
         staff_role: "Portal",
@@ -153,7 +153,7 @@ function renderReadinessMessage(order) {
     return "Production is underway. Timeline updates will appear below as work progresses.";
   }
 
-  return "Tee & Co is actively managing this order. Open the timeline below for the latest operational context.";
+  return "The shop is actively managing this order. Open the timeline below for the latest operational context.";
 }
 
 function DetailTile({ label, value }) {
