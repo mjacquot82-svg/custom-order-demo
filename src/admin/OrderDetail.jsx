@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import "./OrderDetail.css";
 import { recordStoredOrderPayment, updateStoredOrder, useStoredOrders } from "../lib/ordersStore";
 import { useStoredProducts } from "../lib/productsStore";
@@ -22,6 +22,7 @@ import {
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
 import { isAdminWorkspaceView, isStaffWorkspaceView } from "./adminRoleView";
+import { markAssignmentAttentionSeen } from "../lib/staffAssignmentAttentionStore";
 
 const cardStyle = {
   background: "#ffffff",
@@ -90,6 +91,22 @@ export default function OrderDetail() {
         : [],
     });
   }, [order, quoteSnapshot]);
+
+  useEffect(() => {
+    if (!order || !isStaffWorkspace || !activeStaffUser?.id) return;
+    if (order.assigned_to_staff_id !== activeStaffUser.id) return;
+    if (!order.assigned_at) return;
+
+    markAssignmentAttentionSeen({
+      staffId: activeStaffUser.id,
+      orderNumber: order.order_number,
+      assignedAt: order.assigned_at,
+    });
+  }, [
+    activeStaffUser?.id,
+    isStaffWorkspace,
+    order,
+  ]);
 
   if (!order) {
     return (

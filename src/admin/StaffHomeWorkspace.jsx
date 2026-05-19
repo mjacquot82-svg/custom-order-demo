@@ -6,6 +6,11 @@ import {
   normalizeOperationalStatus,
 } from "../orders/orderWorkflow";
 import { buildWorkerJobsView } from "../worker/buildWorkerJobsView";
+import {
+  markAssignmentAttentionSeen,
+  useStaffAssignmentAttention,
+} from "../lib/staffAssignmentAttentionStore";
+import { buildStaffAssignmentAttentionItems } from "../staff/buildStaffAssignmentAttentionItems";
 
 function Section({ title, description, children }) {
   return (
@@ -163,25 +168,23 @@ function buildStaffWorkspaceSummary(orders = []) {
   );
 }
 
-function buildStaffActivity(orders = []) {
-  return orders
-    .flatMap((order) =>
-      (order.connected_timeline || order.activity_log || []).map((event) => ({
-        ...event,
-        order_number: order.order_number,
-      }))
-    )
-    .sort(
-      (left, right) =>
-        new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime()
-    )
-    .slice(0, 6);
-}
-
 export default function StaffHomeWorkspace({ orders, staffUser }) {
   const summary = buildStaffWorkspaceSummary(orders);
   const groupedOrders = buildWorkerJobsView(orders, staffUser);
-  const recentActivity = buildStaffActivity(orders);
+  const attentionState = useStaffAssignmentAttention();
+  const attentionItems = buildStaffAssignmentAttentionItems({
+    assignedOrders: orders,
+    staffUser,
+    attentionState,
+  });
+
+  function handleAcknowledgeAssignment(item) {
+    markAssignmentAttentionSeen({
+      staffId: staffUser?.id,
+      orderNumber: item.orderNumber,
+      assignedAt: item.assignedAt,
+    });
+  }
 
   return (
     <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "24px", display: "grid", gap: "18px" }}>
@@ -227,30 +230,81 @@ export default function StaffHomeWorkspace({ orders, staffUser }) {
         />
       </section>
 
-      <Section title="Recent Activity" description="A lightweight timeline for your assigned jobs so you can regain context without a second dashboard.">
-        {recentActivity.length ? (
+      <Section
+        title="Operational Attention"
+        description="Newly assigned work appears here until you open it or acknowledge it. Queue totals remain separate."
+      >
+        {attentionItems.length ? (
           <div style={{ display: "grid", gap: "10px" }}>
-            {recentActivity.map((event, index) => (
+            {attentionItems.map((item) => (
               <article
-                key={event.id || `${event.order_number}-${index}`}
+                key={item.key}
                 style={{
-                  borderLeft: "4px solid #171717",
-                  background: "#f8fafc",
+                  borderLeft: `4px solid ${item.tone === "warning" ? "#c2410c" : "#171717"}`,
+                  background: item.tone === "warning" ? "#fff7ed" : "#f8fafc",
                   borderRadius: "12px",
                   padding: "12px 14px",
+                  display: "grid",
+                  gap: "10px",
                 }}
               >
-                <strong>{event.note || "Order activity recorded."}</strong>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                  <strong>{item.label}</strong>
+                  <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+                    {item.timestamp ? formatDateTime(item.timestamp) : ""}
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gap: "4px" }}>
+                  <strong style={{ fontSize: "14px" }}>{item.detail}</strong>
+                  <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+                    {item.supportingDetail}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <Link
+                    to={item.to}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "10px",
+                      padding: "10px 12px",
+                      background: "#171717",
+                      color: "#ffffff",
+                      textDecoration: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Open Work Order
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAcknowledgeAssignment(item)}
+                    style={{
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "10px",
+                      padding: "10px 12px",
+                      background: "#ffffff",
+                      color: "#171717",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Acknowledge
+                  </button>
+                </div>
+
                 <div style={{ marginTop: "4px", color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
-                  {event.order_number ? `Order ${event.order_number}` : "Order update"}
-                  {event.created_at ? ` • ${formatDateTime(event.created_at)}` : ""}
+                  Attention clears after you view or acknowledge this assignment.
                 </div>
               </article>
             ))}
           </div>
         ) : (
           <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
-            No recent activity is attached to your assignments yet.
+            No new assignment attention is waiting right now. Your full workload remains in My Assigned Work.
           </p>
         )}
       </Section>

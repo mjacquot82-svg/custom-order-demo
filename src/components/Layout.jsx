@@ -1,7 +1,6 @@
 import { Component, useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useStoredOrders } from "../lib/ordersStore";
-import { useOperationalEvents } from "../lib/operationalEventsStore";
 import { formatShortDate } from "../lib/dateFormatting";
 import { isActiveOperationalStatus } from "../orders/orderWorkflow";
 import {
@@ -26,12 +25,13 @@ import { pushAuthDiagnostic } from "../lib/authDiagnostics";
 import { clearAllAuthSessions } from "../lib/authSessionStore";
 import { getUserInitials } from "../utils/getUserInitials";
 import AdminDiagnosticsPanel from "./AdminDiagnosticsPanel";
+import { useStaffAssignmentAttention } from "../lib/staffAssignmentAttentionStore";
+import { buildStaffAssignmentAttentionItems } from "../staff/buildStaffAssignmentAttentionItems";
 
 const ADMIN_LOGO_SRC = "/tee&co512x512.png";
 const FACEBOOK_URL =
   "https://www.facebook.com/p/Tee-Co-Ltd-100078145951464/";
 const INSTAGRAM_URL = "https://www.instagram.com/teeandcodesigns/";
-const STAFF_ATTENTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function FacebookIcon() {
   return (
@@ -208,12 +208,6 @@ function AttentionBadge({ count, active = false }) {
   );
 }
 
-function isRecentAttentionTimestamp(value) {
-  const timestamp = new Date(value || "").getTime();
-  if (!timestamp) return false;
-  return Date.now() - timestamp <= STAFF_ATTENTION_WINDOW_MS;
-}
-
 function buildAttentionTimestampLabel(value) {
   const timestamp = new Date(value || "").getTime();
   if (!timestamp) return "";
@@ -231,131 +225,6 @@ function buildAttentionTimestampLabel(value) {
   }
 
   return formatShortDate(value);
-}
-
-function buildStaffAttentionItems({
-  assignedOrders = [],
-  operationalEvents = [],
-  staffUser,
-}) {
-  if (!staffUser?.id && !staffUser?.name) return [];
-
-  const orderLookup = new Map(
-    assignedOrders.map((order) => [order.order_number, order])
-  );
-  const items = [];
-
-  assignedOrders.forEach((order) => {
-    if (isRecentAttentionTimestamp(order.assigned_at)) {
-      const urgentAssignment = Boolean(
-        order.due_date &&
-          new Date(`${order.due_date}T00:00:00`).getTime() <=
-            Date.now() + 2 * 24 * 60 * 60 * 1000
-      );
-      const dueDateLabel = order.due_date
-        ? `Due ${formatShortDate(order.due_date)}`
-        : "Due date pending";
-
-      items.push({
-        key: `assignment-${order.order_number}`,
-        label: urgentAssignment ? "Rush Order Assigned" : "New Assignment",
-        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${dueDateLabel}`,
-        to: `/admin/orders/${order.order_number}`,
-        timestamp: order.assigned_at,
-        tone: urgentAssignment ? "warning" : "default",
-      });
-    }
-
-    if (order.status === "Ready for Pickup") {
-      items.push({
-        key: `pickup-${order.order_number}`,
-        label: "Pickup Waiting",
-        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • Ready for handoff`,
-        to: `/admin/orders/${order.order_number}`,
-        timestamp: order.updated_at || order.assigned_at,
-        tone: "success",
-      });
-    }
-  });
-
-  operationalEvents.forEach((event) => {
-    const order = orderLookup.get(event.reference_id);
-    if (!order || !isRecentAttentionTimestamp(event.created_at)) return;
-
-    if (event.event_type === "order_ready_for_pickup") {
-      items.push({
-        key: `event-pickup-${event.id}`,
-        label: "Pickup Waiting",
-        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${event.summary}`,
-        to: event.reference_path || `/admin/orders/${order.order_number}`,
-        timestamp: event.created_at,
-        tone: "success",
-      });
-    }
-
-    if (event.event_type === "quote_released_to_production") {
-      items.push({
-        key: `event-artwork-${event.id}`,
-        label: "Artwork Ready",
-        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${event.summary}`,
-        to: event.reference_path || `/admin/orders/${order.order_number}`,
-        timestamp: event.created_at,
-        tone: "default",
-      });
-    }
-  });
-
-  assignedOrders.forEach((order) => {
-    const recentActivity = (order.activity_log || []).find((event) =>
-      isRecentAttentionTimestamp(event?.created_at)
-    );
-
-    if (!recentActivity) return;
-
-    if (recentActivity.type === "artwork") {
-      items.push({
-        key: `activity-artwork-${order.order_number}`,
-        label: "Artwork Ready",
-        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${recentActivity.note || "Artwork updated."}`,
-        to: `/admin/orders/${order.order_number}`,
-        timestamp: recentActivity.created_at,
-        tone: "default",
-      });
-    }
-
-    if (
-      recentActivity.type === "status_change" &&
-      order.due_date &&
-      new Date(`${order.due_date}T00:00:00`).getTime() <= Date.now() + 2 * 24 * 60 * 60 * 1000
-    ) {
-      items.push({
-        key: `activity-priority-${order.order_number}`,
-        label: "Priority Change",
-        detail: `${order.order_number} • ${order.customer_name || "Walk-in Customer"} • ${recentActivity.note || "Job priority changed."}`,
-        to: `/admin/orders/${order.order_number}`,
-        timestamp: recentActivity.created_at,
-        tone: "warning",
-      });
-    }
-  });
-
-  const dedupedItems = [];
-  const seenOrderLabels = new Set();
-
-  items
-    .sort(
-      (left, right) =>
-        new Date(right.timestamp || 0).getTime() -
-        new Date(left.timestamp || 0).getTime()
-    )
-    .forEach((item) => {
-      const dedupeKey = `${item.label}-${item.to}`;
-      if (seenOrderLabels.has(dedupeKey)) return;
-      seenOrderLabels.add(dedupeKey);
-      dedupedItems.push(item);
-    });
-
-  return dedupedItems.slice(0, 4);
 }
 
 function StaffAttentionStrip({ items = [] }) {
@@ -408,10 +277,10 @@ function StaffAttentionStrip({ items = [] }) {
             letterSpacing: "0.08em",
           }}
         >
-          Attention Now
+          Assignment Attention
         </p>
         <p style={{ margin: 0, color: "#64748b", fontSize: "12px", lineHeight: 1.4 }}>
-          Recent assignment and workflow changes, separate from queue totals.
+          New assignments stay visible here until you open the work order.
         </p>
       </div>
 
@@ -465,6 +334,10 @@ function StaffAttentionStrip({ items = [] }) {
             <span style={{ fontSize: "12px", lineHeight: 1.4, color: "#334155" }}>
               {item.detail}
             </span>
+
+            <span style={{ fontSize: "12px", lineHeight: 1.4, color: "#64748b" }}>
+              {item.supportingDetail}
+            </span>
           </Link>
         );
       })}
@@ -515,7 +388,7 @@ function SocialLinks({ compact = false }) {
 
 function AdminSidebar({ pathname, staffUser }) {
   const orders = useStoredOrders();
-  const operationalEvents = useOperationalEvents();
+  const assignmentAttentionState = useStaffAssignmentAttention();
   const staffWorkspace = isStaffWorkspaceView(staffUser);
   const operationalOrders = isAdminWorkspaceView(staffUser)
     ? orders
@@ -534,10 +407,10 @@ function AdminSidebar({ pathname, staffUser }) {
     ? "Staff Operations"
     : "Central Operations";
   const staffAttentionItems = staffWorkspace
-    ? buildStaffAttentionItems({
+    ? buildStaffAssignmentAttentionItems({
         assignedOrders,
-        operationalEvents,
         staffUser,
+        attentionState: assignmentAttentionState,
       })
     : [];
 
