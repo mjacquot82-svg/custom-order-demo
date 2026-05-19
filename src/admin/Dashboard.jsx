@@ -509,100 +509,94 @@ function OwnerDashboard({ orders, operationalEvents }) {
       </div>
 
       <div
-        className="owner-dashboard-top-grid"
+        className="owner-dashboard-layout"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: "14px",
           alignItems: "start",
-          marginBottom: "14px",
         }}
       >
-        <Section
-          className="owner-dashboard-section-primary"
-          title="Owner Attention"
-          description="Only the highest-priority items stay here. Detailed queue management remains in Quotes, Shop Production, Front Counter, Assignments, and Financial."
-        >
-          {attentionItems.length ? (
-            <div className="owner-dashboard-attention-grid" style={{ display: "grid", gap: "12px" }}>
-              {attentionItems.map((queue) => (
-                <WorkspaceCountLink
-                  key={queue.label}
-                  label={queue.label}
-                  count={queue.count}
-                  description={queue.description}
-                  to={queue.to}
-                  tone={queue.tone}
+        <div className="owner-dashboard-primary-column" style={{ display: "grid", gap: "14px", alignContent: "start" }}>
+          <Section
+            className="owner-dashboard-section-primary"
+            title="Owner Attention"
+            description="Only the highest-priority items stay here. Detailed queue management remains in Quotes, Shop Production, Front Counter, Assignments, and Financial."
+          >
+            {attentionItems.length ? (
+              <div className="owner-dashboard-attention-grid" style={{ display: "grid", gap: "12px" }}>
+                {attentionItems.map((queue) => (
+                  <WorkspaceCountLink
+                    key={queue.label}
+                    label={queue.label}
+                    count={queue.count}
+                    description={queue.description}
+                    to={queue.to}
+                    tone={queue.tone}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyAttentionState />
+            )}
+          </Section>
+
+          <Section
+            className="owner-dashboard-section-primary"
+            title="Upcoming Deadlines"
+            description="A short operational cut of the next due jobs so the owner overview stays useful without becoming another production board."
+          >
+            {upcomingOrders.length ? (
+              <div className="owner-dashboard-deadlines-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px" }}>
+                {upcomingOrders.slice(0, 6).map((order) => (
+                  <UpcomingOrderCard key={order.orderNumber} order={order} />
+                ))}
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
+                No active jobs with due dates are in the operational queue.
+              </p>
+            )}
+          </Section>
+        </div>
+
+        <div className="owner-dashboard-secondary-column" style={{ display: "grid", gap: "14px", alignContent: "start" }}>
+          <Section
+            className="owner-dashboard-section-secondary"
+            title="Workspace Guide"
+            description="Each workspace keeps its own workflow detail so the dashboard can stay calm and quick to scan."
+          >
+            <div className="owner-dashboard-workspace-grid" style={{ display: "grid", gap: "10px" }}>
+              {workspaceOverview.map((workspace) => (
+                <WorkspaceOverviewLink
+                  key={workspace.label}
+                  label={workspace.label}
+                  count={workspace.count}
+                  description={workspace.description}
+                  to={workspace.to}
                 />
               ))}
             </div>
-          ) : (
-            <EmptyAttentionState />
-          )}
-        </Section>
+          </Section>
 
-        <Section
-          className="owner-dashboard-section-secondary"
-          title="Workspace Guide"
-          description="Each workspace keeps its own workflow detail so the dashboard can stay calm and quick to scan."
-        >
-          <div className="owner-dashboard-workspace-grid" style={{ display: "grid", gap: "10px" }}>
-            {workspaceOverview.map((workspace) => (
-              <WorkspaceOverviewLink
-                key={workspace.label}
-                label={workspace.label}
-                count={workspace.count}
-                description={workspace.description}
-                to={workspace.to}
-              />
-            ))}
-          </div>
-        </Section>
-      </div>
-
-      <div
-        className="owner-dashboard-bottom-grid"
-        style={{
-          display: "grid",
-          gap: "16px",
-          alignItems: "start",
-        }}
-      >
-        <Section
-          className="owner-dashboard-section-primary"
-          title="Upcoming Deadlines"
-          description="A short operational cut of the next due jobs so the owner overview stays useful without becoming another production board."
-        >
-          {upcomingOrders.length ? (
-            <div className="owner-dashboard-deadlines-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px" }}>
-              {upcomingOrders.slice(0, 6).map((order) => (
-                <UpcomingOrderCard key={order.orderNumber} order={order} />
-              ))}
-            </div>
-          ) : (
-            <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
-              No active jobs with due dates are in the operational queue.
-            </p>
-          )}
-        </Section>
-
-        <Section
-          className="owner-dashboard-section-secondary"
-          title="Recent Operational Activity"
-          description="Important workflow actions performed by staff. This stays lightweight and owner-facing so operational awareness improves without turning into a notification center."
-        >
-          {recentOperationalEvents.length ? (
-            <div className="owner-dashboard-events-list" style={{ display: "grid", gap: "9px" }}>
-              {recentOperationalEvents.map((event) => (
-                <OperationalEventCard key={event.id} event={event} />
-              ))}
-            </div>
-          ) : (
-            <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
-              Important operational events will appear here as staff complete workflow actions.
-            </p>
-          )}
-        </Section>
+          <Section
+            className="owner-dashboard-section-secondary"
+            title="Recent Operational Activity"
+            description="Important workflow actions performed by staff. This stays lightweight and owner-facing so operational awareness improves without turning into a notification center."
+          >
+            {recentOperationalEvents.length ? (
+              <div className="owner-dashboard-events-list" style={{ display: "grid", gap: "9px" }}>
+                {recentOperationalEvents.map((event) => (
+                  <OperationalEventCard key={event.id} event={event} />
+                ))}
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: "#64748b", fontWeight: 700 }}>
+                Important operational events will appear here as staff complete workflow actions.
+              </p>
+            )}
+          </Section>
+        </div>
       </div>
     </div>
   );
